@@ -18,13 +18,13 @@ const schibsted = localFont({
 })
 
 export const metadata: Metadata = {
-  title: { default: "Fuel & Lift", template: "%s · Fuel & Lift" },
+  title: { default: "adebite", template: "%s · adebite" },
   description: "Private calorie and gym tracker for you and a few friends.",
-  applicationName: "Fuel & Lift",
+  applicationName: "adebite",
   robots: { index: false, follow: false },
   appleWebApp: {
     capable: true,
-    title: "Fuel & Lift",
+    title: "adebite",
     statusBarStyle: "default",
   },
   formatDetection: { telephone: false },
@@ -46,7 +46,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#ECEEE7",
+  themeColor: "#FBEFF3",
   colorScheme: "light",
 }
 
@@ -62,7 +62,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             style: {
               fontFamily: "var(--font-sans)",
               borderRadius: 14,
-              background: "#171A12",
+              background: "#2E1A24",
               color: "#FFFFFF",
               border: "none",
             },

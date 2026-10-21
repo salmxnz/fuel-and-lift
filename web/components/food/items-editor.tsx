@@ -54,7 +54,7 @@ export function ItemsEditor({
             {variant === "numbered" ? (
               <span
                 aria-hidden="true"
-                className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full bg-lime text-[11px] font-extrabold"
+                className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full bg-pink text-[11px] font-extrabold"
               >
                 {i + 1}
               </span>

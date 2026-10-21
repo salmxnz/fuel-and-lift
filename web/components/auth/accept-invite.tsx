@@ -15,7 +15,7 @@ export function AcceptInvite({ token, inviter }: { token: string; inviter: strin
   return (
     <>
       {error ? (
-        <p role="alert" className="m-0 rounded-tile bg-night-2 px-3.5 py-3 text-[14px] text-[#F6EDD4]">
+        <p role="alert" className="m-0 rounded-tile bg-night-2 px-3.5 py-3 text-[14px] text-ink">
           {error}
         </p>
       ) : null}

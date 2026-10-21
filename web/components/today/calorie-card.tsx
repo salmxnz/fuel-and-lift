@@ -25,7 +25,7 @@ export function CalorieCard({ day }: { day: Day }) {
       >
         {eaten > 0 ? (
           <div
-            className="box-border h-full border-r-2 border-ink bg-lime transition-[width] duration-500"
+            className="box-border h-full border-r-2 border-ink bg-pink transition-[width] duration-500"
             style={{ width: `${Math.min(100, p)}%` }}
           />
         ) : null}

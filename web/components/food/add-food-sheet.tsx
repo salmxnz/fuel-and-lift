@@ -179,9 +179,9 @@ function AddFoodBody({
         href={`/log/photo${q}`}
         aria-disabled={disabled}
         onClick={(e) => (disabled ? e.preventDefault() : onClose())}
-        className="flex items-center gap-3.5 rounded-[20px] border border-[rgba(23,26,18,0.12)] bg-lime p-4 text-ink no-underline"
+        className="flex items-center gap-3.5 rounded-[20px] border border-[rgba(46,26,36,0.12)] bg-pink p-4 text-ink no-underline"
       >
-        <span className="flex h-[54px] w-[54px] flex-none items-center justify-center rounded-btn bg-ink text-lime">
+        <span className="flex h-[54px] w-[54px] flex-none items-center justify-center rounded-btn bg-ink text-pink">
           <CameraIcon size={26} />
         </span>
         <span className="flex flex-1 flex-col gap-0.5">

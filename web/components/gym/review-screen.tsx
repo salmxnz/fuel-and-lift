@@ -37,7 +37,7 @@ function useNightBody() {
     document.body.classList.add("theme-night")
     const meta = document.querySelector('meta[name="theme-color"]')
     const prev = meta?.getAttribute("content")
-    meta?.setAttribute("content", "#171A12")
+    meta?.setAttribute("content", "#2E1A24")
     return () => {
       document.body.classList.remove("theme-night")
       if (meta && prev) meta.setAttribute("content", prev)
@@ -207,7 +207,7 @@ export function ReviewScreen({ id }: { id: string }) {
           style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}
         >
           {reviewable.map((b, i) => (
-            <span key={b.id} className={cn("h-1 rounded-sm", i < idx ? "bg-lime" : i === idx ? "bg-white" : "bg-night-3")} />
+            <span key={b.id} className={cn("h-1 rounded-sm", i < idx ? "bg-pink" : i === idx ? "bg-white" : "bg-night-3")} />
           ))}
         </div>
       ) : null}
@@ -216,11 +216,11 @@ export function ReviewScreen({ id }: { id: string }) {
         <FinishedSummary session={s} />
       ) : reviewedAll ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-          <span className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-lime text-ink">
+          <span className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-pink text-ink">
             <CheckIcon size={30} />
           </span>
           <p className="m-0 text-[18px] font-bold">All checked</p>
-          <Button variant="lime" onClick={() => finish()} loading={finishing} className="w-full">
+          <Button variant="pink" onClick={() => finish()} loading={finishing} className="w-full">
             Save workout
           </Button>
           <button type="button" onClick={() => setIdx(0)} className="min-h-11 text-[14px] text-night-muted underline">
@@ -261,7 +261,7 @@ export function ReviewScreen({ id }: { id: string }) {
               disabled={busy}
               className="flex flex-col items-center gap-1.5 text-[13px] font-bold text-white disabled:opacity-60"
             >
-              <span className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-lime text-ink">
+              <span className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-pink text-ink">
                 {busy ? <Spinner size={24} /> : <CheckIcon size={28} />}
               </span>
               Done
@@ -272,7 +272,7 @@ export function ReviewScreen({ id }: { id: string }) {
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
           <p className="m-0 text-[16px] text-night-soft">Nothing to review in this workout.</p>
-          <Button variant="lime" onClick={() => finish()} loading={finishing} className="w-full">
+          <Button variant="pink" onClick={() => finish()} loading={finishing} className="w-full">
             Finish anyway
           </Button>
         </div>
@@ -395,7 +395,7 @@ function SwipeCard({
       transition={{ type: "spring", stiffness: 320, damping: 30 }}
     >
       <div className="flex items-start justify-between">
-        <span className={cn("rounded-full px-2.5 py-1.5 text-[13px] font-bold", diff != null && diff > 0 ? "bg-lime" : "bg-mint")}>
+        <span className={cn("rounded-full px-2.5 py-1.5 text-[13px] font-bold", diff != null && diff > 0 ? "bg-pink" : "bg-mint")}>
           {badge}
         </span>
         <motion.span
@@ -644,7 +644,7 @@ function UpdateTemplateSheet({
                 <span className="text-[14px]">
                   <span className="text-muted line-through">{num1(p.from_kg)} kg</span> <span aria-hidden="true">→</span>{" "}
                   <span className="sr-only">to</span>
-                  <span className="rounded-md bg-lime px-1.5 py-px font-bold">{num1(p.to_kg)} kg</span>
+                  <span className="rounded-md bg-pink px-1.5 py-px font-bold">{num1(p.to_kg)} kg</span>
                 </span>
               </div>
               <Switch
@@ -690,7 +690,7 @@ function FinishedSummary({ session }: { session: Session }) {
       </ul>
       <Link
         href="/gym"
-        className="mt-auto flex min-h-14 items-center justify-center rounded-btn bg-lime text-[16px] font-bold text-ink no-underline"
+        className="mt-auto flex min-h-14 items-center justify-center rounded-btn bg-pink text-[16px] font-bold text-ink no-underline"
       >
         Back to Gym
       </Link>

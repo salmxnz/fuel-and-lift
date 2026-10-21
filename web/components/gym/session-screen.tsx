@@ -238,7 +238,7 @@ export function SessionScreen({ id }: { id: string }) {
                     b.skipped
                       ? "mt-2.5 h-3.5 w-3.5 border-2 border-dashed border-muted"
                       : isCurrent
-                        ? "mt-4 h-[18px] w-[18px] border-2 border-ink bg-lime"
+                        ? "mt-4 h-[18px] w-[18px] border-2 border-ink bg-pink"
                         : done
                           ? "mt-[18px] flex h-3.5 w-3.5 items-center justify-center bg-ink"
                           : "mt-[18px] h-3.5 w-3.5 border-2 border-muted bg-ground"
@@ -410,7 +410,7 @@ function CurrentBlock({
           onClick={() => onCardio(!block.cardio_done)}
           className={cn(
             "flex min-h-[48px] items-center justify-center gap-2 rounded-tile text-[15px] font-bold",
-            block.cardio_done ? "bg-ink text-lime" : "border border-ink"
+            block.cardio_done ? "bg-ink text-pink" : "border border-ink"
           )}
         >
           <CheckIcon size={18} /> {block.cardio_done ? "Done" : `Mark ${cardioText(block.cardio)} done`}
@@ -468,7 +468,7 @@ function CurrentBlock({
                   onClick={() => onToggle(set)}
                   className={cn(
                     "flex h-10 w-11 items-center justify-center rounded-[10px]",
-                    set.done ? "bg-ink text-lime" : "border border-line bg-white text-muted"
+                    set.done ? "bg-ink text-pink" : "border border-line bg-white text-muted"
                   )}
                 >
                   {busy ? <Spinner size={16} /> : <CheckIcon size={18} />}

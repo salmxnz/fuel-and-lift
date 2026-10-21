@@ -48,7 +48,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
         <div className="flex-1" />
         <Link
           href={session ? "/today" : "/login"}
-          className="flex min-h-14 items-center justify-center rounded-btn border border-night-line text-[16px] font-bold text-white no-underline"
+          className="flex min-h-14 items-center justify-center rounded-btn border border-night-line text-[16px] font-bold text-ink no-underline"
         >
           {session ? "Go to Today" : "Sign in"}
         </Link>
@@ -72,7 +72,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-[72px] w-[72px] items-center justify-center rounded-full border-[3px] border-night bg-lime text-[30px] font-extrabold text-ink"
+            className="flex h-[72px] w-[72px] items-center justify-center rounded-full border-[3px] border-night bg-white text-[30px] font-extrabold text-ink"
           >
             {first[0]?.toUpperCase()}
           </span>

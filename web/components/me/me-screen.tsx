@@ -79,7 +79,7 @@ export function MeScreen() {
           <span
             className={
               isPro
-                ? "rounded-full bg-lime px-2 py-1 text-[12px] font-extrabold text-ink"
+                ? "rounded-full bg-pink px-2 py-1 text-[12px] font-extrabold text-ink"
                 : "rounded-full border border-line px-2 py-1 text-[12px] font-bold text-muted"
             }
           >
@@ -94,7 +94,7 @@ export function MeScreen() {
         <Link href="/pro" className="flex flex-col gap-2.5 rounded-card bg-ink p-3.5 text-white no-underline">
           <span className="flex items-baseline justify-between">
             <span className="text-[15px] font-bold">Pro forever, free</span>
-            <span className="text-[13px] font-bold text-lime">
+            <span className="text-[13px] font-bold text-pink">
               {b.referrals.joined} of {b.referrals.needed} friends
             </span>
           </span>
@@ -106,7 +106,7 @@ export function MeScreen() {
         </Link>
       ) : b && isPro ? (
         <Link href="/pro" className="flex items-center gap-3 rounded-card bg-ink p-3.5 text-white no-underline">
-          <span className="flex h-11 w-11 flex-none items-center justify-center rounded-[12px] bg-lime text-[13px] font-extrabold text-ink">
+          <span className="flex h-11 w-11 flex-none items-center justify-center rounded-[12px] bg-pink text-[13px] font-extrabold text-ink">
             PRO
           </span>
           <span className="flex flex-1 flex-col">

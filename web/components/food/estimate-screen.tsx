@@ -62,11 +62,11 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
       />
 
       {photo ? (
-        <figure className="relative m-0 h-[172px] overflow-hidden rounded-card bg-[#3A3F33]">
+        <figure className="relative m-0 h-[172px] overflow-hidden rounded-card bg-[#553646]">
           {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview */}
           <img src={photo.previewUrl} alt={`Your ${target.label.toLowerCase()} photo`} className="h-full w-full object-cover" />
           {busy ? (
-            <figcaption className="absolute inset-0 flex items-center justify-center gap-2 bg-[rgba(23,26,18,0.55)] text-[15px] font-semibold text-white">
+            <figcaption className="absolute inset-0 flex items-center justify-center gap-2 bg-[rgba(46,26,36,0.55)] text-[15px] font-semibold text-white">
               <Spinner size={18} /> Finding each item…
             </figcaption>
           ) : null}
@@ -88,8 +88,8 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
               placeholder="Cooked in ghee, 2 big bites of fish already eaten"
               className="rounded-tile border border-line bg-white px-3.5 py-3 text-[15px]"
             />
-            <label className="flex cursor-pointer items-center gap-3.5 rounded-[20px] border border-[rgba(23,26,18,0.12)] bg-lime p-4 text-ink focus-within:outline-2 focus-within:outline-ink">
-              <span className="flex h-[54px] w-[54px] flex-none items-center justify-center rounded-btn bg-ink text-lime">
+            <label className="flex cursor-pointer items-center gap-3.5 rounded-[20px] border border-[rgba(46,26,36,0.12)] bg-pink p-4 text-ink focus-within:outline-2 focus-within:outline-ink">
+              <span className="flex h-[54px] w-[54px] flex-none items-center justify-center rounded-btn bg-ink text-pink">
                 <CameraIcon size={26} />
               </span>
               <span className="flex flex-1 flex-col gap-0.5">

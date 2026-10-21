@@ -1,56 +1,57 @@
 @import "tailwindcss";
 
-/* Fuel & Lift design tokens, ported from docs/design/*.dc.html. */
+/* adebite design tokens: pastel pink and white, with plum for text.
+   See docs/brand/BRAND.md for the palette and how to use it. */
 @theme {
   --font-sans: var(--font-schibsted), "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /* Light screens */
-  --color-ground: #eceee7;
+  --color-ground: #fbeff3;
   --color-surface: #ffffff;
-  --color-sheet: #f7f8f3;
-  --color-field: #f5f6f1;
-  --color-chip: #e6e9df;
-  --color-ink: #171a12;
-  --color-ink-soft: #3b4034;
-  --color-muted: #5c6355;
-  --color-line: #cdd1c4;
-  --color-line-soft: #eef0e8;
-  --color-dash: #a3a99a;
+  --color-sheet: #fff8fa;
+  --color-field: #fdf3f6;
+  --color-chip: #f8e2ea;
+  --color-ink: #2e1a24;
+  --color-ink-soft: #4a3340;
+  --color-muted: #765a67;
+  --color-line: #ecd3dd;
+  --color-line-soft: #f7e8ee;
+  --color-dash: #c9a9b6;
 
   /* Accents */
-  --color-lime: #c8f04d;
-  --color-lime-soft: #ddf59a;
-  --color-protein: #3e6b1f;
-  --color-carbs: #a9d42c;
-  --color-fat: #e3a93b;
-  --color-warn: #8a5a00;
-  --color-warn-line: #c98a2b;
-  --color-warn-bg: #f6edd4;
-  --color-mint: #eef3dc;
-  --color-lilac: #e8e1f5;
-  --color-sand: #e4d3a8;
-  --color-sand-ink: #6b5622;
-  --color-danger: #a8321e;
+  --color-pink: #f6b8ca;
+  --color-pink-soft: #fbdce6;
+  --color-protein: #a82f61;
+  --color-carbs: #ee8fb0;
+  --color-fat: #f2b48c;
+  --color-warn: #8a4b00;
+  --color-warn-line: #d39a52;
+  --color-warn-bg: #fbeadb;
+  --color-mint: #fde8ef;
+  --color-lilac: #ede3f6;
+  --color-sand: #f6dccb;
+  --color-sand-ink: #7a4a33;
+  --color-danger: #b0261c;
 
   /* Dark screens (Join, Paywall, Review) */
-  --color-night: #171a12;
-  --color-night-2: #2c3125;
-  --color-night-3: #3a4032;
-  --color-night-line: #4a5140;
-  --color-night-dim: #6a7260;
-  --color-night-muted: #b9bfaf;
-  --color-night-soft: #d7dbcf;
+  --color-night: #2e1a24;
+  --color-night-2: #452a37;
+  --color-night-3: #553646;
+  --color-night-line: #674454;
+  --color-night-dim: #8d6a7a;
+  --color-night-muted: #cdb3bf;
+  --color-night-soft: #ebdbe2;
 
   --radius-card: 18px;
   --radius-tile: 14px;
   --radius-btn: 16px;
   --radius-sheet: 26px;
 
-  --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(23, 26, 18, 0.06),
-    0 6px 20px rgba(23, 26, 18, 0.1);
-  --shadow-lens: inset 0 1px 0 #ffffff, 0 1px 3px rgba(23, 26, 18, 0.12);
-  --shadow-fab: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 20px rgba(23, 26, 18, 0.14);
-  --shadow-float: inset 0 1px 0 #ffffff, 0 8px 24px rgba(23, 26, 18, 0.18);
+  --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(46, 26, 36, 0.06),
+    0 6px 20px rgba(46, 26, 36, 0.1);
+  --shadow-lens: inset 0 1px 0 #ffffff, 0 1px 3px rgba(46, 26, 36, 0.12);
+  --shadow-fab: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 20px rgba(46, 26, 36, 0.14);
+  --shadow-float: inset 0 1px 0 #ffffff, 0 8px 24px rgba(46, 26, 36, 0.18);
 }
 
 :root {
@@ -80,6 +81,18 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+}
+
+/* Login and Join: pastel pink screens. Re-points the night tokens those
+   screens use, so the same markup reads plum-on-pink. */
+.theme-blush {
+  --color-night: #f6b8ca;
+  --color-night-2: #fbdce6;
+  --color-night-3: #ec9db5;
+  --color-night-line: #2e1a24;
+  --color-night-dim: #8a5a6e;
+  --color-night-muted: #5e3f4e;
+  --color-night-soft: #3f2733;
 }
 
 body.theme-night,
@@ -117,11 +130,11 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0;
 }
 
-/* Focus rings: lime with an ink halo so they show on light and dark. */
+/* Focus rings: pink with an ink halo so they show on light and dark. */
 :where(a, button, input, select, textarea, [tabindex], summary):focus-visible {
   outline: 2px solid var(--color-ink);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--color-lime);
+  box-shadow: 0 0 0 4px var(--color-pink);
   border-radius: inherit;
 }
 /* Text fields: a plain ink outline, like the designs' 1.5px focused border. */
@@ -131,7 +144,7 @@ input[type="number"]::-webkit-inner-spin-button {
   box-shadow: none;
 }
 .on-dark :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline-color: var(--color-lime);
+  outline-color: var(--color-pink);
   box-shadow: none;
 }
 }
@@ -177,12 +190,12 @@ input[type="number"]::-webkit-inner-spin-button {
   box-shadow: var(--shadow-float);
 }
 .scrim {
-  background: rgba(23, 26, 18, 0.42);
+  background: rgba(46, 26, 36, 0.42);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
 .glass-dark {
-  background: rgba(23, 26, 18, 0.92);
+  background: rgba(46, 26, 36, 0.92);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
@@ -195,7 +208,7 @@ input[type="number"]::-webkit-inner-spin-button {
     background: #ffffff;
   }
   .scrim {
-    background: rgba(23, 26, 18, 0.6);
+    background: rgba(46, 26, 36, 0.6);
   }
   .glass-dark {
     background: var(--color-night);
@@ -211,7 +224,7 @@ input[type="number"]::-webkit-inner-spin-button {
     border-color: var(--color-line);
   }
   .scrim {
-    background: rgba(23, 26, 18, 0.7);
+    background: rgba(46, 26, 36, 0.7);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -224,8 +237,8 @@ input[type="number"]::-webkit-inner-spin-button {
 
 /* ------------------------------------------------------------ Bits */
 
-.hatch-lime {
-  background: repeating-linear-gradient(135deg, var(--color-lime) 0 5px, var(--color-lime-soft) 5px 10px);
+.hatch-pink {
+  background: repeating-linear-gradient(135deg, var(--color-pink) 0 5px, var(--color-pink-soft) 5px 10px);
 }
 
 .sr-only {

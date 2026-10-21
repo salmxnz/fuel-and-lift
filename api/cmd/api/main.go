@@ -1,4 +1,4 @@
-// Command api runs the Fuel & Lift API.
+// Command api runs the adebite API.
 //
 //	api          serve HTTP (runs migrations first unless RUN_MIGRATIONS=false)
 //	api migrate  apply migrations and exit

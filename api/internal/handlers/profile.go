@@ -152,7 +152,7 @@ func (h *Handler) Onboard(w http.ResponseWriter, r *http.Request) {
 	if upgraded != "" {
 		h.Notifier.Notify([]string{upgraded}, push.Message{
 			Title: "You've got Pro, for good",
-			Body:  "8 friends joined Fuel & Lift through your links. Unlimited photo estimates are yours.",
+			Body:  "8 friends joined adebite through your links. Unlimited photo estimates are yours.",
 			URL:   "/me", Tag: "pro",
 		})
 	}

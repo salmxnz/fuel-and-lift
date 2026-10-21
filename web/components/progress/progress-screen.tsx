@@ -166,7 +166,7 @@ export function ProgressScreen() {
                         {num1(last.top_kg)} kg <span className="text-[14px] font-semibold text-muted">× {last.top_reps}</span>
                       </span>
                       {pts.length > 1 && Math.abs(delta) >= 0.1 ? (
-                        <span className={cn("rounded-full px-2 py-1 text-[13px] font-bold", delta > 0 ? "bg-lime" : "bg-warn-bg")}>
+                        <span className={cn("rounded-full px-2 py-1 text-[13px] font-bold", delta > 0 ? "bg-pink" : "bg-warn-bg")}>
                           {signed(delta, 1)} kg since {formatDayMonth(pts[0].date)}
                         </span>
                       ) : null}
@@ -253,10 +253,10 @@ function CaloriesWeek({
                     v <= 0
                       ? "rounded-sm bg-line-soft"
                       : isToday
-                        ? "hatch-lime rounded-md border-[1.5px] border-ink"
+                        ? "hatch-pink rounded-md border-[1.5px] border-ink"
                         : target && v > target * 1.1
                           ? "rounded-md bg-fat"
-                          : "rounded-md bg-lime"
+                          : "rounded-md bg-pink"
                   )}
                   style={{ height: h }}
                 />

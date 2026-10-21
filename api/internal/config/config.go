@@ -80,7 +80,7 @@ func LoadDotEnv() {
 // Load reads the configuration and checks the required values.
 func Load() (Config, error) {
 	cfg := Config{
-		AppName: env("APP_NAME", "Fuel & Lift"),
+		AppName: env("APP_NAME", "adebite"),
 		AppEnv:  env("APP_ENV", "development"),
 		AppURL:  strings.TrimRight(env("APP_URL", "http://localhost:3000"), "/"),
 

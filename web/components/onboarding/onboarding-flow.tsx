@@ -12,6 +12,7 @@ import { formatMonthYear, localTimeZone, todayISO, WEEKDAY_KEYS, type WeekdayKey
 import { CM_PER_IN, kcal, kgToLb, lbToKg, num1, parseDecimal, round1 } from "@/lib/format"
 import { enablePush, isStandalone, needsIOSInstall, pushSupport } from "@/lib/push"
 import { PacePicker, usePlanPreview } from "./pace-picker"
+import { Logo } from "@/components/brand/logo"
 
 const STORE_KEY = "fl:onboarding:v1"
 
@@ -126,21 +127,19 @@ function Flow({ a, set, onFinished }: { a: Answers; set: (p: Partial<Answers>) =
       className="app-column flex min-h-dvh flex-col gap-5"
       style={{ paddingBottom: "calc(var(--safe-bottom) + 28px)", paddingLeft: "max(20px, var(--safe-left))", paddingRight: "max(20px, var(--safe-right))" }}
     >
-      <div className="flex items-center gap-3">
-        {index > 0 && step !== "done" ? (
-          <button
-            type="button"
-            aria-label="Back"
-            onClick={() => go(-1)}
-            className="flex h-11 w-11 flex-none items-center justify-center rounded-[12px] bg-white"
-          >
-            <BackIcon size={20} />
-          </button>
-        ) : (
-          <span className="flex h-11 flex-none items-center text-[16px] font-extrabold tracking-[-0.01em]">
-            Fuel <span className="mx-1 text-protein">&amp;</span> Lift
-          </span>
-        )}
+      {/* The back slot always takes up the same space, so the progress bar
+          never shifts between steps. -ml-4 lines the chevron's tip up with the
+          title below while the hit area stays 44px. */}
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          aria-label="Back"
+          onClick={() => go(-1)}
+          disabled={index === 0 || step === "done"}
+          className="-ml-4 flex h-11 w-11 flex-none items-center justify-center rounded-full text-ink transition-[transform,background-color] duration-150 ease-out hover:bg-ink/5 active:scale-[0.94] active:bg-ink/10 disabled:invisible"
+        >
+          <BackIcon size={22} />
+        </button>
         <div
           role="progressbar"
           aria-label="Setup progress"
@@ -271,7 +270,7 @@ function Choice({
       onClick={onClick}
       className={cn(
         "flex min-h-16 items-center justify-between gap-3 rounded-btn border-2 px-4 py-3 text-left",
-        selected ? "border-ink bg-lime" : "border-transparent bg-white"
+        selected ? "border-ink bg-pink" : "border-transparent bg-white"
       )}
     >
       <span className="flex flex-col gap-0.5">
@@ -297,6 +296,7 @@ function NameStep({ a, set }: StepProps) {
         set({ name: v.trim().slice(0, 40), step: "sex" })
       }}
     >
+      <Logo className="text-ink" />
       <Title sub="This is how your friends see you.">What should we call you?</Title>
       <label className="sr-only" htmlFor="ob-name">
         Your name
@@ -336,7 +336,7 @@ function DobStep({ a, set }: StepProps) {
         Date of birth
       </label>
       <BigInput id="ob-dob" type="date" value={v} min="1920-01-01" max={max} onChange={(e) => setV(e.target.value)} className="text-[22px]" />
-      {v && !ok ? <p className="m-0 text-[14px] font-semibold text-danger">Fuel &amp; Lift is for people aged 13 and over.</p> : null}
+      {v && !ok ? <p className="m-0 text-[14px] font-semibold text-danger">adebite is for people aged 13 and over.</p> : null}
       {ok ? <p className="m-0 text-[15px] text-muted">{age} years old</p> : null}
       <Footer onContinue={() => set({ dob: v, step: "height" })} disabled={!ok} />
     </>
@@ -611,7 +611,7 @@ function GymStep({ a, set, next }: StepProps) {
               onClick={() => toggle(d)}
               className={cn(
                 "flex min-h-14 items-center justify-center rounded-tile text-[13px] font-bold",
-                on ? "border-2 border-ink bg-lime" : "border-2 border-transparent bg-white text-muted"
+                on ? "border-2 border-ink bg-pink" : "border-2 border-transparent bg-white text-muted"
               )}
             >
               {DAY_LABEL[d]}
@@ -657,7 +657,7 @@ function InstallStep({ next }: { next: () => void }) {
 
   return (
     <>
-      <Title sub="Fuel & Lift works best as an app on your home screen, with reminders for meals and gym days.">
+      <Title sub="adebite works best as an app on your home screen, with reminders for meals and gym days.">
         Put it on your phone
       </Title>
       {ios ? (
@@ -745,7 +745,7 @@ function DoneStep({ a, onFinished }: { a: Answers; onFinished: () => void }) {
   return (
     <>
       <div className="flex flex-1 flex-col justify-center gap-5">
-        <span aria-hidden="true" className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-lime">
+        <span aria-hidden="true" className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-pink">
           <CheckIcon size={30} />
         </span>
         <Title sub="Log your first meal with a photo, or set up your gym week.">You&apos;re set, {a.name.trim() || "friend"}.</Title>

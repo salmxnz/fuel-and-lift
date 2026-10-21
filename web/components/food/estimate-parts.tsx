@@ -29,7 +29,7 @@ export function QuestionsCard({
               {q.options.map((o) => (
                 <Chip
                   key={o.id}
-                  tone="lime"
+                  tone="pink"
                   selected={answers[q.id] === o.id}
                   disabled={busy}
                   onClick={() => onAnswer(q.id, o.id)}

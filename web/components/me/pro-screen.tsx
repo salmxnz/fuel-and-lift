@@ -61,7 +61,7 @@ export function ProScreen() {
       style={{ paddingBottom: "calc(var(--safe-bottom) + 28px)" }}
     >
       <div className="flex items-center justify-between">
-        <span className="rounded-full bg-lime px-2.5 py-[5px] text-[13px] font-extrabold text-ink">PRO</span>
+        <span className="rounded-full bg-pink px-2.5 py-[5px] text-[13px] font-extrabold text-ink">PRO</span>
         <CloseButton dark onClick={close} />
       </div>
 
@@ -84,7 +84,7 @@ export function ProScreen() {
           <div className="flex-1" />
           <Link
             href="/today"
-            className="flex min-h-[58px] items-center justify-center rounded-btn bg-lime text-[17px] font-extrabold text-ink no-underline"
+            className="flex min-h-[58px] items-center justify-center rounded-btn bg-pink text-[17px] font-extrabold text-ink no-underline"
           >
             Back to Today
           </Link>
@@ -109,7 +109,7 @@ export function ProScreen() {
                 <th scope="col" className="w-[76px] pb-2 text-right text-[12px] font-semibold text-night-muted">
                   Free
                 </th>
-                <th scope="col" className="w-[84px] pb-2 text-right text-[12px] font-extrabold text-lime">
+                <th scope="col" className="w-[84px] pb-2 text-right text-[12px] font-extrabold text-pink">
                   Pro
                 </th>
               </tr>
@@ -135,7 +135,7 @@ export function ProScreen() {
 
           <div className="flex-1" />
           <div className="flex flex-col gap-2">
-            <Button variant="lime" onClick={checkout} loading={checkingOut} className="min-h-[58px] text-[17px] font-extrabold">
+            <Button variant="pink" onClick={checkout} loading={checkingOut} className="min-h-[58px] text-[17px] font-extrabold">
               Get Pro
             </Button>
             <span className="text-center text-[12px] text-night-muted">Cancel any time.</span>
@@ -150,7 +150,7 @@ export function ProScreen() {
           <Link href="/friends/add" className="flex flex-col gap-2.5 rounded-card border-[1.5px] border-night-3 p-3.5 text-white no-underline">
             <span className="flex items-baseline justify-between gap-3">
               <span className="text-[15px] font-bold">Invite {b.referrals.needed} friends, get Pro forever</span>
-              <span className="flex-none text-[13px] font-bold text-lime">
+              <span className="flex-none text-[13px] font-bold text-pink">
                 {b.referrals.joined} of {b.referrals.needed}
               </span>
             </span>

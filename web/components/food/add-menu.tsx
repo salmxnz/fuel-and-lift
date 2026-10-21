@@ -9,14 +9,14 @@ const ITEMS = [
     key: "food",
     title: "Food",
     sub: "Photo, your meals, a restaurant",
-    tile: "bg-lime",
+    tile: "bg-pink",
     icon: <BowlIcon size={26} />,
   },
   {
     key: "workout",
     title: "Workout",
     sub: "Today's plan or any template",
-    tile: "bg-ink text-lime",
+    tile: "bg-ink text-pink",
     icon: <DumbbellIcon size={26} strokeWidth={1.9} />,
   },
   {
@@ -78,7 +78,7 @@ export function AddMenu({
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="flex h-[62px] w-[62px] items-center justify-center rounded-full bg-ink text-lime shadow-[0_6px_20px_rgba(23,26,18,0.25)]"
+              className="flex h-[62px] w-[62px] items-center justify-center rounded-full bg-ink text-pink shadow-[0_6px_20px_rgba(46,26,36,0.25)]"
             >
               <CloseIcon size={24} strokeWidth={2.4} />
             </button>

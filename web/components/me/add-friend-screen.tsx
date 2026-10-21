@@ -91,7 +91,7 @@ export function AddFriendScreen() {
 
   async function share() {
     if (!link) return
-    const data = { title: "Fuel & Lift", text: "Train with me on Fuel & Lift", url: link.url }
+    const data = { title: "adebite", text: "Train with me on adebite", url: link.url }
     if (navigator.share) {
       try {
         await navigator.share(data)
@@ -174,7 +174,7 @@ export function AddFriendScreen() {
           <div className="flex items-center gap-3">
             <span
               aria-hidden="true"
-              className="flex h-11 w-11 flex-none items-center justify-center rounded-[12px] bg-lime text-[13px] font-extrabold text-ink"
+              className="flex h-11 w-11 flex-none items-center justify-center rounded-[12px] bg-pink text-[13px] font-extrabold text-ink"
             >
               PRO
             </span>
@@ -188,7 +188,7 @@ export function AddFriendScreen() {
               <span className="flex-1">
                 <ReferralBar joined={ref.joined} needed={ref.needed} />
               </span>
-              <span className="text-[13px] font-bold text-lime">
+              <span className="text-[13px] font-bold text-pink">
                 {ref.joined} of {ref.needed}
               </span>
             </div>
@@ -273,7 +273,7 @@ export function AddFriendScreen() {
                     <span
                       className={cn(
                         "rounded-full px-2 py-1 text-[12px] font-bold",
-                        l.status === "accepted" ? "bg-lime" : "bg-chip text-muted"
+                        l.status === "accepted" ? "bg-pink" : "bg-chip text-muted"
                       )}
                     >
                       {STATUS[l.status]}

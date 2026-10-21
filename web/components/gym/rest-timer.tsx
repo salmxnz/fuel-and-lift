@@ -66,9 +66,9 @@ export function RestTimerPill({
       role="timer"
       aria-live="off"
       aria-label={`Rest: ${m} minutes ${s} seconds left`}
-      className="relative flex items-center gap-2 overflow-hidden rounded-btn bg-lime px-3 py-1.5 text-ink shadow-fab"
+      className="relative flex items-center gap-2 overflow-hidden rounded-btn bg-pink px-3 py-1.5 text-ink shadow-fab"
     >
-      <span aria-hidden="true" className="absolute inset-y-0 left-0 bg-[rgba(23,26,18,0.08)]" style={{ width: `${p}%` }} />
+      <span aria-hidden="true" className="absolute inset-y-0 left-0 bg-[rgba(46,26,36,0.08)]" style={{ width: `${p}%` }} />
       <ClockIcon size={20} className="relative" />
       <span className="relative flex-1 text-[15px] font-bold">
         Rest <span className="inline-block min-w-[3.2ch] text-[20px] font-extrabold">{m}:{s}</span>
@@ -76,7 +76,7 @@ export function RestTimerPill({
       <button type="button" onClick={onAdd} className="relative min-h-[40px] rounded-[10px] px-2.5 text-[14px] font-bold">
         +15 s
       </button>
-      <button type="button" onClick={onStop} className="relative min-h-[40px] rounded-[10px] bg-ink px-3 text-[14px] font-bold text-lime">
+      <button type="button" onClick={onStop} className="relative min-h-[40px] rounded-[10px] bg-ink px-3 text-[14px] font-bold text-pink">
         Skip
       </button>
     </div>

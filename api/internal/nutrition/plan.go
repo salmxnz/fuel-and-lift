@@ -126,7 +126,7 @@ func Validate(in Input) error {
 		return ValidationError{"activity_level must be 1 to 6"}
 	}
 	if age := AgeOn(in.DateOfBirth, in.Today); age < 16 || age > 100 {
-		return ValidationError{"you need to be at least 16 to use Fuel & Lift"}
+		return ValidationError{"you need to be at least 16 to use adebite"}
 	}
 	switch in.Mode {
 	case Maintain:

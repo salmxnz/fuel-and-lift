@@ -112,7 +112,7 @@ export function TodayScreen() {
               scroll={false}
               className={cn(
                 "flex min-h-[48px] flex-col items-center gap-0.5 rounded-[12px] py-2 text-[12px] no-underline",
-                current ? "bg-ink text-lime" : "text-muted",
+                current ? "bg-ink text-pink" : "text-muted",
                 future && !current && "opacity-50"
               )}
             >
@@ -122,7 +122,7 @@ export function TodayScreen() {
                 className={cn(
                   "text-[15px]",
                   current ? "font-bold text-white" : "font-semibold text-ink",
-                  d === today && !current && "underline decoration-lime decoration-[3px] underline-offset-4"
+                  d === today && !current && "underline decoration-pink decoration-[3px] underline-offset-4"
                 )}
               >
                 {parseISODate(d).getDate()}

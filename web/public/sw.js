@@ -1,4 +1,4 @@
-/* Fuel & Lift service worker (hand-written, no build step).
+/* adebite service worker (hand-written, no build step).
  *
  * - install: precache the app shell (offline page, manifest, icons)
  * - navigations: network first, falling back to the cached offline page
@@ -8,7 +8,7 @@
  * - notificationclick: focus an open window on that url, or open one
  */
 
-const VERSION = "fl-v1"
+const VERSION = "fl-v2"
 const SHELL_CACHE = `${VERSION}-shell`
 const STATIC_CACHE = `${VERSION}-static`
 const OFFLINE_URL = "/offline"
@@ -96,7 +96,7 @@ self.addEventListener("push", (event) => {
   } catch {
     payload = { body: event.data ? event.data.text() : "" }
   }
-  const title = typeof payload.title === "string" && payload.title ? payload.title : "Fuel & Lift"
+  const title = typeof payload.title === "string" && payload.title ? payload.title : "adebite"
   const url = typeof payload.url === "string" && payload.url.startsWith("/") ? payload.url : "/today"
   event.waitUntil(
     self.registration.showNotification(title, {

@@ -90,7 +90,7 @@ export function NotificationsScreen() {
           <p className="m-0 text-[14px] text-muted">This browser can&apos;t show push notifications.</p>
         ) : device === "denied" ? (
           <p className="m-0 text-[14px] text-muted">
-            Notifications are blocked for Fuel &amp; Lift. Allow them in your browser or phone settings, then come back.
+            Notifications are blocked for adebite. Allow them in your browser or phone settings, then come back.
           </p>
         ) : (
           <div className="flex items-center justify-between gap-3">
@@ -187,7 +187,7 @@ export function IOSInstallSteps({ compact }: { compact?: boolean }) {
           <Step n={2} /> Choose <strong>Add to Home Screen</strong>
         </li>
         <li className="flex items-center gap-2.5">
-          <Step n={3} /> Open Fuel &amp; Lift from your Home Screen
+          <Step n={3} /> Open adebite from your Home Screen
         </li>
       </ol>
     </div>
@@ -196,7 +196,7 @@ export function IOSInstallSteps({ compact }: { compact?: boolean }) {
 
 function Step({ n }: { n: number }) {
   return (
-    <span aria-hidden="true" className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-lime text-[12px] font-extrabold text-ink">
+    <span aria-hidden="true" className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-pink text-[12px] font-extrabold text-ink">
       {n}
     </span>
   )

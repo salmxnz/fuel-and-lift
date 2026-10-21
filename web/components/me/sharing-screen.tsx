@@ -61,7 +61,7 @@ export function previewSentence(s: Sharing, name: string, data: PreviewData): st
   }
   if (s.weight_trend) parts.push("Weight is trending up or down, never the number")
   if (s.food_streaks) parts.push("Streaks like hitting protein a few days in a row")
-  return parts.length ? `${parts.join(". ")}.` : "Nothing. Friends only see that you are on Fuel & Lift."
+  return parts.length ? `${parts.join(". ")}.` : "Nothing. Friends only see that you are on adebite."
 }
 
 export function SharingScreen() {

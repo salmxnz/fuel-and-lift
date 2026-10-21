@@ -9,13 +9,13 @@ import { BackIcon, CloseIcon } from "./icons"
 
 // ------------------------------------------------------------ Buttons
 
-type Variant = "primary" | "outline" | "lime" | "ghost" | "white" | "danger" | "night-outline"
+type Variant = "primary" | "outline" | "pink" | "ghost" | "white" | "danger" | "night-outline"
 type Size = "lg" | "md" | "sm"
 
 const variantClass: Record<Variant, string> = {
   primary: "bg-ink text-white border border-ink",
   outline: "bg-transparent text-ink border border-ink",
-  lime: "bg-lime text-ink border border-[rgba(23,26,18,0.12)]",
+  pink: "bg-pink text-ink border border-[rgba(46,26,36,0.12)]",
   ghost: "bg-transparent text-ink border border-transparent",
   white: "bg-white text-ink border border-white",
   danger: "bg-transparent text-danger border border-line",
@@ -183,7 +183,7 @@ export function Switch({
         checked ? "justify-end bg-ink" : "justify-start bg-line"
       )}
     >
-      <span className={cn("h-[26px] w-[26px] rounded-full transition-colors", checked ? "bg-lime" : "bg-white")} />
+      <span className={cn("h-[26px] w-[26px] rounded-full transition-colors", checked ? "bg-pink" : "bg-white")} />
     </button>
   )
 }
@@ -204,8 +204,8 @@ export function Chip({
   onClick?: () => void
   children: ReactNode
   role?: "radio" | "pressed" | "button"
-  /** Selected look: solid ink (meal picker) or lime (answers, add-ons). */
-  tone?: "ink" | "lime"
+  /** Selected look: solid ink (meal picker) or pink (answers, add-ons). */
+  tone?: "ink" | "pink"
   dashed?: boolean
   className?: string
   disabled?: boolean
@@ -228,7 +228,7 @@ export function Chip({
         selected
           ? tone === "ink"
             ? "border border-ink bg-ink font-bold text-white"
-            : "border border-ink bg-lime font-bold text-ink"
+            : "border border-ink bg-pink font-bold text-ink"
           : dashed
             ? "border-[1.5px] border-dashed border-dash bg-transparent font-semibold text-ink"
             : "border border-line bg-white text-ink",
@@ -332,10 +332,10 @@ export function Avatar({
   name: string | null | undefined
   url?: string | null
   size?: number
-  tone?: "lilac" | "ink" | "lime"
+  tone?: "lilac" | "ink" | "pink"
   className?: string
 }) {
-  const toneClass = tone === "ink" ? "bg-ink text-lime" : tone === "lime" ? "bg-lime text-ink" : "bg-lilac text-ink"
+  const toneClass = tone === "ink" ? "bg-ink text-pink" : tone === "pink" ? "bg-pink text-ink" : "bg-lilac text-ink"
   if (url) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- remote avatars (Google) without image config
@@ -372,7 +372,7 @@ export function ReferralBar({ joined, needed }: { joined: number; needed: number
       style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}
     >
       {Array.from({ length: total }, (_, i) => (
-        <span key={i} className={cn("h-1.5 rounded-[3px]", i < joined ? "bg-lime" : "bg-night-3")} />
+        <span key={i} className={cn("h-1.5 rounded-[3px]", i < joined ? "bg-pink" : "bg-night-3")} />
       ))}
     </span>
   )

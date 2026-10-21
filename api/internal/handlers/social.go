@@ -164,7 +164,7 @@ func (h *Handler) AcceptInviteLink(w http.ResponseWriter, r *http.Request) {
 		if me, err := h.Store.GetProfile(ctx, userID); err == nil {
 			h.Notifier.Notify([]string{prev.Inviter.ID}, push.Message{
 				Title: me.DisplayName + " is your friend now",
-				Body:  "They opened your Fuel & Lift link.",
+				Body:  "They opened your adebite link.",
 				URL:   "/friends", Tag: "friend-" + userID,
 			})
 		}

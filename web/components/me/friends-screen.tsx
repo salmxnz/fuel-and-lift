@@ -134,7 +134,7 @@ export function FriendsScreen() {
                 return (
                   <article
                     key={it.id}
-                    className={cn("flex flex-col gap-2.5 rounded-card bg-white p-3.5", mine && it.kind === "record" && "border-[1.5px] border-lime")}
+                    className={cn("flex flex-col gap-2.5 rounded-card bg-white p-3.5", mine && it.kind === "record" && "border-[1.5px] border-pink")}
                   >
                     <div className="flex items-center gap-2.5">
                       <Avatar name={it.actor.name} url={it.actor.avatar_url} size={40} tone={mine ? "ink" : "lilac"} />
@@ -145,9 +145,9 @@ export function FriendsScreen() {
                         <span className="text-[12px] text-muted">{it.text}</span>
                       </div>
                       {it.kind === "record" ? (
-                        <span className="rounded-full bg-lime px-2 py-1 text-[12px] font-extrabold">PR</span>
+                        <span className="rounded-full bg-pink px-2 py-1 text-[12px] font-extrabold">PR</span>
                       ) : it.kind === "workout_finished" ? (
-                        <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-ink text-lime">
+                        <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-ink text-pink">
                           <DumbbellIcon size={20} strokeWidth={1.9} />
                         </span>
                       ) : (
@@ -167,7 +167,7 @@ export function FriendsScreen() {
                         onClick={() => cheer(it)}
                         className={cn(
                           "flex min-h-9 items-center gap-1.5 self-start rounded-full px-3 text-[13px] font-semibold",
-                          it.cheered_by_me ? "border border-ink bg-lime" : "border border-line"
+                          it.cheered_by_me ? "border border-ink bg-pink" : "border border-line"
                         )}
                       >
                         <CheerIcon size={16} />

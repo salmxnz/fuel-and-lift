@@ -1,4 +1,4 @@
-# Fuel & Lift — notes for Claude
+# adebite — notes for Claude
 
 - `api/` is Go 1.24 with only stdlib `net/http`, pgx, golang-jwt, godotenv and
   x/crypto. Don't add frameworks or ORMs; SQL lives in `internal/store/*.go`.

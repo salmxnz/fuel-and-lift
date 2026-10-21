@@ -196,7 +196,7 @@ function EntryRow({ entry, onEdit }: { entry: Entry; onEdit: () => void }) {
   )
 }
 
-/** Chips for a saved meal's add-ons: lime when included, dashed "+ name" when not. */
+/** Chips for a saved meal's add-ons: pink when included, dashed "+ name" when not. */
 function AddonChips({
   entry,
   saved,
@@ -250,7 +250,7 @@ function AddonChips({
             className={cn(
               "relative min-h-[32px] rounded-full px-3 text-[13px] text-ink disabled:opacity-60",
               "before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-['']",
-              on ? "border border-ink bg-lime font-semibold" : "border border-dashed border-dash bg-transparent"
+              on ? "border border-ink bg-pink font-semibold" : "border border-dashed border-dash bg-transparent"
             )}
           >
             {on ? label : `+ ${label}`}

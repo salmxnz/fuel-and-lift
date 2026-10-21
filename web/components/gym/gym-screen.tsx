@@ -95,7 +95,7 @@ export function GymScreen() {
           <span className="text-[22px] font-extrabold tracking-[-0.01em]">{active.template_name ?? "Workout"}</span>
           <Link
             href={`/gym/session/${active.id}`}
-            className="flex min-h-[52px] items-center justify-center rounded-btn bg-lime text-[16px] font-bold text-ink no-underline"
+            className="flex min-h-[52px] items-center justify-center rounded-btn bg-pink text-[16px] font-bold text-ink no-underline"
           >
             Resume workout
           </Link>
@@ -107,7 +107,7 @@ export function GymScreen() {
             {todayTemplate.name} <span className="text-[13px] font-semibold text-night-muted">v{todayTemplate.version}</span>
           </span>
           <span className="text-[13px] text-night-soft">{summarizeTemplate(todayTemplate)}</span>
-          <Button variant="lime" onClick={() => start(todayTemplate.id)} loading={starting === todayTemplate.id}>
+          <Button variant="pink" onClick={() => start(todayTemplate.id)} loading={starting === todayTemplate.id}>
             Start today&apos;s workout
           </Button>
         </section>

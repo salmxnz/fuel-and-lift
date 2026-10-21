@@ -100,7 +100,7 @@ export function MealSlotsScreen() {
                 key={slot.id}
                 className={cn(
                   "relative flex min-h-[60px] items-center gap-3 border-b border-line-soft bg-white last:border-b-0",
-                  dragging ? "z-10 rounded-[12px] shadow-[0_8px_24px_rgba(23,26,18,0.18)]" : "transition-transform duration-150"
+                  dragging ? "z-10 rounded-[12px] shadow-[0_8px_24px_rgba(46,26,36,0.18)]" : "transition-transform duration-150"
                 )}
                 style={{ transform: y ? `translateY(${y}px)` : undefined }}
               >
@@ -287,7 +287,7 @@ function SlotForm({
             key={value}
             className={cn(
               "flex min-h-[56px] cursor-pointer items-center gap-3 rounded-tile border-2 px-3.5 py-2",
-              schedule === value ? "border-ink bg-lime" : "border-transparent bg-white"
+              schedule === value ? "border-ink bg-pink" : "border-transparent bg-white"
             )}
           >
             <input

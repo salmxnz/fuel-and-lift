@@ -189,7 +189,7 @@ function PickForm({
                   onClick={() => setChosen((c) => (on ? c.filter((x) => x !== a.id) : [...c, a.id]))}
                   className={cn(
                     "min-h-[40px] rounded-full px-3 text-[13px]",
-                    on ? "border border-ink bg-lime font-semibold" : "border border-dashed border-dash"
+                    on ? "border border-ink bg-pink font-semibold" : "border border-dashed border-dash"
                   )}
                 >
                   {on ? a.name : `+ ${a.name}`} · {kcal(a.kcal)}

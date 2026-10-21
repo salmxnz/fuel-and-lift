@@ -24,7 +24,7 @@ function isActive(pathname: string, match: readonly string[]) {
 }
 
 /**
- * Floating liquid-glass tab bar plus the round lime + button.
+ * Floating liquid-glass tab bar plus the round pink + button.
  *
  * Must stay a direct child of the body-level layout: backdrop-filter samples
  * what is behind the element, and any ancestor with filter / opacity /
@@ -77,7 +77,7 @@ export function GlassNav() {
           aria-haspopup="dialog"
           aria-expanded={menuOpen}
           onClick={openMenu}
-          className="flex h-[62px] w-[62px] flex-none items-center justify-center rounded-full border border-[rgba(23,26,18,0.15)] bg-lime text-ink shadow-fab"
+          className="flex h-[62px] w-[62px] flex-none items-center justify-center rounded-full border border-[rgba(46,26,36,0.15)] bg-pink text-ink shadow-fab"
         >
           <PlusIcon size={26} strokeWidth={2.2} />
         </button>

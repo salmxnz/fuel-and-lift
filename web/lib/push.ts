@@ -72,7 +72,7 @@ export async function enablePush(): Promise<PushSubscription> {
   const support = pushSupport()
   if (!support.ok) {
     if (support.reason === "ios-not-installed") {
-      throw new Error("On iPhone, add Fuel & Lift to your Home Screen first, then turn on notifications from there.")
+      throw new Error("On iPhone, add adebite to your Home Screen first, then turn on notifications from there.")
     }
     if (support.reason === "denied") {
       throw new Error("Notifications are blocked. Allow them for this site in your browser settings.")

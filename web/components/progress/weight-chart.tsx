@@ -87,12 +87,12 @@ export function WeightChart({
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Weight chart. ${desc}`} className="block h-auto overflow-visible">
-      <g stroke="#EEF0E8" strokeWidth={1}>
+      <g stroke="#F7E8EE" strokeWidth={1}>
         {ticks.map((t) => (
           <line key={t} x1={LEFT} x2={W} y1={y(t)} y2={y(t)} />
         ))}
       </g>
-      <g fontSize={10} fill="#5C6355" fontFamily="inherit">
+      <g fontSize={10} fill="#765A67" fontFamily="inherit">
         {ticks.map((t) => (
           <text key={t} x={0} y={y(t) + 3.2}>
             {Number.isInteger(t) ? t : t.toFixed(1)}
@@ -110,18 +110,18 @@ export function WeightChart({
           x2={W}
           y1={y(goal.goal_weight_kg)}
           y2={y(goal.goal_weight_kg)}
-          stroke="#3E6B1F"
+          stroke="#A82F61"
           strokeWidth={1}
           strokeDasharray="2 4"
         />
       ) : null}
-      {planPath ? <path d={planPath} stroke="#171A12" strokeWidth={2} strokeDasharray="6 5" fill="none" /> : null}
+      {planPath ? <path d={planPath} stroke="#2E1A24" strokeWidth={2} strokeDasharray="6 5" fill="none" /> : null}
       {dots.map((w) => (
-        <circle key={w.id} cx={x(w.date)} cy={y(w.weight_kg)} r={2.6} fill="#A3A99A" />
+        <circle key={w.id} cx={x(w.date)} cy={y(w.weight_kg)} r={2.6} fill="#C9A9B6" />
       ))}
-      {trendPath ? <path d={trendPath} stroke="#3E6B1F" strokeWidth={2.4} fill="none" strokeLinejoin="round" strokeLinecap="round" /> : null}
+      {trendPath ? <path d={trendPath} stroke="#A82F61" strokeWidth={2.4} fill="none" strokeLinejoin="round" strokeLinecap="round" /> : null}
       {latest && inRange(latest.date) ? (
-        <circle cx={x(latest.date)} cy={y(latest.weight_kg)} r={6} fill="#C8F04D" stroke="#171A12" strokeWidth={2} />
+        <circle cx={x(latest.date)} cy={y(latest.weight_kg)} r={6} fill="#F6B8CA" stroke="#2E1A24" strokeWidth={2} />
       ) : null}
     </svg>
   )
@@ -140,9 +140,9 @@ export function Sparkline({ points, label }: { points: { date: string; v: number
   const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${sx(i).toFixed(1)} ${sy(p.v).toFixed(1)}`).join(" ")
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width="100%" role="img" aria-label={label} className="block h-auto">
-      <path d={d} fill="none" stroke="#171A12" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      <path d={d} fill="none" stroke="#2E1A24" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
       {points.map((p, i) => (
-        <circle key={p.date + i} cx={sx(i)} cy={sy(p.v)} r={i === points.length - 1 ? 5 : 2.5} fill={i === points.length - 1 ? "#C8F04D" : "#171A12"} stroke="#171A12" strokeWidth={i === points.length - 1 ? 2 : 0} />
+        <circle key={p.date + i} cx={sx(i)} cy={sy(p.v)} r={i === points.length - 1 ? 5 : 2.5} fill={i === points.length - 1 ? "#F6B8CA" : "#2E1A24"} stroke="#2E1A24" strokeWidth={i === points.length - 1 ? 2 : 0} />
       ))}
     </svg>
   )

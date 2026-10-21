@@ -1,4 +1,4 @@
-# Fuel & Lift
+# adebite
 
 A private calorie and gym tracker for a few friends: log food (photo → AI
 estimate you can edit, saved meals with add-ons, restaurant menus, barcode),

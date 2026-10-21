@@ -53,7 +53,7 @@ export default async function LoginPage({
       </ul>
       <div className="flex-1" />
       {message ? (
-        <p role="alert" className="m-0 rounded-tile bg-night-2 px-3.5 py-3 text-[14px] leading-[1.45] text-[#F6EDD4]">
+        <p role="alert" className="m-0 rounded-tile bg-night-2 px-3.5 py-3 text-[14px] leading-[1.45] text-ink">
           {message}
         </p>
       ) : null}

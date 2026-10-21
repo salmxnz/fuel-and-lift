@@ -81,7 +81,7 @@ export function PacePicker({
               onClick={() => onPace(p.id)}
               className={cn(
                 "flex min-h-16 items-center justify-between gap-3 rounded-btn border-2 px-4 py-3 text-left",
-                selected ? "border-ink bg-lime" : "border-transparent bg-white"
+                selected ? "border-ink bg-pink" : "border-transparent bg-white"
               )}
             >
               <span className="flex flex-col gap-0.5">
@@ -112,14 +112,14 @@ export function PacePicker({
           <>
             <div className="flex flex-col gap-1">
               <span className="text-[13px] text-night-muted">You reach {goalLabel} around</span>
-              <span className="text-[36px] font-extrabold leading-[1.05] tracking-[-0.02em] text-lime">
+              <span className="text-[36px] font-extrabold leading-[1.05] tracking-[-0.02em] text-pink">
                 {plan.forecast_date ? formatMonthYear(plan.forecast_date) : "–"}
               </span>
               {plan.weeks_to_goal != null ? (
                 <span className="text-[14px] text-night-soft">About {Math.round(plan.weeks_to_goal)} weeks</span>
               ) : null}
             </div>
-            <div className="h-px bg-[#343A2B]" />
+            <div className="h-px bg-[#452A37]" />
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-0.5">
                 <span className="text-[12px] text-night-muted">Daily target</span>
@@ -131,7 +131,7 @@ export function PacePicker({
               </div>
             </div>
             {plan.warnings.length > 0 ? (
-              <ul className="m-0 flex list-none flex-col gap-1 rounded-[12px] bg-night-2 p-3 text-[13px] text-[#F6EDD4]">
+              <ul className="m-0 flex list-none flex-col gap-1 rounded-[12px] bg-night-2 p-3 text-[13px] text-[#FBDCE6]">
                 {plan.warnings.map((w) => (
                   <li key={w}>{w.charAt(0).toUpperCase() + w.slice(1)}</li>
                 ))}

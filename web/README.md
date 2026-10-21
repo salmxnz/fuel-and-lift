@@ -1,6 +1,6 @@
-# Fuel & Lift — web
+# adebite — web
 
-The installable PWA for Fuel & Lift: food log with AI photo estimates, gym
+The installable PWA for adebite: food log with AI photo estimates, gym
 templates and workouts, progress, friends. Next.js 16 (App Router) + React 19 +
 TypeScript + Tailwind CSS 4, talking to the Go API in `../api` through a
 backend-for-frontend (BFF). The browser never sees a token.
@@ -109,7 +109,7 @@ Tab screens (`app/(app)/(tabs)`) get the floating glass nav; focused flows
 ## PWA
 
 - `app/manifest.ts` → `/manifest.webmanifest` (standalone, start `/today`,
-  theme/background `#ECEEE7`, icons 192/512/maskable-512, apple-touch 180).
+  theme/background `#FBEFF3`, icons 192/512/maskable-512, apple-touch 180).
 - `public/sw.js` (hand-written): precaches the shell, network-first navigations
   with `/offline` fallback, cache-first `/_next/static`, never caches `/api`;
   `push` → `showNotification({title, body, url})`; `notificationclick` focuses
@@ -122,9 +122,12 @@ Tab screens (`app/(app)/(tabs)`) get the floating glass nav; focused flows
 
 ## Design system
 
-Tokens live in `app/globals.css` (`@theme`): ground `#ECEEE7`, surface white,
-ink `#171A12`, muted `#5C6355`, lines `#CDD1C4`/`#EEF0E8`, lime `#C8F04D`,
-protein `#3E6B1F`, carbs `#A9D42C`, fat `#E3A93B`, dark screens `#171A12`.
+Pastel pink and white; see `docs/brand/BRAND.md` for the palette, logo and
+rules. Tokens live in `app/globals.css` (`@theme`): ground `#FBEFF3`, surface
+white, ink (plum) `#2E1A24`, muted `#765A67`, lines `#ECD3DD`/`#F7E8EE`, pink
+`#F6B8CA`, protein `#A82F61`, carbs `#EE8FB0`, fat `#F2B48C`, dark screens
+`#2E1A24`; Login/Join use `.theme-blush` (pink). The logo is
+`components/brand/logo.tsx`; `npm run icons` redraws `public/icons`.
 Schibsted Grotesk is self-hosted from `app/fonts` (Fontsource, OFL) via
 `next/font/local`, so the installed app renders offline and builds need no
 network. The glass nav (`components/nav/glass-nav.tsx`) uses

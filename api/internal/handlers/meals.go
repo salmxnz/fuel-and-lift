@@ -557,7 +557,7 @@ func OpenFoodFacts(ctx context.Context, code string) (store.Food, error) {
 	if err != nil {
 		return store.Food{}, err
 	}
-	req.Header.Set("User-Agent", "FuelAndLift/1.0 (personal tracker)")
+	req.Header.Set("User-Agent", "adebite/1.0 (personal tracker)")
 	res, err := offClient.Do(req)
 	if err != nil {
 		return store.Food{}, err

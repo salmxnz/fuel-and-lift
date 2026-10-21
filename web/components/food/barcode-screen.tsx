@@ -144,13 +144,13 @@ export function BarcodeScreen() {
       {scanning ? (
         <div className="relative overflow-hidden rounded-card bg-ink">
           <video ref={video} playsInline muted className="block aspect-[4/3] w-full object-cover" aria-label="Camera preview" />
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-8 top-1/2 h-0.5 -translate-y-1/2 bg-lime" />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-8 top-1/2 h-0.5 -translate-y-1/2 bg-pink" />
           <Button variant="white" size="sm" onClick={stopCamera} className="absolute bottom-3 right-3">
             Stop
           </Button>
         </div>
       ) : canScan ? (
-        <Button variant="lime" onClick={startCamera} className="rounded-[20px]">
+        <Button variant="pink" onClick={startCamera} className="rounded-[20px]">
           <BarcodeIcon size={24} /> Scan with camera
         </Button>
       ) : (

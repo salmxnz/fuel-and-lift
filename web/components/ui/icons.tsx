@@ -218,15 +218,6 @@ export const StarIcon = (p: IconProps) => (
     <path d="M12 4l2.3 4.9 5.2.6-3.9 3.6 1.1 5.2L12 15.7l-4.7 2.6 1.1-5.2L4.5 9.5l5.2-.6Z" />
   </Svg>
 )
-export const GoogleGlyph = () => (
-  <span
-    aria-hidden="true"
-    className="flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 border-current text-[13px] font-extrabold"
-  >
-    G
-  </span>
-)
-
 /** Lat-pulldown style machine drawing used as the default exercise art. */
 export function MachineArt({ size = 56, label }: { size?: number; label?: string }) {
   return (
@@ -235,7 +226,7 @@ export function MachineArt({ size = 56, label }: { size?: number; label?: string
       height={size}
       viewBox="0 0 64 64"
       fill="none"
-      stroke="#171A12"
+      stroke="#2E1A24"
       strokeWidth={size > 80 ? 1.8 : 2.2}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -251,7 +242,7 @@ export function MachineArt({ size = 56, label }: { size?: number; label?: string
       <path d="M28 46h18" />
       <path d="M32 46v12" />
       <path d="M30 38h14" />
-      <rect x="16" y="22" width="8" height="14" rx="2" fill="#C8F04D" />
+      <rect x="16" y="22" width="8" height="14" rx="2" fill="#F6B8CA" />
       <path d="M20 8v14" />
     </svg>
   )
@@ -260,11 +251,11 @@ export function MachineArt({ size = 56, label }: { size?: number; label?: string
 /** Treadmill-ish drawing for cardio blocks. */
 export function CardioArt({ size = 56 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke="#171A12" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke="#2E1A24" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M8 50h40l8-8" />
       <path d="M8 56h44" />
       <path d="M44 42V14h8" />
-      <circle cx="26" cy="14" r="5" fill="#C8F04D" />
+      <circle cx="26" cy="14" r="5" fill="#F6B8CA" />
       <path d="M26 20l-4 12 8 6v10M22 32l-8 4M28 24l8 4" />
     </svg>
   )

@@ -78,7 +78,7 @@ export type SheetProps = {
   hideTitle?: boolean
   description?: ReactNode
   children: ReactNode
-  /** Sheet surface: #F7F8F3 (default, over light screens) or ground. */
+  /** Sheet surface: #FFF8FA (default, over light screens) or ground. */
   surface?: "sheet" | "ground"
   showClose?: boolean
   className?: string
