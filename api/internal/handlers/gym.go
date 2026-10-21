@@ -471,6 +471,7 @@ func (h *Handler) FinishSession(w http.ResponseWriter, r *http.Request) {
 	}
 	if before.Status != "finished" {
 		h.announceWorkout(context.WithoutCancel(r.Context()), userID, s, recs)
+		h.celebrateStreak(context.WithoutCancel(r.Context()), userID)
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"session": s, "proposals": props, "records": recs})
 }

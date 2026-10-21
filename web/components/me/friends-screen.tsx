@@ -11,6 +11,7 @@ import type { FeedItem, FeedItemResponse, FeedResponse, FriendResponse, FriendsR
 import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
 import { formatDayMonth, relativeDay } from "@/lib/dates"
+import { RewardIcon } from "@/components/progress/rewards-card"
 
 const KIND_VERB: Record<FeedItem["kind"], string> = {
   workout_finished: "worked out",
@@ -139,13 +140,29 @@ export function FriendsScreen() {
                     <div className="flex items-center gap-2.5">
                       <Avatar name={it.actor.name} url={it.actor.avatar_url} size={40} tone={mine ? "ink" : "lilac"} />
                       <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="text-[15px]">
-                          <strong>{mine ? "You" : it.actor.name}</strong> {KIND_VERB[it.kind]}
-                        </span>
-                        <span className="text-[12px] text-muted">{it.text}</span>
+                        {it.kind === "streak" ? (
+                          <>
+                            <span className="text-[15px]">
+                              <strong>{mine ? "You" : it.actor.name}</strong> {mine ? "are" : "is"} on a{" "}
+                              {typeof it.data.days === "number" ? `${it.data.days}-day` : ""} streak
+                            </span>
+                            <span className="text-[12px] text-muted">Days in a row with a meal or a workout</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-[15px]">
+                              <strong>{mine ? "You" : it.actor.name}</strong> {KIND_VERB[it.kind]}
+                            </span>
+                            <span className="text-[12px] text-muted">{it.text}</span>
+                          </>
+                        )}
                       </div>
                       {it.kind === "record" ? (
                         <span className="rounded-full bg-pink px-2 py-1 text-[12px] font-extrabold">PR</span>
+                      ) : it.kind === "streak" ? (
+                        <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-pink-soft">
+                          <RewardIcon name="fire" size={32} />
+                        </span>
                       ) : it.kind === "workout_finished" ? (
                         <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-ink text-pink">
                           <DumbbellIcon size={20} strokeWidth={1.9} />

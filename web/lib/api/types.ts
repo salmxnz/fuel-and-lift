@@ -413,6 +413,17 @@ export type PersonalRecord = {
   date: string
 }
 export type ProgressRecordsResponse = { records: PersonalRecord[] }
+export type Streak = {
+  current: number
+  best: number
+  active_today: boolean
+  last_active: string | null
+  /** Oldest first, ending today. */
+  last_7: boolean[]
+  milestones: { days: number; reached: boolean }[]
+  since: string | null
+}
+export type StreakResponse = { streak: Streak }
 
 // ---------------------------------------------------------------- Billing
 

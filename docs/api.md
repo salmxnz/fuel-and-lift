@@ -338,6 +338,13 @@ type Proposal = { exercise_id: string, exercise_name: string, from_kg: number, t
 - `GET /v1/progress/calories?from=&to=` → `{"days": [{date, kcal, protein_g, target_kcal, logged}]}` (`logged`: at least one entry that day)
 - `GET /v1/progress/exercises/{exercise_id}` → `{"exercise": Exercise, "points": [{date, top_kg, top_reps, e1rm_kg}]}`
 - `GET /v1/progress/records` → `{"records": [{exercise_id, exercise_name, kg, reps, date}]}`
+- `GET /v1/progress/streak` → `{"streak": {current, best, active_today, last_active, last_7: bool[7], milestones: [{days, reached}], since}}`
+  One combined streak: a day counts when a meal was logged or a workout
+  finished (user's time zone). Today without activity yet doesn't break it.
+  `last_7` is oldest first, ending today. Milestones: 3, 7, 14, 30, 60, 100, 365.
+  Reaching one (by logging today or finishing a workout) posts a `streak`
+  activity once per streak, `text` "is on a 7-day streak", `data` `{days}`,
+  and pushes to friends who get workout pushes, when `food_streaks` is on.
 
 ## Plan (free / Pro)
 
@@ -394,7 +401,7 @@ type Sharing = {
   workout_details: boolean   // exercises, sets and weights
   records: boolean           // new personal records
   weight_trend: boolean      // direction and milestones only, never the number
-  food_streaks: boolean      // "hit protein 5 days in a row"
+  food_streaks: boolean      // streak milestones: "is on a 7-day streak"
 }
 type Friend = { id: string, name: string, avatar_url: string | null, since: string,
                 last_workout_on: string | null, notify_workouts: boolean }
@@ -407,7 +414,7 @@ type FeedItem = { id: string, actor: { id: string, name: string, avatar_url: str
 - `GET /v1/friends` → `200 {"friends": Friend[]}`
 - `DELETE /v1/friends/{user_id}` → `204`
 - `PATCH /v1/friends/{user_id}` `{notify_workouts}` → `200 {"friend": Friend}` (push me when this friend finishes a workout)
-- `GET /v1/sharing` / `PUT /v1/sharing` → `{"sharing": Sharing}` (what all my friends can see; defaults: workouts and records on, the rest off)
+- `GET /v1/sharing` / `PUT /v1/sharing` → `{"sharing": Sharing}` (what all my friends can see; defaults: workouts, records and streaks on, the rest off)
 - `GET /v1/feed?before=` → `200 {"items": FeedItem[]}` (friends' activity, newest first, 30 per page)
 - `POST /v1/feed/{id}/cheer` / `DELETE /v1/feed/{id}/cheer` → `200 {"item": FeedItem}` (a cheer pushes the actor)
 

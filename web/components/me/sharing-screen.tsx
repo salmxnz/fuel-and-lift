@@ -23,7 +23,7 @@ const ROWS: { key: keyof Sharing; title: string; sub: string }[] = [
   { key: "workout_details", title: "Workout details", sub: "Exercises, sets and weights" },
   { key: "records", title: "Personal records", sub: "New best lifts" },
   { key: "weight_trend", title: "Weight trend", sub: "Direction and milestones, never the number" },
-  { key: "food_streaks", title: "Food streaks", sub: "Days in a row hitting protein or calories" },
+  { key: "food_streaks", title: "Streaks", sub: "Milestones like a 7-day streak of logging or training" },
 ]
 
 type PreviewData = { session?: Session; record?: PersonalRecord }
@@ -60,7 +60,7 @@ export function previewSentence(s: Sharing, name: string, data: PreviewData): st
     parts.push(r ? `New record: ${r.exercise_name.toLowerCase()} ${num1(r.kg)} kg × ${r.reps}` : "New personal records")
   }
   if (s.weight_trend) parts.push("Weight is trending up or down, never the number")
-  if (s.food_streaks) parts.push("Streaks like hitting protein a few days in a row")
+  if (s.food_streaks) parts.push("Streak milestones, like 7 days in a row")
   return parts.length ? `${parts.join(". ")}.` : "Nothing. Friends only see that you are on adebite."
 }
 

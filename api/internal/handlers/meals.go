@@ -267,6 +267,9 @@ func (h *Handler) AddEntry(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
+	if d == h.today(r.Context(), userID) {
+		h.celebrateStreak(context.WithoutCancel(r.Context()), userID)
+	}
 	httpx.JSON(w, http.StatusCreated, map[string]any{"entry": e, "day": day})
 }
 
@@ -456,6 +459,9 @@ func (h *Handler) LogSavedMeal(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.storeError(w, r, err)
 		return
+	}
+	if d == h.today(r.Context(), userID) {
+		h.celebrateStreak(context.WithoutCancel(r.Context()), userID)
 	}
 	httpx.JSON(w, http.StatusCreated, map[string]any{"entry": e, "day": day})
 }

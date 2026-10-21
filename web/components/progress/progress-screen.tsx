@@ -15,6 +15,7 @@ import { cn } from "@/lib/cn"
 import { addDays, addMonths, formatDayMonth, formatMonthYear, todayISO, weekDays, weekdayLetter } from "@/lib/dates"
 import { kcal, num1, signed } from "@/lib/format"
 import { Sparkline, WeightChart } from "./weight-chart"
+import { RewardsCard } from "./rewards-card"
 
 type Range = "3m" | "6m" | "goal"
 
@@ -78,6 +79,8 @@ export function ProgressScreen() {
           ))}
         </div>
       </header>
+
+      <RewardsCard />
 
       {/* Weight */}
       <section aria-label="Weight" className="flex flex-col gap-3 rounded-card bg-white p-4">

@@ -218,6 +218,20 @@ export const StarIcon = (p: IconProps) => (
     <path d="M12 4l2.3 4.9 5.2.6-3.9 3.6 1.1 5.2L12 15.7l-4.7 2.6 1.1-5.2L4.5 9.5l5.2-.6Z" />
   </Svg>
 )
+export const FireIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 2.6-5.4 3.6-8.3.3-.9 1.4-1.1 1.9-.3.9 1.4 1.1 2.8 1 4.1 1-.6 1.7-1.6 2-2.7.2-.8 1.2-1 1.7-.4 1.4 1.7 2.8 4.1 2.8 6.9 0 4.2-3 6.9-6.5 6.9Z" />
+    <path d="M12 21c-1.7 0-2.9-1.2-2.9-2.8 0-1.8 1.4-2.7 2.1-4.1.4.9 1.2 1.5 1.8 1.9.8.5 1.9 1.3 1.9 2.4 0 1.5-1.3 2.6-2.9 2.6Z" />
+  </Svg>
+)
+export const TrophyIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M8 4h8v5a4 4 0 0 1-8 0V4Z" />
+    <path d="M8 6H5.5A2.5 2.5 0 0 0 8 10.4M16 6h2.5a2.5 2.5 0 0 1-2.5 4.4" />
+    <path d="M12 13v4M8.5 20h7M10 17h4v3h-4z" />
+  </Svg>
+)
+
 /** Lat-pulldown style machine drawing used as the default exercise art. */
 export function MachineArt({ size = 56, label }: { size?: number; label?: string }) {
   return (

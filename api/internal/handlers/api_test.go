@@ -479,6 +479,33 @@ func TestAPI(t *testing.T) {
 		t.Fatalf("history: %v", hist)
 	}
 
+	// --- streak: three days in a row posts once to the feed -----------------------
+	day0, _ := time.Parse(time.DateOnly, today)
+	for _, back := range []int{2, 1} {
+		d := day0.AddDate(0, 0, -back).Format(time.DateOnly)
+		e.must(me, 201, "POST", "/v1/days/"+d+"/entries", obj{"meal_name": "Snack", "name": "Apple", "kcal": 80, "carbs_g": 20})
+	}
+	for i := 0; i < 2; i++ { // the second log on the same day doesn't post again
+		e.must(me, 201, "POST", "/v1/days/"+today+"/entries", obj{"meal_name": "Snack", "name": "Pear", "kcal": 90, "carbs_g": 22})
+	}
+	st := e.must(me, 200, "GET", "/v1/progress/streak", nil)
+	if get(st, "streak", "current").(float64) != 3 || get(st, "streak", "active_today") != true ||
+		get(st, "streak", "milestones", 0, "reached") != true || len(get(st, "streak", "last_7").([]any)) != 7 {
+		t.Fatalf("streak: %v", st)
+	}
+	streakPosts := 0
+	for _, it := range get(e.must(ravi, 200, "GET", "/v1/feed", nil), "items").([]any) {
+		if get(it, "kind") == "streak" && get(it, "actor", "name") == "Bhavish" {
+			streakPosts++
+			if get(it, "text") != "is on a 3-day streak" {
+				t.Fatalf("streak post: %v", it)
+			}
+		}
+	}
+	if streakPosts != 1 {
+		t.Fatalf("want one streak post, got %d", streakPosts)
+	}
+
 	// --- feed, cheers, sharing ---------------------------------------------------
 	feed := get(e.must(ravi, 200, "GET", "/v1/feed", nil), "items").([]any)
 	var workout obj

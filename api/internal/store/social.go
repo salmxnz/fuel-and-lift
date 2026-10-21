@@ -334,7 +334,7 @@ type Sharing struct {
 }
 
 // DefaultSharing is used until the user changes anything.
-var DefaultSharing = Sharing{Workouts: true, Records: true}
+var DefaultSharing = Sharing{Workouts: true, Records: true, FoodStreaks: true}
 
 // GetSharing returns the user's sharing settings.
 func (s *Store) GetSharing(ctx context.Context, userID string) (Sharing, error) {
@@ -401,7 +401,7 @@ const feedSelect = `
 	        when 'workout_finished' then coalesce(sh.workouts, true)
 	        when 'record'           then coalesce(sh.records, true)
 	        when 'weight_milestone' then coalesce(sh.weight_trend, false)
-	        when 'streak'           then coalesce(sh.food_streaks, false)
+	        when 'streak'           then coalesce(sh.food_streaks, true)
 	        else false end)`
 
 func scanFeed(r pgx.CollectableRow) (FeedItem, error) {
