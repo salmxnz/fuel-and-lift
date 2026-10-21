@@ -68,7 +68,12 @@ export function RestTimerPill({
       aria-label={`Rest: ${m} minutes ${s} seconds left`}
       className="relative flex items-center gap-2 overflow-hidden rounded-btn bg-pink px-3 py-1.5 text-ink shadow-fab"
     >
-      <span aria-hidden="true" className="absolute inset-y-0 left-0 bg-[rgba(46,26,36,0.08)]" style={{ width: `${p}%` }} />
+      {/* Time-based, so linear, eased between the 250ms ticks. */}
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 origin-left bg-[rgba(46,26,36,0.08)] transition-transform duration-[250ms] ease-linear"
+        style={{ transform: `scaleX(${Math.min(100, p) / 100})` }}
+      />
       <ClockIcon size={20} className="relative" />
       <span className="relative flex-1 text-[15px] font-bold">
         Rest <span className="inline-block min-w-[3.2ch] text-[20px] font-extrabold">{m}:{s}</span>

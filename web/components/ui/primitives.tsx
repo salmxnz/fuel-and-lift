@@ -1,11 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react"
 import { cn } from "@/lib/cn"
 import { initial } from "@/lib/format"
-import { BackIcon, CloseIcon } from "./icons"
+import { BackButton } from "./back-button"
+import { CloseIcon } from "./icons"
 
 // ------------------------------------------------------------ Buttons
 
@@ -45,7 +45,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        "inline-flex items-center justify-center gap-2 font-bold transition-opacity disabled:opacity-50",
+        // Press feedback: a slight scale-in, never on disabled buttons.
+        "inline-flex items-center justify-center gap-2 font-bold transition-[transform,opacity] duration-[160ms] ease-out enabled:active:scale-[0.97] disabled:opacity-50",
         variantClass[variant],
         sizeClass[size],
         className
@@ -87,7 +88,7 @@ export function ButtonLink({
 
 // ------------------------------------------------------------ Header
 
-/** White 44px square back button + small eyebrow + title, as in the designs. */
+/** Back chevron (see BackButton) + small eyebrow + title. */
 export function PageHeader({
   title,
   eyebrow,
@@ -104,29 +105,9 @@ export function PageHeader({
   right?: ReactNode
   titleClassName?: string
 }) {
-  const router = useRouter()
   return (
-    <div className="flex items-center gap-3">
-      {back ? (
-        back === "history" ? (
-          <button
-            type="button"
-            aria-label={backLabel}
-            onClick={() => (window.history.length > 1 ? router.back() : router.push("/today"))}
-            className="flex h-11 w-11 flex-none items-center justify-center rounded-[12px] bg-white text-ink"
-          >
-            <BackIcon size={20} />
-          </button>
-        ) : (
-          <Link
-            href={back}
-            aria-label={backLabel}
-            className="flex h-11 w-11 flex-none items-center justify-center rounded-[12px] bg-white text-ink"
-          >
-            <BackIcon size={20} />
-          </Link>
-        )
-      ) : null}
+    <div className="flex items-center gap-1.5">
+      {back ? <BackButton href={back} label={backLabel} /> : null}
       <div className="flex min-w-0 flex-1 flex-col">
         {eyebrow ? <span className="text-[13px] text-muted">{eyebrow}</span> : null}
         <h1 className={cn("m-0 truncate text-[24px] font-extrabold tracking-[-0.02em]", titleClassName)}>{title}</h1>
@@ -177,13 +158,19 @@ export function Switch({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative flex h-8 w-[52px] flex-none items-center rounded-full p-[3px] transition-colors disabled:opacity-50",
+        "relative flex h-8 w-[52px] flex-none items-center rounded-full p-[3px] transition-colors duration-150 disabled:opacity-50",
         // 44px tap target without changing the drawn size
         "before:absolute before:-inset-y-1.5 before:-inset-x-0 before:content-['']",
-        checked ? "justify-end bg-ink" : "justify-start bg-line"
+        checked ? "bg-ink" : "bg-line"
       )}
     >
-      <span className={cn("h-[26px] w-[26px] rounded-full transition-colors", checked ? "bg-pink" : "bg-white")} />
+      {/* The thumb slides (transform) rather than jumping between ends. */}
+      <span
+        className={cn(
+          "h-[26px] w-[26px] rounded-full transition-[transform,background-color] duration-[180ms] ease-out",
+          checked ? "translate-x-5 bg-pink" : "translate-x-0 bg-white"
+        )}
+      />
     </button>
   )
 }
@@ -223,7 +210,7 @@ export function Chip({
       disabled={disabled}
       {...aria}
       className={cn(
-        "relative inline-flex min-h-[34px] items-center rounded-full px-3 text-[13px] disabled:opacity-50",
+        "relative inline-flex min-h-[34px] items-center rounded-full px-3 text-[13px] transition-transform duration-[160ms] ease-out enabled:active:scale-[0.97] disabled:opacity-50",
         "before:absolute before:-inset-y-[5px] before:inset-x-0 before:content-['']",
         selected
           ? tone === "ink"

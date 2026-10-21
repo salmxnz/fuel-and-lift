@@ -21,13 +21,24 @@ export function CalorieCard({ day }: { day: Day }) {
       <div
         role="img"
         aria-label={`${Math.round(p)} percent of calorie target eaten`}
-        className="h-3 overflow-hidden rounded-[6px] bg-line-soft"
+        className="relative h-3 overflow-hidden rounded-[6px] bg-line-soft"
       >
         {eaten > 0 ? (
-          <div
-            className="box-border h-full border-r-2 border-ink bg-pink transition-[width] duration-500"
-            style={{ width: `${Math.min(100, p)}%` }}
-          />
+          <>
+            {/* Transforms only, no layout work: the fill scales, and the plum
+                end marker rides along on a translated full-width layer. */}
+            <div
+              className="h-full origin-left bg-pink transition-transform duration-300 ease-out"
+              style={{ transform: `scaleX(${Math.min(100, p) / 100})` }}
+            />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 flex justify-end transition-transform duration-300 ease-out"
+              style={{ transform: `translateX(${Math.min(100, p) - 100}%)` }}
+            >
+              <span className="h-full w-[2px] bg-ink" />
+            </div>
+          </>
         ) : null}
       </div>
       <div className="grid grid-cols-3 gap-3">
@@ -52,7 +63,7 @@ function MacroBar({ label, value, target, color }: { label: string; value: numbe
         aria-label={`${label}: ${num1(value)} of ${kcal(target)} grams`}
         className="h-1.5 overflow-hidden rounded-[3px] bg-line-soft"
       >
-        <div className={`h-full ${color}`} style={{ width: `${p}%` }} />
+        <div className={`h-full origin-left transition-transform duration-300 ease-out ${color}`} style={{ transform: `scaleX(${Math.min(100, p) / 100})` }} />
       </div>
     </div>
   )

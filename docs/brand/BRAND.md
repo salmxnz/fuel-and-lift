@@ -104,6 +104,40 @@ tokens to plum-on-pink values, so those screens keep the same markup.
 - **Wordmark:** custom drawn geometric letters (see above). Don't set
   "adebite" in Schibsted Grotesk as a logo; in running text it is fine.
 
+## Motion
+
+Quick and soft, never bouncy, except one rare celebration. Tokens live in
+`web/app/globals.css` (`@theme`) and `web/lib/motion.ts`.
+
+| Token | Value | Use |
+|---|---|---|
+| `--ease-out` / `EASE_OUT` | `cubic-bezier(0.23, 1, 0.32, 1)` | Anything entering, leaving or answering a tap |
+| `--ease-in-out` / `EASE_IN_OUT` | `cubic-bezier(0.77, 0, 0.175, 1)` | Things already on screen that move or fill |
+| `--ease-drawer` | `cubic-bezier(0.32, 0.72, 0, 1)` | Drawer-like surfaces |
+| `SPRING_SNAPPY` | stiffness 520, damping 38, mass 0.8 | Nav lens, selected-day pill, photo dots |
+| `SPRING_SHEET` | damping 32, stiffness 360 | Bottom sheets |
+| `SPRING_POP` | duration 0.5, bounce 0.2 | Only for a newly earned streak badge |
+| `PAGE_SLIDE` | 240 ms ease-out, 24 px + fade | Day swipes, onboarding steps, template versions |
+
+- **Press:** pressables scale to 0.97 (0.96 for the back button, 0.98 for big
+  cards) over 160 ms. Never on disabled ones.
+- **Budgets:** taps 100–160 ms, small surfaces ≤ 250 ms, nothing over 300 ms
+  except sheets (springs).
+- **Only `transform` and `opacity`.** Bars fill with `scaleX`, never `width`.
+- **Swipes** change page past 30% of the width or on a flick (> 0.11 px/ms).
+- **Reduced motion:** keep fades, drop movement.
+
+The back button is one component (`web/components/ui/back-button.tsx`): a bare
+22 px chevron in a 44 px round hit area, aligned to the content edge.
+
+## Pixel icons
+
+Exercises and rewards use "Free Pixel Gym & Fitness Icons 32x32" by reodesuxz
+(itch.io; free for commercial use, no redistribution of the pack). Show them
+only at whole multiples of 32 px with `image-rendering: pixelated`, on a
+`pink-soft` tile. Import with `npm run pixel-icons -- <zip>`; commit
+`web/public/pixel` only while the repository is private.
+
 ## Sign in with Google
 
 The button follows Google's branding guidelines

@@ -1,9 +1,11 @@
 "use client"
 
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import { Button, Spinner } from "@/components/ui/primitives"
-import { BackIcon, CheckIcon } from "@/components/ui/icons"
+import { BackButton } from "@/components/ui/back-button"
+import { CheckIcon } from "@/components/ui/icons"
 import { IOSInstallSteps } from "@/components/settings/notifications-screen"
 import { ApiError, api, errorMessage } from "@/lib/api/client"
 import type { ActivityLevel, Mode, OnboardingRequest, Pace, PlanPreviewRequest, Sex } from "@/lib/api/types"
@@ -11,6 +13,7 @@ import { cn } from "@/lib/cn"
 import { formatMonthYear, localTimeZone, todayISO, WEEKDAY_KEYS, type WeekdayKey } from "@/lib/dates"
 import { CM_PER_IN, kcal, kgToLb, lbToKg, num1, parseDecimal, round1 } from "@/lib/format"
 import { enablePush, isStandalone, needsIOSInstall, pushSupport } from "@/lib/push"
+import { PAGE_SLIDE, pageVariants } from "@/lib/motion"
 import { PacePicker, usePlanPreview } from "./pace-picker"
 import { Logo } from "@/components/brand/logo"
 
@@ -121,6 +124,16 @@ function Flow({ a, set, onFinished }: { a: Answers; set: (p: Partial<Answers>) =
   const step = steps[index] ?? "name"
   const go = (delta: number) => set({ step: steps[Math.min(steps.length - 1, Math.max(0, index + delta))] })
   const next = () => go(1)
+  const reduce = useReducedMotion()
+
+  // Which way the last step change went, so the new step slides in from the
+  // right going forward and from the left going back.
+  const [prevIndex, setPrevIndex] = useState(index)
+  const [dir, setDir] = useState(1)
+  if (prevIndex !== index) {
+    setDir(index > prevIndex ? 1 : -1)
+    setPrevIndex(index)
+  }
 
   return (
     <main
@@ -131,15 +144,7 @@ function Flow({ a, set, onFinished }: { a: Answers; set: (p: Partial<Answers>) =
           never shifts between steps. -ml-4 lines the chevron's tip up with the
           title below while the hit area stays 44px. */}
       <div className="flex items-center gap-1">
-        <button
-          type="button"
-          aria-label="Back"
-          onClick={() => go(-1)}
-          disabled={index === 0 || step === "done"}
-          className="-ml-4 flex h-11 w-11 flex-none items-center justify-center rounded-full text-ink transition-[transform,background-color] duration-150 ease-out hover:bg-ink/5 active:scale-[0.94] active:bg-ink/10 disabled:invisible"
-        >
-          <BackIcon size={22} />
-        </button>
+        <BackButton onClick={() => go(-1)} disabled={index === 0 || step === "done"} />
         <div
           role="progressbar"
           aria-label="Setup progress"
@@ -150,24 +155,45 @@ function Flow({ a, set, onFinished }: { a: Answers; set: (p: Partial<Answers>) =
           style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
         >
           {steps.map((s, i) => (
-            <span key={s} className={cn("h-[5px] rounded-[3px]", i <= index ? "bg-ink" : "bg-line")} />
+            <span key={s} className="h-[5px] overflow-hidden rounded-[3px] bg-line">
+              {/* Fills left to right (transform only), 300ms strong ease-in-out. */}
+              <span
+                className={cn(
+                  "block h-full origin-left bg-ink transition-transform duration-300 ease-in-out",
+                  i <= index ? "scale-x-100" : "scale-x-0"
+                )}
+              />
+            </span>
           ))}
         </div>
       </div>
 
-      {step === "name" && <NameStep a={a} set={set} next={next} />}
-      {step === "sex" && <SexStep a={a} set={set} next={next} />}
-      {step === "dob" && <DobStep a={a} set={set} next={next} />}
-      {step === "height" && <HeightStep a={a} set={set} next={next} />}
-      {step === "weight" && <WeightStep a={a} set={set} next={next} />}
-      {step === "activity" && <ActivityStep a={a} set={set} next={next} />}
-      {step === "mode" && <ModeStep a={a} set={set} next={next} />}
-      {step === "goal" && <GoalStep a={a} set={set} next={next} />}
-      {step === "pace" && <PaceStep a={a} set={set} next={next} />}
-      {step === "summary" && <SummaryStep a={a} next={next} />}
-      {step === "gym" && <GymStep a={a} set={set} next={next} />}
-      {step === "install" && <InstallStep next={next} />}
-      {step === "done" && <DoneStep a={a} onFinished={onFinished} />}
+      <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+        <motion.div
+          key={step}
+          custom={dir}
+          variants={reduce ? undefined : pageVariants}
+          initial={reduce ? { opacity: 0 } : "enter"}
+          animate={reduce ? { opacity: 1 } : "center"}
+          exit={reduce ? { opacity: 0 } : "exit"}
+          transition={PAGE_SLIDE}
+          className="flex flex-1 flex-col gap-5"
+        >
+          {step === "name" && <NameStep a={a} set={set} next={next} />}
+          {step === "sex" && <SexStep a={a} set={set} next={next} />}
+          {step === "dob" && <DobStep a={a} set={set} next={next} />}
+          {step === "height" && <HeightStep a={a} set={set} next={next} />}
+          {step === "weight" && <WeightStep a={a} set={set} next={next} />}
+          {step === "activity" && <ActivityStep a={a} set={set} next={next} />}
+          {step === "mode" && <ModeStep a={a} set={set} next={next} />}
+          {step === "goal" && <GoalStep a={a} set={set} next={next} />}
+          {step === "pace" && <PaceStep a={a} set={set} next={next} />}
+          {step === "summary" && <SummaryStep a={a} next={next} />}
+          {step === "gym" && <GymStep a={a} set={set} next={next} />}
+          {step === "install" && <InstallStep next={next} />}
+          {step === "done" && <DoneStep a={a} onFinished={onFinished} />}
+        </motion.div>
+      </AnimatePresence>
     </main>
   )
 }
@@ -269,7 +295,7 @@ function Choice({
       aria-checked={selected}
       onClick={onClick}
       className={cn(
-        "flex min-h-16 items-center justify-between gap-3 rounded-btn border-2 px-4 py-3 text-left",
+        "flex min-h-16 items-center justify-between gap-3 rounded-btn border-2 px-4 py-3 text-left transition-transform duration-[160ms] ease-out active:scale-[0.98]",
         selected ? "border-ink bg-pink" : "border-transparent bg-white"
       )}
     >
