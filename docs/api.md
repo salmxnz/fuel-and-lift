@@ -262,7 +262,9 @@ Error codes on `POST /v1/ai/meal-estimate`: `rate_minute` / `rate_day` (429),
 ```ts
 type Exercise = { id: string, name: string, kind: "strength" | "cardio",
                   muscle_group: string | null, equipment: string | null,
-                  media_url: string | null, gym_photo_url: string | null }
+                  media_url: string | null, gym_photo_url: string | null,
+                  aliases: string[],              // other names: "stairmaster", "rdl"
+                  matched_alias?: string }        // search only: the alias that matched
 
 type PlannedSet = { warmup: boolean, target_kg: number | null,
                     target_reps: number | null, to_failure: boolean }
@@ -278,6 +280,10 @@ type Template = { id: string, name: string, version: number, version_id: string,
                   blocks: TemplateBlock[], updated_at: string }
 ```
 ### `GET /v1/exercises?q=` → `200 {"exercises": Exercise[]}`
+Ranked search over the shared library and your own exercises: every word must
+match the name, an alias, the muscle group or the equipment, in any order,
+with a small typo allowed ("raise calf", "calf rasie", "stair master", "rdl").
+Best 50 results; an empty `q` returns everything by name.
 ### `POST /v1/exercises` `{name, kind, muscle_group?, equipment?}` → `201 {"exercise": Exercise}`
 ### `GET /v1/templates` → `200 {"templates": Template[]}`
 ### `POST /v1/templates` `{name, blocks: [{exercise_id, sets, cardio, rest_seconds, notes}]}` → `201 {"template": Template}`

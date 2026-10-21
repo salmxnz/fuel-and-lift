@@ -135,6 +135,7 @@ function PickerBody({ onPick }: { onPick: (exercise: Exercise) => void }) {
               <span className="flex min-w-0 flex-col">
                 <span className="truncate text-[15px] font-bold">{ex.name}</span>
                 <span className="text-[12px] text-muted">
+                  {ex.matched_alias ? `Matches “${ex.matched_alias}” · ` : ""}
                   {[ex.muscle_group, ex.equipment, ex.kind === "cardio" ? "Cardio" : null].filter(Boolean).join(", ") || "Exercise"}
                 </span>
               </span>

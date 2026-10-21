@@ -369,7 +369,7 @@ func TestAPI(t *testing.T) {
 		!strings.Contains(string(last.Edited), "Eggs") || !strings.Contains(ai.UserPrompt(*last), "no butter") {
 		t.Fatalf("refine request: %+v", last)
 	}
-	e.must(me, 200, "POST", "/v1/ai/meal-estimate", obj{"image": img})                 // admin is Pro
+	e.must(me, 200, "POST", "/v1/ai/meal-estimate", obj{"image": img}) // admin is Pro
 	bill := e.must(ravi, 200, "GET", "/v1/billing", nil)
 	if get(bill, "billing", "plan") != "free" || get(bill, "billing", "photo_estimates", "used_this_month").(float64) != 10 {
 		t.Fatalf("billing: %v", bill)
@@ -404,6 +404,16 @@ func TestAPI(t *testing.T) {
 		t.Fatal("no lat pulldown in the library")
 	}
 	lat := get(exs, 0, "id").(string)
+	if get(exs, 0, "name") != "Lat pulldown" {
+		t.Fatalf("lat search: %v", get(exs, 0, "name"))
+	}
+	sm := e.must(me, 200, "GET", "/v1/exercises?q=stair%20master", nil)
+	if get(sm, "exercises", 0, "name") != "Stair climber" || get(sm, "exercises", 0, "matched_alias") != "stair master" {
+		t.Fatalf("stair master search: %v", get(sm, "exercises", 0))
+	}
+	if n := len(get(e.must(me, 200, "GET", "/v1/exercises", nil), "exercises").([]any)); n < 110 {
+		t.Fatalf("library has %d exercises, want the bigger catalogue", n)
+	}
 	tm := get(e.must(me, 200, "GET", "/v1/exercises?q=treadmill", nil), "exercises", 0, "id").(string)
 	tpl := e.must(me, 201, "POST", "/v1/templates", obj{"name": "Upper-1", "blocks": []obj{
 		{"exercise_id": tm, "cardio": obj{"minutes": 5}},

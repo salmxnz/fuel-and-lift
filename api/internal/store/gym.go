@@ -16,36 +16,47 @@ import (
 
 // Exercise is a movement in the library.
 type Exercise struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Kind        string  `json:"kind"` // strength | cardio
-	MuscleGroup *string `json:"muscle_group"`
-	Equipment   *string `json:"equipment"`
-	MediaURL    *string `json:"media_url"`
-	GymPhotoURL *string `json:"gym_photo_url"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Kind        string   `json:"kind"` // strength | cardio
+	MuscleGroup *string  `json:"muscle_group"`
+	Equipment   *string  `json:"equipment"`
+	MediaURL    *string  `json:"media_url"`
+	GymPhotoURL *string  `json:"gym_photo_url"`
+	Aliases     []string `json:"aliases"`
+	// MatchedAlias is set by search when the hit came from another name
+	// ("stairmaster" → Stair climber).
+	MatchedAlias *string `json:"matched_alias,omitempty"`
 }
 
-const exerciseCols = `id::text, name, kind, muscle_group, equipment, media_url, gym_photo_url`
+const exerciseCols = `id::text, name, kind, muscle_group, equipment, media_url, gym_photo_url, aliases`
 
 func scanExercise(r pgx.CollectableRow) (Exercise, error) {
 	var e Exercise
-	return e, r.Scan(&e.ID, &e.Name, &e.Kind, &e.MuscleGroup, &e.Equipment, &e.MediaURL, &e.GymPhotoURL)
+	err := r.Scan(&e.ID, &e.Name, &e.Kind, &e.MuscleGroup, &e.Equipment, &e.MediaURL, &e.GymPhotoURL, &e.Aliases)
+	if e.Aliases == nil {
+		e.Aliases = []string{}
+	}
+	return e, err
 }
 
-// ListExercises searches the shared library and the user's own exercises.
+// ListExercises searches the shared library and the user's own exercises
+// (see RankExercises): any word order, other names and small typos match.
 func (s *Store) ListExercises(ctx context.Context, userID, q string) ([]Exercise, error) {
-	q = "%" + strings.ReplaceAll(strings.TrimSpace(q), "%", "") + "%"
 	rows, err := s.Pool.Query(ctx, `select `+exerciseCols+` from exercises
-		where (owner_id is null or owner_id = $1::uuid) and (name ilike $2 or coalesce(muscle_group, '') ilike $2)
-		order by name limit 100`, userID, q)
+		where owner_id is null or owner_id = $1::uuid order by name`, userID)
 	if err != nil {
 		return nil, err
 	}
-	out, err := pgx.CollectRows(rows, scanExercise)
-	if out == nil {
-		out = []Exercise{}
+	all, err := pgx.CollectRows(rows, scanExercise)
+	if err != nil {
+		return nil, err
 	}
-	return out, err
+	limit := 50
+	if strings.TrimSpace(q) == "" {
+		limit = 300
+	}
+	return RankExercises(all, q, limit), nil
 }
 
 // GetExercise returns one exercise the user can see.

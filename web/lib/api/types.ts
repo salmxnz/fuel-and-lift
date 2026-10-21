@@ -286,6 +286,10 @@ export type Exercise = {
   equipment: string | null
   media_url: string | null
   gym_photo_url: string | null
+  /** Other names people search by ("stairmaster", "rdl"). */
+  aliases: string[]
+  /** Search only: the other name that matched the query. */
+  matched_alias?: string
 }
 
 export type PlannedSet = {
