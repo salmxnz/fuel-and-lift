@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Update Upper-1</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#171A12}a:hover{color:#3E6B1F}
+button:focus-visible,a:focus-visible{outline:2px solid #3E6B1F;outline-offset:2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #171A12; color: #171A12; font-family: 'Schibsted Grotesk', system-ui, sans-serif; font-variant-numeric: tabular-nums;">
+  <div aria-hidden="true" style="position: absolute; left: 16px; right: 16px; top: 52px; display: flex; flex-direction: column; gap: 6px; color: #6A7260;">
+    <span style="font-size: 13px;">Upper-1 done</span>
+    <span style="font-size: 26px; font-weight: 800;">Quick review</span>
+  </div>
+
+  <section role="dialog" aria-modal="true" aria-labelledby="sheet-title" style="position: absolute; left: 0; right: 0; bottom: 0; background: #ECEEE7; border-radius: 26px 26px 0 0; padding: 10px 16px 28px; display: flex; flex-direction: column; gap: 16px;">
+    <span aria-hidden="true" style="align-self: center; width: 40px; height: 5px; border-radius: 3px; background: #CDD1C4;"></span>
+
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <h1 id="sheet-title" style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.02em;">Update Upper-1?</h1>
+      <p style="margin: 0; font-size: 15px; color: #5C6355; line-height: 1.45;">You lifted more than planned on every working set. Pick what next Monday should start from.</p>
+    </div>
+
+    <div style="background: #FFFFFF; border-radius: 18px; padding: 4px 14px; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #EEF0E8;">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+          <span id="chg-lat" style="font-size: 16px; font-weight: 700;">Lat pulldown</span>
+          <span style="font-size: 14px;"><span style="color: #5C6355; text-decoration: line-through;">35 kg</span> <span aria-hidden="true">→</span> <span style="font-weight: 700; background: #C8F04D; padding: 1px 6px; border-radius: 6px;">37.5 kg</span></span>
+        </div>
+        <button role="switch" aria-checked="true" aria-labelledby="chg-lat" style="width: 52px; height: 32px; flex: none; border-radius: 999px; border: none; background: #171A12; padding: 3px; display: flex; justify-content: flex-end;"><span style="width: 26px; height: 26px; border-radius: 50%; background: #C8F04D;"></span></button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0;">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: 16px; font-weight: 700;">Incline dumbbell press</span>
+          <span style="font-size: 14px; color: #5C6355; line-height: 1.4;">8 reps instead of 7 at 12 kg. Saved in your history; extra reps alone don't change the plan.</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; border: 1.5px dashed #A3A99A;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3E6B1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 1px;"><path d="M4 16l5-5 4 4 7-8"></path><path d="M15 7h5v5"></path></svg>
+      <span style="font-size: 13px; line-height: 1.45;">Upper-1 v1 stays in your history, so the progress chart shows the jump.</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <a href="Main.dc.html" style="min-height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 16px; background: #171A12; color: #FFFFFF; font-size: 16px; font-weight: 700; text-decoration: none;">Save as Upper-1 v2</a>
+      <a href="Main.dc.html" style="min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 16px; color: #171A12; font-size: 15px; font-weight: 600;">Keep Upper-1 as it is</a>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

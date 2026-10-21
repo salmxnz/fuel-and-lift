@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>My meals</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#171A12}a:hover{color:#3E6B1F}
+a:focus-visible,button:focus-visible{outline:2px solid #3E6B1F;outline-offset:2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; padding: 52px 16px 0; background: #ECEEE7; color: #171A12; font-family: 'Schibsted Grotesk', system-ui, sans-serif; display: flex; flex-direction: column; gap: 14px;">
+
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <a href="Me.dc.html" aria-label="Back to Me" style="width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #FFFFFF; color: #171A12;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+    </a>
+    <div style="display: flex; flex-direction: column;">
+      <span style="font-size: 13px; color: #5C6355;">Me</span>
+      <h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em;">My meals</h1>
+    </div>
+  </div>
+
+  <p style="margin: 0; font-size: 14px; color: #5C6355; line-height: 1.45;">These show on Today every day, in this order. Drag to reorder, tap to rename or change when they show.</p>
+
+  <ol aria-label="Meals" style="list-style: none; margin: 0; padding: 4px 14px; background: #FFFFFF; border-radius: 18px; display: flex; flex-direction: column;">
+    <li style="display: flex; align-items: center; gap: 12px; min-height: 60px; border-bottom: 1px solid #EEF0E8;">
+      <button aria-label="Reorder Breakfast" style="width: 28px; height: 44px; border: none; background: transparent; color: #A3A99A; padding: 0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg></button>
+      <a href="#" style="flex: 1; display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: #171A12;"><span style="display: flex; flex-direction: column;"><span style="font-size: 16px; font-weight: 700;">Breakfast</span><span style="font-size: 12px; color: #5C6355;">Every day</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5C6355" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></a>
+    </li>
+    <li style="display: flex; align-items: center; gap: 12px; min-height: 60px; border-bottom: 1px solid #EEF0E8;">
+      <button aria-label="Reorder Lunch" style="width: 28px; height: 44px; border: none; background: transparent; color: #A3A99A; padding: 0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg></button>
+      <a href="#" style="flex: 1; display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: #171A12;"><span style="display: flex; flex-direction: column;"><span style="font-size: 16px; font-weight: 700;">Lunch</span><span style="font-size: 12px; color: #5C6355;">Every day</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5C6355" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></a>
+    </li>
+    <li style="display: flex; align-items: center; gap: 12px; min-height: 60px; border-bottom: 1px solid #EEF0E8;">
+      <button aria-label="Reorder Pre-workout" style="width: 28px; height: 44px; border: none; background: transparent; color: #A3A99A; padding: 0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg></button>
+      <a href="#" style="flex: 1; display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: #171A12;"><span style="display: flex; flex-direction: column;"><span style="font-size: 16px; font-weight: 700;">Pre-workout</span><span style="font-size: 12px; color: #3E6B1F; font-weight: 600;">Gym days only</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5C6355" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></a>
+    </li>
+    <li style="display: flex; align-items: center; gap: 12px; min-height: 60px; border-bottom: 1px solid #EEF0E8;">
+      <button aria-label="Reorder Dinner" style="width: 28px; height: 44px; border: none; background: transparent; color: #A3A99A; padding: 0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg></button>
+      <a href="#" style="flex: 1; display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: #171A12;"><span style="display: flex; flex-direction: column;"><span style="font-size: 16px; font-weight: 700;">Dinner</span><span style="font-size: 12px; color: #5C6355;">Every day</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5C6355" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></a>
+    </li>
+    <li style="display: flex; align-items: center; gap: 12px; min-height: 60px;">
+      <button aria-label="Reorder Snacks" style="width: 28px; height: 44px; border: none; background: transparent; color: #A3A99A; padding: 0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg></button>
+      <a href="#" style="flex: 1; display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: #171A12;"><span style="display: flex; flex-direction: column;"><span style="font-size: 16px; font-weight: 700;">Snacks</span><span style="font-size: 12px; color: #5C6355;">Every day</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5C6355" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></a>
+    </li>
+  </ol>
+
+  <button style="font: inherit; min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 16px; border: 1.5px dashed #A3A99A; background: transparent; color: #171A12; font-size: 15px; font-weight: 700;">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Add a meal</button>
+
+  <div style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: #FFFFFF;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3E6B1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 1px;"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+    <span style="font-size: 13px; line-height: 1.45;">Need one just for today, like a late-night snack? Use <strong>Add a meal today</strong> on Today. It won't change this list.</span>
+  </div>
+
+  <nav aria-label="Main" style="position: absolute; left: 16px; right: 16px; bottom: 26px; display: flex; gap: 10px; align-items: center;">
+    <div style="flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 5px; border-radius: 999px; background: rgba(255,255,255,0.5); backdrop-filter: blur(18px) saturate(180%); -webkit-backdrop-filter: blur(18px) saturate(180%); border: 1px solid rgba(255,255,255,0.7); box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), inset 0 -1px 0 rgba(23,26,18,0.06), 0 6px 20px rgba(23,26,18,0.10);">
+      <a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 0; border-radius: 999px; color: #3B4034; font-size: 11px; font-weight: 600; text-decoration: none;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20H4Z"></path><path d="M10 20v-5h4v5"></path></svg>Today</a>
+      <a href="Workout.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 0; border-radius: 999px; color: #3B4034; font-size: 11px; font-weight: 600; text-decoration: none;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11"></path></svg>Gym</a>
+      <a href="Progress.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 0; border-radius: 999px; color: #3B4034; font-size: 11px; font-weight: 600; text-decoration: none;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M6 15l4-5 3 3 5-6"></path></svg>Progress</a>
+      <a href="#" aria-current="page" style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 0; border-radius: 999px; background: rgba(255,255,255,0.9); box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 3px rgba(23,26,18,0.12); color: #171A12; font-size: 11px; font-weight: 700; text-decoration: none;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c1.3-3.6 4-5.5 7-5.5s5.7 1.9 7 5.5"></path></svg>Me</a>
+    </div>
+    <a href="Add-Menu.dc.html" aria-label="Add food or workout" style="width: 62px; height: 62px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #C8F04D; color: #171A12; border: 1px solid rgba(23,26,18,0.15); box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), 0 6px 20px rgba(23,26,18,0.14);">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

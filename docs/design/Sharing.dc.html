@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sharing</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#171A12}a:hover{color:#3E6B1F}
+a:focus-visible,button:focus-visible{outline:2px solid #3E6B1F;outline-offset:2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 52px 16px 24px; background: #ECEEE7; color: #171A12; font-family: 'Schibsted Grotesk', system-ui, sans-serif; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <a href="Me.dc.html" aria-label="Back to Me" style="width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #FFFFFF; color: #171A12;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <div style="display: flex; flex-direction: column;"><span style="font-size: 13px; color: #5C6355;">Me</span><h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em;">Sharing</h1></div>
+  </div>
+
+  <p style="margin: 0; font-size: 14px; color: #5C6355; line-height: 1.45;">Choose what your friends see. Switching something off also hides what you shared before.</p>
+
+  <section aria-label="What friends see" style="background: #FFFFFF; border-radius: 18px; padding: 2px 14px; display: flex; flex-direction: column;">
+    <sc-for list="{{ share }}" as="row" hint-placeholder-count="5">
+      <div style="min-height: 64px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #EEF0E8;">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; font-weight: 700;">{{ row.title }}</span><span style="font-size: 12px; color: #5C6355; line-height: 1.35;">{{ row.sub }}</span></div>
+        <sc-if value="{{ row.on }}" hint-placeholder-val="{{ true }}">
+          <button role="switch" aria-checked="true" aria-label="{{ row.title }}" onClick="{{ row.toggle }}" style="width: 52px; height: 32px; flex: none; border-radius: 999px; border: none; background: #171A12; padding: 3px; display: flex; justify-content: flex-end; cursor: pointer;"><span style="width: 26px; height: 26px; border-radius: 50%; background: #C8F04D;"></span></button>
+        </sc-if>
+        <sc-if value="{{ row.off }}" hint-placeholder-val="{{ false }}">
+          <button role="switch" aria-checked="false" aria-label="{{ row.title }}" onClick="{{ row.toggle }}" style="width: 52px; height: 32px; flex: none; border-radius: 999px; border: none; background: #CDD1C4; padding: 3px; display: flex; justify-content: flex-start; cursor: pointer;"><span style="width: 26px; height: 26px; border-radius: 50%; background: #FFFFFF;"></span></button>
+        </sc-if>
+      </div>
+    </sc-for>
+  </section>
+
+  <section aria-label="Preview" style="border: 1.5px dashed #A3A99A; border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;">
+    <span style="font-size: 12px; font-weight: 600; color: #5C6355;">Your friends would see</span>
+    <span style="font-size: 14px; font-weight: 600;">{{ preview }}</span>
+  </section>
+
+  <section aria-label="Notifications from friends" style="background: #FFFFFF; border-radius: 18px; padding: 2px 14px; display: flex; flex-direction: column;">
+    <div style="min-height: 60px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #EEF0E8;">
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><span id="n-workouts" style="font-size: 15px; font-weight: 700;">When friends work out</span><span style="font-size: 12px; color: #5C6355;">Push notification, per friend in Friends</span></div>
+      <button role="switch" aria-checked="true" aria-labelledby="n-workouts" style="width: 52px; height: 32px; flex: none; border-radius: 999px; border: none; background: #171A12; padding: 3px; display: flex; justify-content: flex-end;"><span style="width: 26px; height: 26px; border-radius: 50%; background: #C8F04D;"></span></button>
+    </div>
+    <div style="min-height: 60px; display: flex; align-items: center; gap: 12px;">
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><span id="n-cheers" style="font-size: 15px; font-weight: 700;">Cheers on your workouts</span><span style="font-size: 12px; color: #5C6355;">When a friend taps Cheer</span></div>
+      <button role="switch" aria-checked="true" aria-labelledby="n-cheers" style="width: 52px; height: 32px; flex: none; border-radius: 999px; border: none; background: #171A12; padding: 3px; display: flex; justify-content: flex-end;"><span style="width: 26px; height: 26px; border-radius: 50%; background: #C8F04D;"></span></button>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { on: { workouts: true, details: false, records: true, weight: false, streaks: false } }; }
+  renderVals() {
+    const defs = [
+      { key: 'workouts', title: 'Workouts', sub: 'That you worked out today, and which template' },
+      { key: 'details', title: 'Workout details', sub: 'Exercises, sets and weights' },
+      { key: 'records', title: 'Personal records', sub: 'New best lifts' },
+      { key: 'weight', title: 'Weight trend', sub: 'Direction and milestones, never the number' },
+      { key: 'streaks', title: 'Food streaks', sub: 'Days in a row hitting protein or calories' }
+    ];
+    const on = this.state.on;
+    const share = defs.map((d) => ({ ...d, on: !!on[d.key], off: !on[d.key], toggle: () => this.setState({ on: { ...on, [d.key]: !on[d.key] } }) }));
+    const parts = [];
+    if (on.workouts) parts.push(on.details ? 'Bhavish finished Upper-1: lat pulldown 2 × 37.5 kg, row 2 × 45 kg' : 'Bhavish worked out today: Upper-1');
+    if (on.records) parts.push('New record: lat pulldown 37.5 kg × 8');
+    if (on.weight) parts.push('Weight is trending up');
+    if (on.streaks) parts.push('Hit protein 3 days in a row');
+    return { share, preview: parts.length ? parts.join('. ') + '.' : 'Nothing. Friends only see that you are on Fuel & Lift.' };
+  }
+}
+</script>
+</body>
+</html>

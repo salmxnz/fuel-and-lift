@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Friends</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#171A12}a:hover{color:#3E6B1F}
+a:focus-visible,button:focus-visible{outline:2px solid #3E6B1F;outline-offset:2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; padding: 52px 16px 0; background: #ECEEE7; color: #171A12; font-family: 'Schibsted Grotesk', system-ui, sans-serif; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <a href="Me.dc.html" aria-label="Back to Me" style="width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #FFFFFF; color: #171A12;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <h1 style="margin: 0; flex: 1; font-size: 26px; font-weight: 800; letter-spacing: -0.02em;">Friends</h1>
+    <a href="Add-Friend.dc.html" style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 6px; border-radius: 12px; background: #171A12; color: #FFFFFF; font-size: 14px; font-weight: 700; text-decoration: none;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Add friend</a>
+  </div>
+
+  <section aria-label="Activity" style="display: flex; flex-direction: column; gap: 8px;">
+    <h2 style="margin: 4px 0 0; font-size: 13px; font-weight: 600; color: #5C6355;">Today</h2>
+
+    <article style="background: #FFFFFF; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span aria-hidden="true" style="width: 40px; height: 40px; flex: none; border-radius: 50%; background: #E8E1F5; font-size: 16px; font-weight: 800; display: flex; align-items: center; justify-content: center;">F</span>
+        <div style="flex: 1; display: flex; flex-direction: column;"><span style="font-size: 15px;"><strong>[Friend]</strong> worked out today</span><span style="font-size: 12px; color: #5C6355;">[Their template] finished</span></div>
+        <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 10px; background: #171A12; color: #C8F04D; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11"></path></svg></span>
+      </div>
+      <button aria-pressed="false" style="font: inherit; align-self: flex-start; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid #CDD1C4; background: transparent; color: #171A12; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V20H4V11ZM7 11l4-7c1.7 0 2.5 1 2.2 2.6L12.6 10H19a1.6 1.6 0 0 1 1.6 1.9l-1.4 6.6A2 2 0 0 1 17.2 20H7"></path></svg>Cheer</button>
+    </article>
+
+    <article style="background: #FFFFFF; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; border: 1.5px solid #C8F04D;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span aria-hidden="true" style="width: 40px; height: 40px; flex: none; border-radius: 50%; background: #171A12; color: #C8F04D; font-size: 16px; font-weight: 800; display: flex; align-items: center; justify-content: center;">B</span>
+        <div style="flex: 1; display: flex; flex-direction: column;"><span style="font-size: 15px;"><strong>You</strong> set a record</span><span style="font-size: 12px; color: #5C6355;">Lat pulldown 37.5 kg × 8</span></div>
+        <span style="font-size: 12px; font-weight: 800; padding: 4px 8px; border-radius: 999px; background: #C8F04D;">PR</span>
+      </div>
+      <span style="font-size: 12px; color: #5C6355;">Your friends see this because Records is on in Sharing.</span>
+    </article>
+
+    <article style="background: #FFFFFF; border-radius: 18px; padding: 14px; display: flex; align-items: center; gap: 10px;">
+      <span aria-hidden="true" style="width: 40px; height: 40px; flex: none; border-radius: 50%; background: #171A12; color: #C8F04D; font-size: 16px; font-weight: 800; display: flex; align-items: center; justify-content: center;">B</span>
+      <div style="flex: 1; display: flex; flex-direction: column;"><span style="font-size: 15px;"><strong>You</strong> worked out today</span><span style="font-size: 12px; color: #5C6355;">Upper-1 finished</span></div>
+      <span style="font-size: 13px; color: #5C6355;">Cheers appear here</span>
+    </article>
+  </section>
+
+  <section aria-label="Your friends" style="background: #FFFFFF; border-radius: 18px; padding: 2px 14px; display: flex; flex-direction: column;">
+    <div style="min-height: 60px; display: flex; align-items: center; gap: 10px;">
+      <span aria-hidden="true" style="width: 36px; height: 36px; flex: none; border-radius: 50%; background: #E8E1F5; font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center;">F</span>
+      <div style="flex: 1; display: flex; flex-direction: column;"><span style="font-size: 15px; font-weight: 700;">[Friend]</span><span style="font-size: 12px; color: #5C6355;">Notify me when they work out</span></div>
+      <button role="switch" aria-checked="true" aria-label="Notify me when [Friend] works out" style="width: 52px; height: 32px; flex: none; border-radius: 999px; border: none; background: #171A12; padding: 3px; display: flex; justify-content: flex-end;"><span style="width: 26px; height: 26px; border-radius: 50%; background: #C8F04D;"></span></button>
+    </div>
+  </section>
+
+  <a href="Add-Friend.dc.html" style="min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 16px; border: 1.5px dashed #A3A99A; color: #171A12; font-size: 14px; font-weight: 600; text-decoration: none;">Send a friend link<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></a>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

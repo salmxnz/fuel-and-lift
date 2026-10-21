@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Add from a restaurant</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#171A12}a:hover{color:#3E6B1F}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #3E6B1F;outline-offset:2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 52px 16px 24px; background: #ECEEE7; color: #171A12; font-family: 'Schibsted Grotesk', system-ui, sans-serif; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <a href="Main.dc.html" aria-label="Back to Today" style="width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #FFFFFF; color: #171A12;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+    </a>
+    <div style="display: flex; flex-direction: column;">
+      <span style="font-size: 13px; color: #5C6355;">Dinner</span>
+      <h1 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em;">Add from a restaurant</h1>
+    </div>
+  </div>
+
+  <label style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border-radius: 14px; background: #FFFFFF; border: 1px solid #CDD1C4;">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5C6355" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4-4"></path></svg>
+    <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">What did you order?</span>
+    <input value="kfc zinger meal, no drink" style="font: inherit; font-size: 15px; flex: 1; min-width: 0; border: none; outline: none; background: transparent; color: #171A12;">
+  </label>
+
+  <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+    <button aria-pressed="false" style="font: inherit; font-size: 13px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #CDD1C4; background: #FFFFFF; color: #171A12;">McDonald's</button>
+    <button aria-pressed="true" style="font: inherit; font-size: 13px; font-weight: 700; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #171A12; background: #171A12; color: #FFFFFF;">KFC</button>
+    <button aria-pressed="false" style="font: inherit; font-size: 13px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #CDD1C4; background: #FFFFFF; color: #171A12;">Your places</button>
+  </div>
+
+  <article aria-label="Zinger meal, built for you" style="background: #FFFFFF; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column;">
+    <div style="background: #171A12; color: #FFFFFF; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <span style="font-size: 12px; color: #B9BFAF;">KFC</span>
+        <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.01em;">Zinger meal</span>
+      </div>
+      <div role="radiogroup" aria-label="Meal size" style="display: flex; padding: 3px; border-radius: 999px; background: #2C3125;">
+        <button role="radio" aria-checked="true" style="font: inherit; font-size: 13px; font-weight: 700; min-height: 32px; padding: 0 12px; border-radius: 999px; border: none; background: #C8F04D; color: #171A12;">Regular</button>
+        <button role="radio" aria-checked="false" style="font: inherit; font-size: 13px; min-height: 32px; padding: 0 12px; border-radius: 999px; border: none; background: transparent; color: #FFFFFF;">Large</button>
+      </div>
+    </div>
+
+    <div style="padding: 2px 16px; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #EEF0E8;">
+        <input type="checkbox" checked aria-label="Include Zinger burger" style="width: 20px; height: 20px; accent-color: #171A12; margin: 0;">
+        <div style="flex: 1; display: flex; flex-direction: column;"><span style="font-size: 15px; font-weight: 700;">Zinger burger</span><span style="font-size: 12px; color: #3E6B1F; font-weight: 600;">Official table</span></div>
+        <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #5C6355;"><input placeholder="[kcal]" aria-label="Zinger burger kcal" style="font: inherit; font-size: 14px; font-weight: 600; color: #171A12; width: 58px; min-height: 36px; text-align: right; border: 1px solid #CDD1C4; border-radius: 10px; padding: 0 6px; box-sizing: border-box;">kcal</label>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #EEF0E8;">
+        <input type="checkbox" checked aria-label="Include fries" style="width: 20px; height: 20px; accent-color: #171A12; margin: 0;">
+        <div style="flex: 1; display: flex; flex-direction: column;"><span style="font-size: 15px; font-weight: 700;">Fries, regular</span><span style="font-size: 12px; color: #3E6B1F; font-weight: 600;">Official table</span></div>
+        <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #5C6355;"><input placeholder="[kcal]" aria-label="Fries kcal" style="font: inherit; font-size: 14px; font-weight: 600; color: #171A12; width: 58px; min-height: 36px; text-align: right; border: 1px solid #CDD1C4; border-radius: 10px; padding: 0 6px; box-sizing: border-box;">kcal</label>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #EEF0E8;">
+        <input type="checkbox" checked aria-label="Include coleslaw" style="width: 20px; height: 20px; accent-color: #171A12; margin: 0;">
+        <div style="flex: 1; display: flex; flex-direction: column;"><span style="font-size: 15px; font-weight: 700;">Coleslaw</span><span style="font-size: 12px; color: #8A5A00; font-weight: 600;">AI estimate, worth checking</span></div>
+        <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #5C6355;"><input placeholder="[kcal]" aria-label="Coleslaw kcal" style="font: inherit; font-size: 14px; font-weight: 600; color: #171A12; width: 58px; min-height: 36px; text-align: right; border: 1.5px dashed #C98A2B; border-radius: 10px; padding: 0 6px; box-sizing: border-box;">kcal</label>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; color: #5C6355;">
+        <input type="checkbox" aria-label="Include drink" style="width: 20px; height: 20px; accent-color: #171A12; margin: 0;">
+        <div style="flex: 1; display: flex; flex-direction: column;"><span style="font-size: 15px; font-weight: 600; text-decoration: line-through;">Soft drink</span><span style="font-size: 12px;">Left out, as you said</span></div>
+      </div>
+    </div>
+
+    <div style="padding: 12px 16px; background: #F5F6F1; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+      <span style="font-size: 13px; color: #5C6355;">Totals update as you edit</span>
+      <span style="font-size: 20px; font-weight: 800;">[total] <span style="font-size: 13px; font-weight: 500; color: #5C6355;">kcal</span></span>
+    </div>
+  </article>
+
+  <p style="margin: 0; font-size: 12px; line-height: 1.45; color: #5C6355; padding: 0 4px;">Menus and portions differ by country. Items you save here become your own, so the next Zinger meal is one tap.</p>
+
+  <div style="flex: 1;"></div>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+    <button style="font: inherit; font-size: 15px; font-weight: 700; min-height: 54px; border-radius: 16px; border: 1px solid #171A12; background: transparent; color: #171A12;">Save to my meals</button>
+    <a href="Main.dc.html" style="min-height: 54px; display: flex; align-items: center; justify-content: center; border-radius: 16px; background: #171A12; color: #FFFFFF; font-size: 15px; font-weight: 700; text-decoration: none;">Log dinner</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

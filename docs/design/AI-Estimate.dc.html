@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Photo meal builder</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#171A12}a:hover{color:#3E6B1F}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #3E6B1F;outline-offset:2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 52px 16px 24px; background: #ECEEE7; color: #171A12; font-family: 'Schibsted Grotesk', system-ui, sans-serif; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <a href="Main.dc.html" aria-label="Back to Today" style="width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #FFFFFF; color: #171A12;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+    </a>
+    <div style="display: flex; flex-direction: column;">
+      <span style="font-size: 13px; color: #5C6355;">Lunch</span>
+      <h1 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em;">Check what I found</h1>
+    </div>
+  </div>
+
+  <figure style="margin: 0; position: relative; height: 172px; border-radius: 18px; overflow: hidden; background: #3A3F33;">
+    <svg width="358" height="172" viewBox="0 0 358 172" role="img" aria-label="Your lunch photo: rice, fish and curry sauce on a plate">
+      <rect width="358" height="172" fill="#5A4B3A"></rect>
+      <ellipse cx="179" cy="92" rx="132" ry="74" fill="#F4F1EA"></ellipse>
+      <ellipse cx="179" cy="92" rx="112" ry="60" fill="#E9E5DB"></ellipse>
+      <path d="M92 92c4-28 40-44 76-40 26 3 30 24 22 44-10 22-48 30-72 22-18-6-28-14-26-26Z" fill="#FBFAF4"></path>
+      <path d="M180 60c34-10 82 2 92 26 8 22-18 40-52 40-30 0-48-12-48-30 0-14 0-30 8-36Z" fill="#C98A2B"></path>
+      <path d="M206 72c10-6 28-4 32 6 3 8-8 14-20 14-12 0-18-10-12-20Z" fill="#EBD8B4"></path>
+      <path d="M226 96c10-4 24 0 26 8 1 6-8 10-18 9-10-1-14-12-8-17Z" fill="#E6CFA4"></path>
+    </svg>
+    <span aria-hidden="true" style="position: absolute; left: 112px; top: 64px; width: 24px; height: 24px; border-radius: 50%; background: #C8F04D; border: 2px solid #171A12; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center;">1</span>
+    <span aria-hidden="true" style="position: absolute; left: 212px; top: 54px; width: 24px; height: 24px; border-radius: 50%; background: #C8F04D; border: 2px solid #171A12; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center;">2</span>
+    <span aria-hidden="true" style="position: absolute; left: 262px; top: 98px; width: 24px; height: 24px; border-radius: 50%; background: #C8F04D; border: 2px solid #171A12; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center;">3</span>
+  </figure>
+
+  <section aria-label="Questions" style="background: #FFFFFF; border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <span id="q-rice" style="font-size: 13px; font-weight: 600;">How much rice?</span>
+      <div role="radiogroup" aria-labelledby="q-rice" style="display: flex; gap: 6px;">
+        <button role="radio" aria-checked="false" style="font: inherit; font-size: 13px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #CDD1C4; background: transparent; color: #171A12;">Small</button>
+        <button role="radio" aria-checked="true" style="font: inherit; font-size: 13px; font-weight: 700; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #171A12; background: #C8F04D; color: #171A12;">Normal plate</button>
+        <button role="radio" aria-checked="false" style="font: inherit; font-size: 13px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #CDD1C4; background: transparent; color: #171A12;">Heaped</button>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <span id="q-fish" style="font-size: 13px; font-weight: 600;">How was the fish cooked?</span>
+      <div role="radiogroup" aria-labelledby="q-fish" style="display: flex; gap: 6px;">
+        <button role="radio" aria-checked="true" style="font: inherit; font-size: 13px; font-weight: 700; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #171A12; background: #C8F04D; color: #171A12;">In the curry</button>
+        <button role="radio" aria-checked="false" style="font: inherit; font-size: 13px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #CDD1C4; background: transparent; color: #171A12;">Fried</button>
+        <button role="radio" aria-checked="false" style="font: inherit; font-size: 13px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #CDD1C4; background: transparent; color: #171A12;">Grilled</button>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="What is on the plate" style="background: #FFFFFF; border-radius: 18px; padding: 4px 14px; display: flex; flex-direction: column;">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #EEF0E8;">
+      <span aria-hidden="true" style="width: 22px; height: 22px; flex: none; border-radius: 50%; background: #C8F04D; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;">1</span>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span style="font-size: 15px; font-weight: 700;">White rice</span><span style="font-size: 12px; color: #5C6355;">Cooked, your normal plate</span></div>
+      <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #5C6355;"><input value="250" aria-label="Rice grams" style="font: inherit; font-size: 14px; font-weight: 600; color: #171A12; width: 46px; min-height: 36px; text-align: right; border: 1px solid #CDD1C4; border-radius: 10px; padding: 0 6px; box-sizing: border-box;">g</label>
+      <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #5C6355;"><input value="325" aria-label="Rice kcal" style="font: inherit; font-size: 14px; font-weight: 600; color: #171A12; width: 50px; min-height: 36px; text-align: right; border: 1px solid #CDD1C4; border-radius: 10px; padding: 0 6px; box-sizing: border-box;">kcal</label>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #EEF0E8;">
+      <span aria-hidden="true" style="width: 22px; height: 22px; flex: none; border-radius: 50%; background: #C8F04D; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;">2</span>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span style="font-size: 15px; font-weight: 700;">Fish, curried</span><span style="font-size: 12px; color: #5C6355;">Two big bites</span></div>
+      <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #5C6355;"><input value="60" aria-label="Fish grams" style="font: inherit; font-size: 14px; font-weight: 600; color: #171A12; width: 46px; min-height: 36px; text-align: right; border: 1px solid #CDD1C4; border-radius: 10px; padding: 0 6px; box-sizing: border-box;">g</label>
+      <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #5C6355;"><input value="90" aria-label="Fish kcal" style="font: inherit; font-size: 14px; font-weight: 600; color: #171A12; width: 50px; min-height: 36px; text-align: right; border: 1px solid #CDD1C4; border-radius: 10px; padding: 0 6px; box-sizing: border-box;">kcal</label>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #EEF0E8;">
+      <span aria-hidden="true" style="width: 22px; height: 22px; flex: none; border-radius: 50%; background: #C8F04D; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;">3</span>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span style="font-size: 15px; font-weight: 700;">Curry sauce</span><span style="font-size: 12px; color: #5C6355;">A few spoonfuls, with its oil</span></div>
+      <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #5C6355;"><input value="60" aria-label="Sauce grams" style="font: inherit; font-size: 14px; font-weight: 600; color: #171A12; width: 46px; min-height: 36px; text-align: right; border: 1px solid #CDD1C4; border-radius: 10px; padding: 0 6px; box-sizing: border-box;">g</label>
+      <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #5C6355;"><input value="70" aria-label="Sauce kcal" style="font: inherit; font-size: 14px; font-weight: 600; color: #171A12; width: 50px; min-height: 36px; text-align: right; border: 1px solid #CDD1C4; border-radius: 10px; padding: 0 6px; box-sizing: border-box;">kcal</label>
+    </div>
+    <button style="font: inherit; font-size: 14px; font-weight: 600; min-height: 44px; border: none; background: transparent; color: #3E6B1F; text-align: left; padding: 0; display: flex; align-items: center; gap: 6px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Add something I missed</button>
+  </section>
+
+  <section aria-label="Meal total" style="display: grid; grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr)); gap: 8px; align-items: end; padding: 0 4px;">
+    <div style="display: flex; flex-direction: column;"><span style="font-size: 12px; color: #5C6355;">Total</span><span style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em;">485 <span style="font-size: 13px; font-weight: 500; color: #5C6355;">kcal</span></span></div>
+    <div style="display: flex; flex-direction: column;"><span style="font-size: 12px; color: #5C6355;">Protein</span><span style="font-size: 16px; font-weight: 700;">22 g</span></div>
+    <div style="display: flex; flex-direction: column;"><span style="font-size: 12px; color: #5C6355;">Carbs</span><span style="font-size: 16px; font-weight: 700;">75 g</span></div>
+    <div style="display: flex; flex-direction: column;"><span style="font-size: 12px; color: #5C6355;">Fat</span><span style="font-size: 16px; font-weight: 700;">9 g</span></div>
+  </section>
+
+  <div style="flex: 1;"></div>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+    <button style="font: inherit; font-size: 15px; font-weight: 700; min-height: 54px; border-radius: 16px; border: 1px solid #171A12; background: transparent; color: #171A12;">Save to my meals</button>
+    <a href="Main.dc.html" style="min-height: 54px; display: flex; align-items: center; justify-content: center; border-radius: 16px; background: #171A12; color: #FFFFFF; font-size: 15px; font-weight: 700; text-decoration: none;">Log lunch</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

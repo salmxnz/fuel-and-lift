@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Choose your pace</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#171A12}a:hover{color:#3E6B1F}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; box-sizing: border-box; padding: 52px 20px 28px; background: #ECEEE7; color: #171A12; font-family: 'Schibsted Grotesk', system-ui, sans-serif; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 20px;">
+
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <a href="#" aria-label="Back" style="width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #FFFFFF; color: #171A12;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+    </a>
+    <div role="progressbar" aria-label="Setup progress" aria-valuemin="1" aria-valuemax="14" aria-valuenow="10" style="flex: 1; display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 3px;">
+      <span style="height: 5px; border-radius: 3px; background: #171A12;"></span><span style="height: 5px; border-radius: 3px; background: #171A12;"></span><span style="height: 5px; border-radius: 3px; background: #171A12;"></span><span style="height: 5px; border-radius: 3px; background: #171A12;"></span><span style="height: 5px; border-radius: 3px; background: #171A12;"></span><span style="height: 5px; border-radius: 3px; background: #171A12;"></span><span style="height: 5px; border-radius: 3px; background: #171A12;"></span><span style="height: 5px; border-radius: 3px; background: #171A12;"></span><span style="height: 5px; border-radius: 3px; background: #171A12;"></span><span style="height: 5px; border-radius: 3px; background: #171A12;"></span><span style="height: 5px; border-radius: 3px; background: #CDD1C4;"></span><span style="height: 5px; border-radius: 3px; background: #CDD1C4;"></span><span style="height: 5px; border-radius: 3px; background: #CDD1C4;"></span><span style="height: 5px; border-radius: 3px; background: #CDD1C4;"></span>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <h1 style="margin: 0; font-size: 32px; font-weight: 800; line-height: 1.08; letter-spacing: -0.025em;">How fast do you want to gain?</h1>
+    <p style="margin: 0; font-size: 15px; color: #5C6355; line-height: 1.45;">From 53 kg to 70 kg. Slower means more of it is muscle. You can change this any time.</p>
+  </div>
+
+  <div role="radiogroup" aria-label="Pace" style="display: flex; flex-direction: column; gap: 8px;">
+    <sc-for list="{{ options }}" as="opt" hint-placeholder-count="3">
+      <sc-if value="{{ opt.selected }}" hint-placeholder-val="{{ false }}">
+        <button role="radio" aria-checked="true" onClick="{{ opt.pick }}" style="font: inherit; text-align: left; min-height: 64px; padding: 12px 16px; border-radius: 16px; border: 2px solid #171A12; background: #C8F04D; color: #171A12; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;">
+          <span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 17px; font-weight: 700;">{{ opt.name }}</span><span style="font-size: 13px;">{{ opt.rate }}</span></span>
+          <span style="font-size: 15px; font-weight: 700;">{{ opt.surplus }}</span>
+        </button>
+      </sc-if>
+      <sc-if value="{{ opt.notSelected }}" hint-placeholder-val="{{ true }}">
+        <button role="radio" aria-checked="false" onClick="{{ opt.pick }}" style="font: inherit; text-align: left; min-height: 64px; padding: 12px 16px; border-radius: 16px; border: 2px solid transparent; background: #FFFFFF; color: #171A12; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;">
+          <span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 17px; font-weight: 700;">{{ opt.name }}</span><span style="font-size: 13px; color: #5C6355;">{{ opt.rate }}</span></span>
+          <span style="font-size: 15px; font-weight: 600; color: #5C6355;">{{ opt.surplus }}</span>
+        </button>
+      </sc-if>
+    </sc-for>
+  </div>
+
+  <section aria-live="polite" aria-label="Your forecast" style="background: #171A12; color: #FFFFFF; border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <span style="font-size: 13px; color: #B9BFAF;">You reach 70 kg around</span>
+      <span style="font-size: 36px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; color: #C8F04D;">{{ date }}</span>
+      <span style="font-size: 14px; color: #D7DBCF;">{{ weeks }}</span>
+    </div>
+    <div style="height: 1px; background: #343A2B;"></div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+      <div style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 12px; color: #B9BFAF;">Daily target</span><span style="font-size: 20px; font-weight: 700;">{{ target }}</span></div>
+      <div style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 12px; color: #B9BFAF;">Maintenance</span><span style="font-size: 20px; font-weight: 700;">2,340 kcal</span></div>
+    </div>
+    <p style="margin: 0; font-size: 12px; color: #B9BFAF; line-height: 1.4;">A starting estimate. After two to three weeks of weigh-ins, your target adjusts to how your weight actually moves.</p>
+  </section>
+
+  <div style="flex: 1;"></div>
+  <a href="Main.dc.html" style="min-height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 16px; background: #171A12; color: #FFFFFF; font-size: 16px; font-weight: 700; text-decoration: none;">Continue</a>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { pace: 1 }; }
+  renderVals() {
+    const data = [
+      { name: 'Slow', rate: '0.25% of body weight a week, about 0.13 kg', surplus: '+146 kcal', date: 'April 2029', weeks: 'About 128 weeks', target: '2,490 kcal' },
+      { name: 'Standard', rate: '0.5% a week, about 0.27 kg', surplus: '+292 kcal', date: 'January 2028', weeks: 'About 64 weeks', target: '2,630 kcal' },
+      { name: 'Fast', rate: '0.75% a week, about 0.4 kg', surplus: '+437 kcal', date: 'August 2027', weeks: 'About 43 weeks', target: '2,780 kcal' }
+    ];
+    const pace = this.state.pace;
+    const options = data.map((d, i) => ({ ...d, selected: i === pace, notSelected: i !== pace, pick: () => this.setState({ pace: i }) }));
+    const cur = data[pace];
+    return { options, date: cur.date, weeks: cur.weeks, target: cur.target };
+  }
+}
+</script>
+</body>
+</html>
