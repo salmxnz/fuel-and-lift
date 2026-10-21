@@ -215,6 +215,10 @@ func TestAPI(t *testing.T) {
 		t.Fatalf("odd target %v", target)
 	}
 	e.must(me, 409, "POST", "/v1/onboarding", onboarding("Bhavish"))
+	starters := get(e.must(me, 200, "GET", "/v1/templates", nil), "templates").([]any)
+	if len(starters) != 2 || len(get(starters, 0, "blocks").([]any)) < 6 {
+		t.Fatalf("starter templates: %v", starters)
+	}
 
 	// --- meals ---------------------------------------------------------------------
 	slots := get(e.must(me, 200, "GET", "/v1/meal-slots", nil), "meal_slots").([]any)
@@ -334,7 +338,7 @@ func TestAPI(t *testing.T) {
 	}
 	e.must(ravi, 402, "POST", "/v1/ai/meal-estimate", obj{"image": img})
 	e.must(ravi, 200, "POST", "/v1/ai/meal-estimate", obj{"text": "2 rotis with dal"}) // text isn't capped
-	e.must(me, 200, "POST", "/v1/ai/meal-estimate", obj{"image": img})                  // admin is Pro
+	e.must(me, 200, "POST", "/v1/ai/meal-estimate", obj{"image": img})                 // admin is Pro
 	bill := e.must(ravi, 200, "GET", "/v1/billing", nil)
 	if get(bill, "billing", "plan") != "free" || get(bill, "billing", "photo_estimates", "used_this_month").(float64) != 10 {
 		t.Fatalf("billing: %v", bill)

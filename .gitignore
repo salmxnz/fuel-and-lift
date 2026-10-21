@@ -17,9 +17,6 @@ web/next-env.d.ts
 *.tsbuildinfo
 npm-debug.log*
 
-# pwa build output
-web/public/sw.js
-web/public/workbox-*.js
 
 # os / editors
 .DS_Store

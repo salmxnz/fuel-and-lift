@@ -29,6 +29,9 @@ cp .env.example .env.local
 npm install && npm run dev
 ```
 
+New users get two starter templates, Upper-1 and Lower-1, so the Gym tab isn't
+empty. Weights start blank and fill in from the first session.
+
 Google sign-in needs an OAuth client (type *Web application*) with the redirect
 URI `http://localhost:3000/api/auth/google/callback`. See [docs/auth.md](docs/auth.md).
 

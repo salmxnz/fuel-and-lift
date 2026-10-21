@@ -148,6 +148,7 @@ func (h *Handler) Onboard(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
+	h.seedStarterTemplates(r.Context(), userID)
 	if upgraded != "" {
 		h.Notifier.Notify([]string{upgraded}, push.Message{
 			Title: "You've got Pro, for good",
