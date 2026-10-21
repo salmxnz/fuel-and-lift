@@ -51,6 +51,7 @@ export function GlassNav() {
               <Link
                 key={href}
                 href={href}
+                data-tour={`tab-${label.toLowerCase()}`}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "relative flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-full py-[7px] text-[11px] no-underline",
@@ -74,6 +75,7 @@ export function GlassNav() {
         <button
           type="button"
           aria-label="Add food, workout or weigh-in"
+          data-tour="fab"
           aria-haspopup="dialog"
           aria-expanded={menuOpen}
           onClick={openMenu}

@@ -264,6 +264,17 @@ func TestAPI(t *testing.T) {
 	e.must(me, 400, "POST", "/v1/plan/preview", obj{"sex": "male", "date_of_birth": "2002-03-10", "height_cm": 175,
 		"weight_kg": 53, "activity_level": 3, "mode": "lose", "goal_weight_kg": 45})
 	ob := e.must(me, 201, "POST", "/v1/onboarding", onboarding("Bhavish"))
+	// The walkthrough shows until it's done; it can be replayed.
+	if get(e.must(me, 200, "GET", "/v1/auth/me", nil), "profile", "tour_done_at") != nil {
+		t.Fatal("tour should be pending after onboarding")
+	}
+	if get(e.must(me, 200, "PATCH", "/v1/profile", obj{"tour_done": true}), "profile", "tour_done_at") == nil {
+		t.Fatal("tour_done didn't stick")
+	}
+	if get(e.must(me, 200, "PATCH", "/v1/profile", obj{"tour_done": false}), "profile", "tour_done_at") != nil {
+		t.Fatal("tour replay didn't clear")
+	}
+	e.must(me, 200, "PATCH", "/v1/profile", obj{"tour_done": true})
 	target := get(ob, "goal", "plan", "target_kcal").(float64)
 	if target < 2000 || target > 3500 {
 		t.Fatalf("odd target %v", target)

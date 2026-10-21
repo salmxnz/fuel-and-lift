@@ -182,11 +182,19 @@ func (h *Handler) PatchProfile(w http.ResponseWriter, r *http.Request) {
 		Timezone       *string     `json:"timezone"`
 		CoachVoice     *string     `json:"coach_voice"`
 		WeighInCadence *string     `json:"weigh_in_cadence"`
+		// TourDone true marks the walkthrough done; false shows it again.
+		TourDone *bool `json:"tour_done"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
 	userID := auth.UserID(r)
+	if in.TourDone != nil {
+		if err := h.Store.SetTourDone(r.Context(), userID, *in.TourDone); err != nil {
+			h.storeError(w, r, err)
+			return
+		}
+	}
 	p, err := h.Store.GetProfile(r.Context(), userID)
 	if err != nil {
 		h.storeError(w, r, err)

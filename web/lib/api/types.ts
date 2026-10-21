@@ -50,6 +50,8 @@ export type Profile = {
   timezone: string
   coach_voice: CoachVoice
   weigh_in_cadence: WeighInCadence
+  /** When the walkthrough was finished or skipped; null = show it. */
+  tour_done_at: string | null
 }
 
 export type MacroTargets = { protein_g: number; fat_g: number; carbs_g: number }

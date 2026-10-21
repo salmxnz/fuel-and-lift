@@ -86,9 +86,17 @@ function onUnauthorized() {
   window.location.assign(`/login?callbackUrl=${encodeURIComponent(here)}`)
 }
 
+/** Fired on window after any meal is logged (the walkthrough listens for it). */
+export const ENTRY_LOGGED_EVENT = "adebite:entry-logged"
+const LOGS_ENTRY = /^days\/[^/]+\/(entries|saved-meals\/[^/]+)$/
+
 export const api = {
   get: <T>(path: string, query?: Query, signal?: AbortSignal) => request<T>("GET", path, { query, signal }),
-  post: <T>(path: string, body?: unknown) => request<T>("POST", path, { body: body ?? {} }),
+  post: async <T>(path: string, body?: unknown) => {
+    const res = await request<T>("POST", path, { body: body ?? {} })
+    if (typeof window !== "undefined" && LOGS_ENTRY.test(path)) window.dispatchEvent(new Event(ENTRY_LOGGED_EVENT))
+    return res
+  },
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body: body ?? {} }),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body: body ?? {} }),
   del: <T = void>(path: string, body?: unknown) => request<T>("DELETE", path, { body }),

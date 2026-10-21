@@ -1,5 +1,6 @@
 import { GlassNav } from "@/components/nav/glass-nav"
 import { AddFlowProvider } from "@/components/food/add-flow"
+import { TourProvider } from "@/components/tour/tour"
 
 // Tab screens: content column plus the floating glass nav. The nav is rendered
 // as a sibling of the content (both direct children of <body>, since layouts
@@ -8,8 +9,11 @@ import { AddFlowProvider } from "@/components/food/add-flow"
 export default function TabsLayout({ children }: { children: React.ReactNode }) {
   return (
     <AddFlowProvider>
-      <main className="app-column pb-nav">{children}</main>
-      <GlassNav />
+      {/* The walkthrough after onboarding; renders no wrapper element. */}
+      <TourProvider>
+        <main className="app-column pb-nav">{children}</main>
+        <GlassNav />
+      </TourProvider>
     </AddFlowProvider>
   )
 }

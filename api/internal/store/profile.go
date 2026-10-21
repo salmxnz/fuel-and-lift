@@ -21,14 +21,16 @@ type Profile struct {
 	Timezone       string  `json:"timezone"`
 	CoachVoice     string  `json:"coach_voice"`
 	WeighInCadence string  `json:"weigh_in_cadence"`
+	// TourDoneAt is when the walkthrough was finished or skipped (nil = show it).
+	TourDoneAt *time.Time `json:"tour_done_at"`
 }
 
-const profileCols = `display_name, sex, date_of_birth, height_cm::float8, activity_level, units, timezone, coach_voice, weigh_in_cadence`
+const profileCols = `display_name, sex, date_of_birth, height_cm::float8, activity_level, units, timezone, coach_voice, weigh_in_cadence, tour_done_at`
 
 func scanProfile(row pgx.Row) (Profile, error) {
 	var p Profile
 	var dob time.Time
-	err := row.Scan(&p.DisplayName, &p.Sex, &dob, &p.HeightCm, &p.ActivityLevel, &p.Units, &p.Timezone, &p.CoachVoice, &p.WeighInCadence)
+	err := row.Scan(&p.DisplayName, &p.Sex, &dob, &p.HeightCm, &p.ActivityLevel, &p.Units, &p.Timezone, &p.CoachVoice, &p.WeighInCadence, &p.TourDoneAt)
 	p.DateOfBirth = DateOf(dob)
 	return p, notFound(err)
 }
@@ -54,6 +56,12 @@ func (s *Store) UpdateProfile(ctx context.Context, userID string, p Profile) (Pr
 		       units = $7, timezone = $8, coach_voice = $9, weigh_in_cadence = $10, updated_at = now()
 		where user_id = $1::uuid returning `+profileCols,
 		userID, p.DisplayName, p.Sex, p.DateOfBirth.Time, p.HeightCm, p.ActivityLevel, p.Units, p.Timezone, p.CoachVoice, p.WeighInCadence))
+}
+
+// SetTourDone marks the walkthrough finished (or, with false, shows it again).
+func (s *Store) SetTourDone(ctx context.Context, userID string, done bool) error {
+	_, err := s.Pool.Exec(ctx, `update profiles set tour_done_at = case when $2 then coalesce(tour_done_at, now()) end where user_id = $1::uuid`, userID, done)
+	return err
 }
 
 // Goal is the active goal.

@@ -69,6 +69,7 @@ type Profile = {
   timezone: string             // IANA, e.g. "Indian/Mauritius"
   coach_voice: "neutral" | "casual"
   weigh_in_cadence: "few_per_week" | "weekly" | "monthly" | "quarterly"
+  tour_done_at: string | null  // walkthrough finished or skipped; null = show it (read-only, see tour_done)
 }
 
 type Plan = {
@@ -110,6 +111,8 @@ Calling it again returns `409`.
 
 ### `GET /v1/profile` → `200 {"profile": Profile}`
 ### `PATCH /v1/profile` (any subset of Profile fields) → `200 {"profile": Profile}`
+Also `{"tour_done": true}` marks the post-onboarding walkthrough done, and
+`false` shows it again ("Show me around").
 ### `GET /v1/goal` → `200 {"goal": Goal}`
 ### `POST /v1/goal` (`mode`, `goal_weight_kg`, `pace`) → `201 {"goal": Goal}` — starts a new goal from the latest weigh-in.
 

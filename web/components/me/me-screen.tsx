@@ -11,6 +11,7 @@ import {
   FriendsIcon,
   CameraIcon,
   GearIcon,
+  PlusIcon,
   ListIcon,
   ScaleIcon,
   ShareIcon,
@@ -20,6 +21,7 @@ import {
 import type { BillingResponse, Goal, GoalResponse, SharingResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { num1 } from "@/lib/format"
+import { useTour } from "@/components/tour/tour"
 
 export function goalSentence(goal: Goal | null | undefined): string {
   if (!goal) return "No goal set"
@@ -44,6 +46,7 @@ function sharingSummary(s: SharingResponse["sharing"] | undefined): string {
 
 export function MeScreen() {
   const me = useMe()
+  const tour = useTour()
   const name = displayName(me)
   const goal = useApi<GoalResponse>("goal")
   const billing = useApi<BillingResponse>("billing")
@@ -119,7 +122,8 @@ export function MeScreen() {
       ) : null}
 
       <nav aria-label="Settings" className="flex flex-col rounded-card bg-white px-3.5 py-0.5">
-        <Row href="/friends" icon={<FriendsIcon size={20} />} title="Friends" />
+        <Row href="/friends" icon={<FriendsIcon size={20} />} title="Friends" sub="Their workouts and streaks" tour="friends-row" />
+        <Row href="/friends/add" icon={<PlusIcon size={20} />} title="Add a friend" sub="Send them a link" tour="add-friend" />
         <Row href="/sharing" icon={<ShareIcon size={20} />} title="Sharing" sub={sharingSummary(sharing.data?.sharing)} />
         <Row href="/meals" icon={<ListIcon size={20} />} title="My meals" sub="Breakfast, lunch and the rest" />
         <Row href="/saved-meals" icon={<StarIcon size={20} />} title="Saved meals" sub="Logged in one tap" />
@@ -141,6 +145,14 @@ export function MeScreen() {
         />
       </nav>
 
+      <button
+        type="button"
+        onClick={tour.start}
+        className="flex min-h-[48px] items-center justify-center gap-2 rounded-tile bg-white text-[15px] font-semibold text-ink transition-transform duration-[160ms] ease-out active:scale-[0.97]"
+      >
+        Show me around
+      </button>
+
       <Button variant="outline" size="md" className="border-line font-semibold" onClick={signOut} loading={signingOut}>
         Sign out
       </Button>
@@ -155,16 +167,20 @@ function Row({
   title,
   sub,
   last,
+  tour,
 }: {
   href: string
   icon: React.ReactNode
   title: string
   sub?: string
   last?: boolean
+  /** Walkthrough target name. */
+  tour?: string
 }) {
   return (
     <Link
       href={href}
+      data-tour={tour}
       className={`flex min-h-[52px] items-center gap-3 text-ink no-underline ${last ? "" : "border-b border-line-soft"}`}
     >
       {icon}
