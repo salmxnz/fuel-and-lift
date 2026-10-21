@@ -156,7 +156,11 @@ type Entry = Macros & {
   ai_estimate_id: string | null
   items: EntryItem[]
   logged_at: string
+  photos: MealPhoto[]             // kept meal photos, in order ([] when none)
 }
+
+// url is a signed link to the private bucket, valid for PHOTO_URL_TTL (1h).
+type MealPhoto = { id: string, url: string, position: number, bytes: number, created_at: string }
 
 type DayMeal = { meal_slot_id: string | null, name: string, entries: Entry[], totals: Macros }
 
@@ -178,10 +182,21 @@ type Day = {
 ```
 Give `meal_slot_id`, or `meal_name` for a one-off meal. Totals are computed from
 `items`; an entry without items may send `kcal`, `protein_g`, `carbs_g`, `fat_g`
-directly. `201 {"entry": Entry, "day": Day}`.
+directly. `201 {"entry": Entry, "day": Day, "photos_skipped": number}`.
+With `ai_estimate_id`, the estimate's photos are kept on the entry while the
+user has room (free: `FREE_PHOTOS_STORED`, 20; Pro unlimited); photos that don't
+fit are deleted and counted in `photos_skipped`.
 
 ### `PATCH /v1/entries/{id}` `{name?, meal_slot_id?, meal_name?, items?}` → `200 {"entry": Entry, "day": Day}`
-### `DELETE /v1/entries/{id}` → `200 {"day": Day}`
+### `DELETE /v1/entries/{id}` → `200 {"day": Day}` (its photos are deleted too)
+
+## Meal photos
+
+- `GET /v1/photos?before=&limit=` → `200 {"photos": (MealPhoto & {entry: {id, name, date}})[], "stored": number, "limit": number | null, "enabled": boolean}`
+  Newest first, 60 per page (`limit` ≤ 120); page with `before` = the last
+  photo's `created_at`. `limit` is null on Pro; `enabled` is false when the
+  server has no photo storage.
+- `DELETE /v1/photos/{id}` → `204` (the meal keeps its numbers)
 
 ## Saved meals ("Usual breakfast")
 
@@ -249,6 +264,11 @@ dish name) and `"items": [{name, grams?, kcal, protein_g, carbs_g, fat_g}]`
 ```
 `429` when over the per-minute or per-day limit, `503` when AI is not configured,
 `502` when every provider failed.
+
+With photo storage on (R2), each photo of a photo estimate is kept as
+*pending*; logging the meal with `ai_estimate_id` (the estimate or one that
+refined it) keeps it on the entry. Pending photos never logged are deleted
+after a day.
 
 ### `GET /v1/ai/usage`
 `200 {"used_today": 3, "limit_today": 60, "per_minute": 6, "photos_this_month": 4, "photo_limit": 10 | null, "resets_on": "2026-11-01"}`
@@ -365,6 +385,8 @@ type Billing = {
   pro_until: string | null                 // null = forever
   photo_estimates: { used_this_month: number, limit_this_month: number | null, resets_on: string } // null = unlimited
   referrals: { joined: number, needed: number }  // needed = 8
+  photos_stored: number                    // meal photos kept
+  photos_limit: number | null              // 20 on free, null = unlimited
 }
 ```
 - `GET /v1/billing` → `200 {"billing": Billing}`

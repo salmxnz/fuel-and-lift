@@ -242,14 +242,22 @@ export function useLogActions({
       }
       setLogging(true)
       try {
-        await api.post<EntryDayResponse>(`days/${seg(target.date)}/entries`, {
+        const res = await api.post<EntryDayResponse>(`days/${seg(target.date)}/entries`, {
           ...targetBody(target),
           name: name.trim() || items[0].name,
           origin,
           ...(estimateId ? { ai_estimate_id: estimateId } : {}),
           items,
         })
-        toast.success(`Logged to ${target.label}`)
+        const skipped = res.photos_skipped ?? 0
+        if (skipped > 0) {
+          toast(`Logged to ${target.label}. ${skipped === 1 ? "The photo wasn't" : `${skipped} photos weren't`} kept: photo storage is full.`, {
+            action: { label: "Make room", onClick: () => router.push("/photos") },
+            duration: 6000,
+          })
+        } else {
+          toast.success(`Logged to ${target.label}`)
+        }
         router.push(`/today?date=${target.date}`)
       } catch (err) {
         toast.error(errorMessage(err))

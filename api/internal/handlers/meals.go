@@ -143,7 +143,11 @@ func (h *Handler) target(ctx context.Context, userID string) store.Macros {
 }
 
 func (h *Handler) day(ctx context.Context, userID string, d store.Date) (store.Day, error) {
-	return h.Store.GetDay(ctx, userID, d, h.target(ctx, userID))
+	day, err := h.Store.GetDay(ctx, userID, d, h.target(ctx, userID))
+	if err == nil {
+		h.withPhotos(ctx, userID, dayEntries(&day)...)
+	}
+	return day, err
 }
 
 // GetDay handles GET /v1/days/{date}.
@@ -262,6 +266,11 @@ func (h *Handler) AddEntry(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
+	skipped := 0
+	if in.AIEstimateID != nil {
+		skipped = h.attachPhotos(context.WithoutCancel(r.Context()), userID, *in.AIEstimateID, e.ID)
+	}
+	h.withPhotos(r.Context(), userID, &e)
 	day, err := h.day(r.Context(), userID, d)
 	if err != nil {
 		h.storeError(w, r, err)
@@ -270,7 +279,7 @@ func (h *Handler) AddEntry(w http.ResponseWriter, r *http.Request) {
 	if d == h.today(r.Context(), userID) {
 		h.celebrateStreak(context.WithoutCancel(r.Context()), userID)
 	}
-	httpx.JSON(w, http.StatusCreated, map[string]any{"entry": e, "day": day})
+	httpx.JSON(w, http.StatusCreated, map[string]any{"entry": e, "day": day, "photos_skipped": skipped})
 }
 
 // UpdateEntry handles PATCH /v1/entries/{id}.
@@ -314,6 +323,7 @@ func (h *Handler) UpdateEntry(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
+	h.withPhotos(r.Context(), userID, &e)
 	day, err := h.day(r.Context(), userID, e.Date)
 	if err != nil {
 		h.storeError(w, r, err)
@@ -329,11 +339,17 @@ func (h *Handler) DeleteEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID := auth.UserID(r)
+	keys, err := h.Store.DeleteEntryPhotos(r.Context(), userID, id)
+	if err != nil {
+		h.storeError(w, r, err)
+		return
+	}
 	d, err := h.Store.DeleteEntry(r.Context(), userID, id)
 	if err != nil {
 		h.storeError(w, r, err)
 		return
 	}
+	h.deleteObjects(context.WithoutCancel(r.Context()), keys)
 	day, err := h.day(r.Context(), userID, d)
 	if err != nil {
 		h.storeError(w, r, err)
@@ -455,6 +471,7 @@ func (h *Handler) LogSavedMeal(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
+	h.withPhotos(r.Context(), userID, &e)
 	day, err := h.day(r.Context(), userID, d)
 	if err != nil {
 		h.storeError(w, r, err)

@@ -98,6 +98,7 @@ browser ──/api/v1/*──► Next (proxy.ts → app/api/v1/[...path]) ──
 | `/me` | Profile, Pro/referral card, settings links, sign out |
 | `/friends`, `/friends/add` | Feed with cheers, friends with notify switch; invite link, copy/share, referrals, revoke |
 | `/sharing` | Sharing switches + live preview, friend notification switches |
+| `/photos` | Meal photos kept in R2: grid, "12 of 20" usage on free, select and delete |
 | `/pro` | Paywall from `/v1/billing`; checkout `501` → "Payments are coming soon" |
 | `/weigh-in` | Weigh-in form as a page (push notification target) |
 | `/settings/notifications`, `/settings/goal`, `/settings/profile` | Push on/off + prefs + quiet hours; goal and targets; units, time zone, height, activity |

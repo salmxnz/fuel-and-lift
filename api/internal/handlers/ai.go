@@ -257,6 +257,9 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
+	if in.Image != nil {
+		h.keepEstimatePhotos(context.WithoutCancel(ctx), userID, id, []ai.Image{*in.Image})
+	}
 	a.usage.CallsToday++
 	if in.Image != nil {
 		a.usage.PhotosThisMonth++
@@ -312,6 +315,15 @@ func (h *Handler) billing(ctx context.Context, userID string) (map[string]any, e
 	if err != nil {
 		return nil, err
 	}
+	stored, err := h.Store.StoredPhotoCount(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	var storedLimit *int
+	if !a.pro {
+		n := h.Cfg.FreePhotosStored
+		storedLimit = &n
+	}
 	plan := "free"
 	var source *string
 	var until *time.Time
@@ -328,7 +340,9 @@ func (h *Handler) billing(ctx context.Context, userID string) (map[string]any, e
 			"limit_this_month": a.photoLimit,
 			"resets_on":        a.resetsOn,
 		},
-		"referrals": map[string]int{"joined": joined, "needed": h.Cfg.ReferralsForPro},
+		"referrals":     map[string]int{"joined": joined, "needed": h.Cfg.ReferralsForPro},
+		"photos_stored": stored,
+		"photos_limit":  storedLimit,
 	}, nil
 }
 

@@ -9,6 +9,7 @@ import {
   BellIcon,
   ChevronRightIcon,
   FriendsIcon,
+  CameraIcon,
   GearIcon,
   ListIcon,
   ScaleIcon,
@@ -122,6 +123,12 @@ export function MeScreen() {
         <Row href="/sharing" icon={<ShareIcon size={20} />} title="Sharing" sub={sharingSummary(sharing.data?.sharing)} />
         <Row href="/meals" icon={<ListIcon size={20} />} title="My meals" sub="Breakfast, lunch and the rest" />
         <Row href="/saved-meals" icon={<StarIcon size={20} />} title="Saved meals" sub="Logged in one tap" />
+        <Row
+          href="/photos"
+          icon={<CameraIcon size={20} />}
+          title="Meal photos"
+          sub={b ? (b.photos_limit != null ? `${b.photos_stored} of ${b.photos_limit} kept` : `${b.photos_stored} kept`) : undefined}
+        />
         <Row href="/settings/goal" icon={<TargetIcon size={20} />} title="Goal and targets" />
         <Row href="/weigh-in" icon={<ScaleIcon size={20} />} title="Weigh-in" />
         <Row href="/settings/notifications" icon={<BellIcon size={20} />} title="Notifications" />

@@ -33,6 +33,15 @@ type Handler struct {
 	Now      func() time.Time
 	// FoodLookup fetches a barcode from Open Food Facts (replaceable in tests).
 	FoodLookup func(ctx context.Context, code string) (store.Food, error)
+	// Photos stores meal photos (Cloudflare R2); nil turns photo storage off.
+	Photos PhotoStorage
+}
+
+// PhotoStorage is where meal photos live (storage.R2, or a fake in tests).
+type PhotoStorage interface {
+	Put(ctx context.Context, key, contentType string, body []byte) error
+	Delete(ctx context.Context, key string) error
+	PresignGet(key string, ttl time.Duration) string
 }
 
 func (h *Handler) now() time.Time {

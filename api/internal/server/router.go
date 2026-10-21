@@ -94,6 +94,9 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/progress/exercises/{id}": h.ExerciseProgress,
 		"GET /v1/progress/records":        h.RecordsProgress,
 		"GET /v1/progress/streak":         h.StreakProgress,
+		// meal photos
+		"GET /v1/photos":         h.ListPhotos,
+		"DELETE /v1/photos/{id}": h.DeletePhoto,
 
 		// friends
 		"POST /v1/invite-links":        h.CreateInviteLink,

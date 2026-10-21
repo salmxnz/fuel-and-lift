@@ -23,6 +23,7 @@ import (
 	"github.com/salmxnz/fuel-and-lift/api/internal/migrate"
 	"github.com/salmxnz/fuel-and-lift/api/internal/push"
 	"github.com/salmxnz/fuel-and-lift/api/internal/server"
+	"github.com/salmxnz/fuel-and-lift/api/internal/storage"
 	"github.com/salmxnz/fuel-and-lift/api/internal/store"
 )
 
@@ -101,6 +102,12 @@ func run(log *slog.Logger, args []string) error {
 		AI:       gateway(cfg, log),
 		Notifier: notifier,
 		Log:      log,
+	}
+	if r2 := storage.NewR2(cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2Bucket); r2 != nil {
+		h.Photos = r2
+		go h.CleanPendingPhotos(ctx)
+	} else {
+		log.Warn("R2 not configured: meal photos are not stored (set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)")
 	}
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

@@ -136,6 +136,8 @@ type Entry struct {
 	Items        []EntryItem `json:"items"`
 	Macros
 	LoggedAt time.Time `json:"logged_at"`
+	// Photos are filled in by the API handler (with signed links).
+	Photos []MealPhoto `json:"photos"`
 }
 
 const entryCols = `id::text, date, meal_slot_id::text, meal_name, name, origin, saved_meal_id::text, ai_estimate_id::text,

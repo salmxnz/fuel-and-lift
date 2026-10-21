@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -58,6 +59,37 @@ type env struct {
 	srv *httptest.Server
 	st  *store.Store
 	ai  *fakeAI
+	ph  *fakePhotos
+}
+
+// fakePhotos is in-memory photo storage.
+type fakePhotos struct {
+	mu      sync.Mutex
+	objects map[string][]byte
+}
+
+func (f *fakePhotos) Put(_ context.Context, key, _ string, body []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.objects[key] = body
+	return nil
+}
+
+func (f *fakePhotos) Delete(_ context.Context, key string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.objects, key)
+	return nil
+}
+
+func (f *fakePhotos) PresignGet(key string, ttl time.Duration) string {
+	return "https://photos.test/" + key + "?ttl=" + ttl.String()
+}
+
+func (f *fakePhotos) count() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.objects)
 }
 
 func setup(t *testing.T) *env {
@@ -82,14 +114,17 @@ func setup(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	fake := &fakeAI{}
+	photos := &fakePhotos{objects: map[string][]byte{}}
 	var lookups atomic.Int32
 	h := &handlers.Handler{
 		Store: st,
 		Cfg: config.Config{
 			AppURL: "http://app.test", JWTSecret: secret, AccessTTL: time.Hour, RefreshTTLDays: 30,
 			AIPerMinute: 100, AIPerDay: 100, FreePhotosMonthly: 10, ReferralsForPro: 8,
+			FreePhotosStored: 2, PhotoURLTTL: time.Hour,
 		},
 		AI:       &ai.Gateway{Providers: []ai.Provider{fake}},
+		Photos:   photos,
 		Notifier: &push.Notifier{Store: st},
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		FoodLookup: func(ctx context.Context, code string) (store.Food, error) {
@@ -106,7 +141,7 @@ func setup(t *testing.T) *env {
 	}
 	srv := httptest.NewServer(server.NewRouter(h))
 	t.Cleanup(func() { srv.Close(); st.Close() })
-	return &env{t: t, srv: srv, st: st, ai: fake}
+	return &env{t: t, srv: srv, st: st, ai: fake, ph: photos}
 }
 
 type user struct {

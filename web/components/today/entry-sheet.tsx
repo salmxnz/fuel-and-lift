@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Sheet } from "@/components/ui/sheet"
 import { Button, Field, TextInput } from "@/components/ui/primitives"
 import { ItemsEditor, TotalsRow } from "@/components/food/items-editor"
+import { PhotoCarousel } from "@/components/food/photo-carousel"
 import { api, errorMessage, seg } from "@/lib/api/client"
 import type { Day, DayResponse, Entry, EntryDayResponse, MealSlot } from "@/lib/api/types"
 import { fromEntryItem, toEntryItems, type EditableItem } from "@/lib/items"
@@ -56,6 +57,23 @@ function EntryForm({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [photos, setPhotos] = useState(entry.photos ?? [])
+  const [removingPhoto, setRemovingPhoto] = useState<string | null>(null)
+
+  async function removePhoto(id: string) {
+    setRemovingPhoto(id)
+    try {
+      await api.del(`photos/${seg(id)}`)
+      setPhotos((list) => list.filter((p) => p.id !== id))
+      const res = await api.get<DayResponse>(`days/${seg(entry.date)}`)
+      onDayChange(res.day)
+      toast.success("Photo deleted. The meal stays logged.")
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setRemovingPhoto(null)
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -124,6 +142,12 @@ function EntryForm({
 
   return (
     <form onSubmit={save} className="flex flex-col gap-3.5" noValidate>
+      <PhotoCarousel
+        photos={photos.map((p, i) => ({ key: p.id, src: p.url, alt: `${entry.name}, photo ${i + 1}` }))}
+        onRemove={(id) => void removePhoto(id)}
+        removeLabel="Delete photo"
+        busyKey={removingPhoto}
+      />
       <Field label="Name" htmlFor="entry-name">
         <TextInput id="entry-name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
       </Field>

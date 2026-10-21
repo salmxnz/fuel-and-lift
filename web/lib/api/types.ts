@@ -140,7 +140,14 @@ export type Entry = Macros & {
   ai_estimate_id: string | null
   items: EntryItem[]
   logged_at: string
+  /** Kept meal photos, in order. */
+  photos: MealPhoto[]
 }
+
+/** `url` is a signed link that works for about an hour. */
+export type MealPhoto = { id: string; url: string; position: number; bytes: number; created_at: string }
+export type ListedPhoto = MealPhoto & { entry: { id: string; name: string; date: string } }
+export type PhotosResponse = { photos: ListedPhoto[]; stored: number; limit: number | null; enabled: boolean }
 
 export type DayMeal = { meal_slot_id: string | null; name: string; entries: Entry[]; totals: Macros }
 
@@ -153,7 +160,7 @@ export type Day = {
 }
 
 export type DayResponse = { day: Day }
-export type EntryDayResponse = { entry: Entry; day: Day }
+export type EntryDayResponse = { entry: Entry; day: Day; photos_skipped?: number }
 
 export type NewEntryRequest = {
   meal_slot_id?: string | null
@@ -437,6 +444,9 @@ export type Billing = {
     resets_on: string
   }
   referrals: Referrals
+  photos_stored: number
+  /** null = unlimited (Pro). */
+  photos_limit: number | null
 }
 export type Referrals = { joined: number; needed: number }
 export type BillingResponse = { billing: Billing }

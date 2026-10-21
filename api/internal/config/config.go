@@ -29,7 +29,7 @@ type Config struct {
 	// Google sign-in. The client secret lives only here, never in the PWA.
 	GoogleClientID     string
 	GoogleClientSecret string
-	// AdminEmails bootstrap the first admins; everyone else needs an invite.
+	// AdminEmails are admins and always have Pro.
 	AdminEmails []string
 
 	// AI providers, tried in order of AIProviders until one answers.
@@ -43,6 +43,14 @@ type Config struct {
 	FreePhotosMonthly int     // free plan photo estimates per calendar month
 	AIMonthlyBudget   float64 // USD across everyone; 0 = no cap
 	ReferralsForPro   int     // friends who must join for Pro forever
+
+	// Meal photos in Cloudflare R2. Photo storage is off unless all four are set.
+	R2AccountID       string
+	R2AccessKeyID     string
+	R2SecretAccessKey string
+	R2Bucket          string
+	PhotoURLTTL       time.Duration // lifetime of signed photo links
+	FreePhotosStored  int           // photos a free user keeps; Pro is unlimited
 
 	// Web Push (VAPID). Generate once with `api vapid`.
 	VAPIDPublicKey  string
@@ -107,6 +115,13 @@ func Load() (Config, error) {
 		FreePhotosMonthly: envInt("FREE_PHOTOS_MONTHLY", 10),
 		AIMonthlyBudget:   envFloat("AI_MONTHLY_BUDGET_USD", 25),
 		ReferralsForPro:   envInt("REFERRALS_FOR_PRO", 8),
+
+		R2AccountID:       os.Getenv("R2_ACCOUNT_ID"),
+		R2AccessKeyID:     os.Getenv("R2_ACCESS_KEY_ID"),
+		R2SecretAccessKey: os.Getenv("R2_SECRET_ACCESS_KEY"),
+		R2Bucket:          env("R2_BUCKET", "adebite-photos"),
+		PhotoURLTTL:       envDuration("PHOTO_URL_TTL", time.Hour),
+		FreePhotosStored:  envInt("FREE_PHOTOS_STORED", 20),
 
 		VAPIDPublicKey:  os.Getenv("VAPID_PUBLIC_KEY"),
 		VAPIDPrivateKey: os.Getenv("VAPID_PRIVATE_KEY"),
