@@ -32,7 +32,7 @@ export function QuickAddSets({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-[12px] bg-field p-1.5 text-[14px]">
+    <div className="flex items-center gap-1.5 rounded-[12px] bg-field p-1.5 text-[14px]">
       <span className="sr-only">Quick add sets</span>
       <div className="flex items-center rounded-[10px] bg-white">
         <button
@@ -57,14 +57,16 @@ export function QuickAddSets({
           <PlusIcon size={14} />
         </button>
       </div>
-      <span className="text-muted">sets ×</span>
+      <span className="text-muted">
+        <span className="sr-only">sets </span>×
+      </span>
       <input
         inputMode="numeric"
         aria-label="Reps per set"
         value={reps}
         onChange={(e) => setReps(e.target.value)}
         placeholder="reps"
-        className="h-9 w-12 rounded-[10px] border border-line bg-white px-2 text-center font-bold"
+        className="h-9 w-11 rounded-[10px] border border-line bg-white px-1.5 text-center font-bold"
       />
       <span className="text-muted">@</span>
       <input
@@ -73,15 +75,16 @@ export function QuickAddSets({
         value={kg}
         onChange={(e) => setKg(e.target.value)}
         placeholder="kg"
-        className="h-9 w-14 rounded-[10px] border border-line bg-white px-2 text-center font-bold"
+        className="h-9 w-[52px] rounded-[10px] border border-line bg-white px-1.5 text-center font-bold"
       />
       <button
         type="button"
         disabled={busy || n < 1}
         onClick={() => void onAdd(n, parseDecimal(reps), parseDecimal(kg))}
-        className="ml-auto flex h-9 items-center gap-1 rounded-[10px] bg-ink px-3 text-[13px] font-bold text-white transition-transform duration-150 active:scale-[0.97] disabled:opacity-50"
+        aria-label={`Add ${n} sets`}
+        className="ml-auto flex h-9 flex-none items-center gap-1 rounded-[10px] bg-ink px-2.5 text-[13px] font-bold text-white transition-transform duration-150 active:scale-[0.97] disabled:opacity-50"
       >
-        <PlusIcon size={14} /> Add {n}
+        <PlusIcon size={14} /> Add
       </button>
     </div>
   )

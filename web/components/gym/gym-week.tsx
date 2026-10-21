@@ -91,17 +91,20 @@ export function GymWeek({
           renderDay={(d) => {
             const tplId = plan.days[weekdayKey(d)]
             const t = tplId ? byId.get(tplId) : undefined
-            const done = byDate.get(d)?.status === "finished"
+            const session = byDate.get(d)
+            const done = session?.status === "finished"
             const selected = d === (openDay ?? today)
+            // A day you trained shows what you did, even off-plan.
+            const label = done && session?.template_name ? session.template_name : t ? t.name : "Rest"
             return (
               <span
                 className={cn(
                   "flex max-w-full items-center gap-0.5 truncate px-0.5 text-[10px] font-semibold leading-tight",
-                  selected ? "text-pink" : t ? "text-ink-soft" : "text-muted"
+                  selected ? "text-pink" : t || done ? "text-ink-soft" : "text-muted"
                 )}
               >
                 {done ? <CheckIcon size={10} className={selected ? "text-pink" : "text-protein"} /> : null}
-                {t ? shortName(t.name) : "Rest"}
+                {label === "Rest" ? label : shortName(label)}
               </span>
             )
           }}

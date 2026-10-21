@@ -101,7 +101,7 @@ export function PhotosScreen() {
         }
       />
 
-      {data && limit != null ? (
+      {data?.enabled && limit != null ? (
         <section aria-label="Photo storage" className="flex flex-col gap-2 rounded-card bg-white p-3.5">
           <div className="flex items-baseline justify-between text-[14px]">
             <span className="font-semibold">
