@@ -68,17 +68,22 @@ export function ItemsEditor({
               />
             )}
             <div className={cn("flex min-w-0 flex-1 flex-col", excluded && "text-muted")}>
-              {it.isNew ? (
+              {excluded ? (
+                <span className="truncate text-[15px] font-semibold line-through">{it.name}</span>
+              ) : (
+                // Every name is editable: AI names are a guess too. New rows
+                // show a box; existing ones look like text until focused.
                 <input
                   value={it.name}
                   placeholder="What was it?"
                   aria-label={`Item ${i + 1} name`}
                   maxLength={80}
                   onChange={(e) => update(it.key, { name: e.target.value })}
-                  className="min-h-[36px] w-full min-w-0 rounded-[10px] border border-line px-2 text-[15px] font-bold"
+                  className={cn(
+                    "min-h-[36px] w-full min-w-0 rounded-[10px] border px-2 text-[15px] font-bold",
+                    it.isNew ? "border-line" : "-ml-2 border-transparent bg-transparent focus:border-line focus:bg-white"
+                  )}
                 />
-              ) : (
-                <span className={cn("truncate text-[15px] font-bold", excluded && "font-semibold line-through")}>{it.name}</span>
               )}
               {variant === "checklist" && !it.isNew ? (
                 excluded ? (

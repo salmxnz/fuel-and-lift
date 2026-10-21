@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import type { EstimateQuestion } from "@/lib/api/types"
 import { Button, Chip, Spinner } from "@/components/ui/primitives"
 import { PencilIcon } from "@/components/ui/icons"
@@ -97,5 +98,60 @@ export function LogFooter({
         Log {mealLabel.toLowerCase()}
       </Button>
     </div>
+  )
+}
+
+/**
+ * After an estimate: tell the AI what it got wrong ("cooked in oil only, no
+ * butter") and get revised numbers. Renaming the dish offers the same refine.
+ */
+export function CorrectionCard({
+  renamed,
+  title,
+  busy,
+  onRefine,
+}: {
+  renamed: boolean
+  title: string
+  busy: boolean
+  onRefine: (correction?: string) => Promise<void>
+}) {
+  const [text, setText] = useState("")
+  const trimmed = text.trim()
+  return (
+    <section aria-label="Fix the estimate" className="flex flex-col gap-2 rounded-card bg-white p-3.5">
+      {renamed ? (
+        <Chip selected={false} onClick={() => void onRefine()} disabled={busy}>
+          Re-estimate as “{title.trim()}”
+        </Chip>
+      ) : null}
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault()
+          if (trimmed.length < 2 || busy) return
+          await onRefine(trimmed)
+          setText("")
+        }}
+      >
+        <label htmlFor="estimate-correction" className="text-[13px] font-semibold text-muted">
+          Fix something? <span className="font-normal">(optional)</span>
+        </label>
+        <div className="flex items-start gap-2">
+          <textarea
+            id="estimate-correction"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={2}
+            maxLength={300}
+            placeholder="Cooked in oil only, no butter"
+            className="min-w-0 flex-1 rounded-tile border border-line bg-white px-3 py-2.5 text-[15px]"
+          />
+          <Button type="submit" size="md" variant="outline" disabled={trimmed.length < 2 || busy} className="flex-none">
+            Update
+          </Button>
+        </div>
+      </form>
+    </section>
   )
 }

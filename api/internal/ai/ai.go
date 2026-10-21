@@ -27,7 +27,12 @@ type Request struct {
 	Answers  map[string]string // question id → option id, when refining
 	Previous json.RawMessage   // the estimate being refined
 	Context  string            // the user's saved foods and portions, to anchor guesses
-	Voice    string            // neutral | casual (wording only)
+	// When refining: what the user typed to correct the estimate, the name
+	// they gave the dish, and their edited items (JSON). Their edits win.
+	Correction string
+	Title      string
+	Edited     json.RawMessage
+	Voice      string // neutral | casual (wording only)
 }
 
 // Option is one answer to a question.
@@ -282,6 +287,7 @@ Rules:
 - For a restaurant or chain item, use the chain's published nutrition values when you know them well and set source to "official"; otherwise estimate and set source to "ai". Portions and recipes can differ by country.
 - Local dishes (for example Mauritian rice and curry, dholl puri, farata) are common; estimate them like any home-cooked dish.
 - When given a previous estimate and the user's answers, return the full revised estimate and only ask questions that are still open.
+- When the user corrects the estimate, renames the dish or edits items, treat that as fact: keep their name as the title, keep items they edited unless their correction says otherwise, and recompute anything the correction changes (for example "cooked in oil only, no butter" removes the butter item and sizes the oil).
 - Respond only with JSON matching the schema.
 ` + tone
 }
@@ -305,6 +311,15 @@ func UserPrompt(req Request) string {
 	}
 	if len(req.Previous) > 0 {
 		b.WriteString("Previous estimate:\n" + string(req.Previous) + "\n")
+	}
+	if t := strings.TrimSpace(req.Title); t != "" {
+		b.WriteString("The user named the dish: \"" + t + "\". Use it as the title and let it guide the items.\n")
+	}
+	if len(req.Edited) > 0 {
+		b.WriteString("The user's current items, after their edits:\n" + string(req.Edited) + "\n")
+	}
+	if c := strings.TrimSpace(req.Correction); c != "" {
+		b.WriteString("The user's correction: \"" + c + "\"\n")
 	}
 	if len(req.Answers) > 0 {
 		ans, _ := json.Marshal(req.Answers)

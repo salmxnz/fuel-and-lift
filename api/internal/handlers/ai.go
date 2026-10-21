@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -85,6 +86,11 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 		Image              *ai.Image         `json:"image"`
 		Answers            map[string]string `json:"answers"`
 		PreviousEstimateID *string           `json:"previous_estimate_id"`
+		// Refine-only: the user's correction, their name for the dish and
+		// their edited items.
+		Correction string          `json:"correction"`
+		Title      string          `json:"title"`
+		Items      json.RawMessage `json:"items"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -112,6 +118,29 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "too many answers")
 		return
 	}
+	in.Correction, in.Title = strings.TrimSpace(in.Correction), strings.TrimSpace(in.Title)
+	if utf8.RuneCountInString(in.Correction) > 300 || utf8.RuneCountInString(in.Title) > 120 {
+		badRequest(w, "correction is limited to 300 characters and title to 120")
+		return
+	}
+	var edited []struct {
+		Name     string   `json:"name"`
+		Grams    *float64 `json:"grams"`
+		Kcal     float64  `json:"kcal"`
+		ProteinG float64  `json:"protein_g"`
+		CarbsG   float64  `json:"carbs_g"`
+		FatG     float64  `json:"fat_g"`
+	}
+	if len(in.Items) > 0 && string(in.Items) != "null" {
+		if err := json.Unmarshal(in.Items, &edited); err != nil || len(edited) > 30 {
+			badRequest(w, "items must be a list of up to 30 items")
+			return
+		}
+	}
+	if (in.Correction != "" || in.Title != "" || len(edited) > 0) && in.PreviousEstimateID == nil {
+		badRequest(w, "correction, title and items need previous_estimate_id")
+		return
+	}
 	userID := auth.UserID(r)
 	ctx := r.Context()
 
@@ -132,6 +161,15 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 		}
 		if req.Text == "" {
 			req.Text = text
+		}
+		req.Title = in.Title
+		if len(edited) > 0 {
+			req.Edited, _ = json.Marshal(edited)
+		}
+		if in.Correction != "" {
+			// Kept with the text so later refines still see it.
+			req.Correction = in.Correction
+			req.Text = strings.TrimSpace(req.Text + "\nCorrection: " + in.Correction)
 		}
 	} else {
 		in.Answers, req.Answers = nil, nil

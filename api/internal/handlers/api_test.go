@@ -32,12 +32,16 @@ import (
 
 const secret = "test-secret-test-secret-test-secret-123"
 
-type fakeAI struct{ calls atomic.Int32 }
+type fakeAI struct {
+	calls atomic.Int32
+	last  atomic.Pointer[ai.Request]
+}
 
 func (f *fakeAI) Name() string  { return "fake" }
 func (f *fakeAI) Model() string { return "fake-1" }
 func (f *fakeAI) Estimate(ctx context.Context, req ai.Request) (ai.Estimate, ai.Usage, error) {
 	f.calls.Add(1)
+	f.last.Store(&req)
 	g := 250.0
 	e := ai.Estimate{Title: "Fish curry with rice", Items: []ai.Item{
 		{Name: "White rice", Grams: &g, Kcal: 325, ProteinG: 6, CarbsG: 71, FatG: 1, Assumption: "normal plate", Confidence: 0.7, Source: "ai"},
@@ -354,6 +358,17 @@ func TestAPI(t *testing.T) {
 	}
 	e.must(ravi, 402, "POST", "/v1/ai/meal-estimate", obj{"image": img})
 	e.must(ravi, 200, "POST", "/v1/ai/meal-estimate", obj{"text": "2 rotis with dal"}) // text isn't capped
+	// A refine carries the user's correction, dish name and edited items.
+	first := e.must(ravi, 200, "POST", "/v1/ai/meal-estimate", obj{"text": "scrambled eggs"})
+	e.must(ravi, 400, "POST", "/v1/ai/meal-estimate", obj{"text": "eggs", "title": "Eggs in oil"})
+	e.must(ravi, 200, "POST", "/v1/ai/meal-estimate", obj{
+		"previous_estimate_id": get(first, "estimate_id"), "correction": "cooked in oil only, no butter",
+		"title": "Scrambled eggs in oil", "items": []obj{{"name": "Eggs", "kcal": 140, "protein_g": 12, "carbs_g": 1, "fat_g": 10}},
+	})
+	if last := e.ai.last.Load(); last.Title != "Scrambled eggs in oil" || last.Correction != "cooked in oil only, no butter" ||
+		!strings.Contains(string(last.Edited), "Eggs") || !strings.Contains(ai.UserPrompt(*last), "no butter") {
+		t.Fatalf("refine request: %+v", last)
+	}
 	e.must(me, 200, "POST", "/v1/ai/meal-estimate", obj{"image": img})                 // admin is Pro
 	bill := e.must(ravi, 200, "GET", "/v1/billing", nil)
 	if get(bill, "billing", "plan") != "free" || get(bill, "billing", "photo_estimates", "used_this_month").(float64) != 10 {

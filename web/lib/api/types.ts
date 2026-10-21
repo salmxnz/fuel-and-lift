@@ -228,6 +228,10 @@ export type MealEstimateRequest = {
   kind: EstimateKind
   answers?: Record<string, string>
   previous_estimate_id?: string
+  /** Refine only: the user's correction, dish name and edited items. */
+  correction?: string
+  title?: string
+  items?: Pick<EntryItem, "name" | "grams" | "kcal" | "protein_g" | "carbs_g" | "fat_g">[]
 }
 
 export type EstimateItem = EntryItem & { confidence: number | null }

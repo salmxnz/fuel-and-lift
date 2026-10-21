@@ -226,6 +226,13 @@ type Food = {
 `kind` is `photo`, `text` or `restaurant`. `image` is optional (resize to ~768 px
 on the phone first; max 2 MB). Send `answers` + `previous_estimate_id` to refine.
 
+A refine (with `previous_estimate_id`) may also send the user's edits, which the
+AI treats as fact (all optional, `400` without `previous_estimate_id`):
+`"correction": "cooked in oil only, no butter"` (≤300 chars, kept with the text
+for later refines), `"title": "Scrambled eggs in oil"` (≤120 chars, used as the
+dish name) and `"items": [{name, grams?, kcal, protein_g, carbs_g, fat_g}]`
+(≤30, the items as currently edited). The image isn't re-sent.
+
 `200`:
 ```json
 {

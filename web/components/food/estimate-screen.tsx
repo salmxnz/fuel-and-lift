@@ -10,7 +10,7 @@ import { prepareImage, type PreparedImage } from "@/lib/image"
 import { targetFromParams } from "@/lib/meal-target"
 import { toEntryItems } from "@/lib/items"
 import { ItemsEditor, TotalsRow } from "./items-editor"
-import { LogFooter, QuestionsCard, TitleInput } from "./estimate-parts"
+import { CorrectionCard, LogFooter, QuestionsCard, TitleInput } from "./estimate-parts"
 import { useEstimate, useLogActions } from "./use-estimate"
 
 /** AI-Estimate.dc.html for both "Take a photo" and "Describe it". */
@@ -175,6 +175,12 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
             <ItemsEditor items={est.items} onChange={est.setItems} label="What is on the plate" />
           </div>
           <TotalsRow items={est.items} />
+          <CorrectionCard
+            renamed={est.renamed}
+            title={est.title}
+            busy={est.status === "refining"}
+            onRefine={est.refine}
+          />
           {est.estimate ? (
             <p className="m-0 px-1 text-[12px] text-muted">
               Estimates are a starting point: check portions you know.

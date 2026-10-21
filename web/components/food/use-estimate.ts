@@ -33,8 +33,14 @@ export function useEstimate(kind: EstimateKind) {
   const [title, setTitle] = useState("")
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [questions, setQuestions] = useState<EstimateQuestion[]>([])
-  const lastText = useRef<string | undefined>(undefined)
   const answersRef = useRef<Record<string, string>>({})
+  // The user's edits win over the AI: a refine keeps their name for the dish
+  // and sends their edited items so the new estimate builds on them.
+  const titleRef = useRef("")
+  const titleEditedRef = useRef(false)
+  const [titleEdited, setTitleEdited] = useState(false)
+  const itemsRef = useRef<EditableItem[]>([])
+  const itemsEditedRef = useRef(false)
 
   const handleError = useCallback(
     (err: unknown, keepResult: boolean) => {
@@ -79,8 +85,14 @@ export function useEstimate(kind: EstimateKind) {
 
   const apply = useCallback((res: MealEstimateResponse) => {
     setEstimate(res)
-    setItems(res.items.map((it) => fromEntryItem(it)))
-    setTitle(res.title)
+    const next = res.items.map((it) => fromEntryItem(it))
+    itemsRef.current = next
+    itemsEditedRef.current = false
+    setItems(next)
+    if (!titleEditedRef.current) {
+      titleRef.current = res.title
+      setTitle(res.title)
+    }
     const answered = { ...answersRef.current }
     setQuestions((prev) => {
       // Keep answered questions on screen so the chosen chip stays visible.
@@ -98,7 +110,8 @@ export function useEstimate(kind: EstimateKind) {
       setAnswers({})
       answersRef.current = {}
       setQuestions([])
-      lastText.current = input.text
+      titleEditedRef.current = false
+      setTitleEdited(false)
       try {
         const body: MealEstimateRequest = { kind, ...(input.text ? { text: input.text } : {}), ...(input.image ? { image: input.image } : {}) }
         apply(await api.post<MealEstimateResponse>("ai/meal-estimate", body))
@@ -109,20 +122,33 @@ export function useEstimate(kind: EstimateKind) {
     [kind, apply, handleError]
   )
 
-  const answer = useCallback(
-    async (questionId: string, optionId: string) => {
+  /**
+   * Re-runs the AI on the current estimate. The image and text aren't re-sent:
+   * previous_estimate_id carries them (and any earlier correction).
+   */
+  const refine = useCallback(
+    async (correction?: string) => {
       if (!estimate) return
-      const next = { ...answersRef.current, [questionId]: optionId }
-      answersRef.current = next
-      setAnswers(next)
       setStatus("refining")
       try {
-        // The image isn't re-sent: previous_estimate_id carries the context.
         const body: MealEstimateRequest = {
           kind,
-          ...(lastText.current ? { text: lastText.current } : {}),
-          answers: next,
+          answers: answersRef.current,
           previous_estimate_id: estimate.estimate_id,
+          ...(titleEditedRef.current && titleRef.current.trim() ? { title: titleRef.current.trim() } : {}),
+          ...(itemsEditedRef.current
+            ? {
+                items: toEntryItems(itemsRef.current).map(({ name, grams, kcal, protein_g, carbs_g, fat_g }) => ({
+                  name,
+                  grams,
+                  kcal,
+                  protein_g,
+                  carbs_g,
+                  fat_g,
+                })),
+              }
+            : {}),
+          ...(correction?.trim() ? { correction: correction.trim() } : {}),
         }
         apply(await api.post<MealEstimateResponse>("ai/meal-estimate", body))
       } catch (err) {
@@ -132,18 +158,65 @@ export function useEstimate(kind: EstimateKind) {
     [estimate, kind, apply, handleError]
   )
 
+  const answer = useCallback(
+    async (questionId: string, optionId: string) => {
+      const next = { ...answersRef.current, [questionId]: optionId }
+      answersRef.current = next
+      setAnswers(next)
+      await refine()
+    },
+    [refine]
+  )
+
+  const editTitle = useCallback((v: string) => {
+    titleRef.current = v
+    titleEditedRef.current = true
+    setTitleEdited(true)
+    setTitle(v)
+  }, [])
+
+  const editItems = useCallback((next: EditableItem[]) => {
+    itemsRef.current = next
+    itemsEditedRef.current = true
+    setItems(next)
+  }, [])
+
   const reset = useCallback(() => {
     setStatus("idle")
     setError(null)
     setEstimate(null)
     setItems([])
     setTitle("")
+    titleRef.current = ""
+    titleEditedRef.current = false
+    setTitleEdited(false)
+    itemsRef.current = []
+    itemsEditedRef.current = false
     setAnswers({})
     answersRef.current = {}
     setQuestions([])
   }, [])
 
-  return { status, error, estimate, items, setItems, title, setTitle, answers, questions, run, answer, reset, setError }
+  /** True when the user renamed the dish away from the AI's title. */
+  const renamed = titleEdited && !!estimate && title.trim() !== "" && title.trim() !== estimate.title.trim()
+
+  return {
+    status,
+    error,
+    estimate,
+    items,
+    setItems: editItems,
+    title,
+    setTitle: editTitle,
+    renamed,
+    answers,
+    questions,
+    run,
+    answer,
+    refine,
+    reset,
+    setError,
+  }
 }
 
 /** "Log <meal>" and "Save to my meals" for an edited list of items. */
