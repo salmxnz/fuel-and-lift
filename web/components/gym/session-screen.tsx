@@ -5,7 +5,7 @@ import { motion, useReducedMotion, type PanInfo } from "motion/react"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { ErrorCard, LoadingBlock, PageHeader, Spinner } from "@/components/ui/primitives"
-import { CardioArt, CheckIcon, MachineArt } from "@/components/ui/icons"
+import { CheckIcon } from "@/components/ui/icons"
 import { api, errorMessage, seg } from "@/lib/api/client"
 import type { Session, SessionBlock, SessionResponse, SessionSet, TemplateDetailResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
@@ -15,6 +15,7 @@ import { num1, parseDecimal } from "@/lib/format"
 import { ExercisePicker } from "./exercise-picker"
 import { RestTimerPill, useRestTimer } from "./rest-timer"
 import { blockDone, blockPlanText, blockSummary, cardioText, ordinal } from "./session-helpers"
+import { ExerciseIcon } from "./exercise-icon"
 import { QuickAddSets } from "./quick-add-sets"
 
 const DEFAULT_REST = 90
@@ -308,9 +309,12 @@ export function SessionScreen({ id }: { id: string }) {
                       className="flex w-full items-center justify-between gap-2 rounded-btn bg-white px-3.5 py-3 text-left"
                       aria-label={`${b.exercise.name}${done ? ", done" : ""}. ${finished ? "" : "Open"}`}
                     >
-                      <span className="flex min-w-0 flex-col">
-                        <span className="text-[12px] text-muted">{b.exercise.muscle_group ?? (b.cardio ? "Cardio" : "")}</span>
-                        <span className="truncate text-[16px] font-bold">{b.exercise.name}</span>
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <ExerciseIcon exercise={b.exercise} size={40} className="rounded-[10px]" />
+                        <span className="flex min-w-0 flex-col">
+                          <span className="text-[12px] text-muted">{b.exercise.muscle_group ?? (b.cardio ? "Cardio" : "")}</span>
+                          <span className="truncate text-[16px] font-bold">{b.exercise.name}</span>
+                        </span>
                       </span>
                       {done ? (
                         <span className="flex flex-none items-center gap-1 text-[14px] font-semibold text-protein">
@@ -405,20 +409,7 @@ function CurrentBlock({
   return (
     <section aria-label={block.exercise.name} className="flex flex-col gap-3 rounded-card bg-white p-3.5">
       <div className="flex items-center gap-3">
-        <div className="flex h-[72px] w-[72px] flex-none items-center justify-center overflow-hidden rounded-tile bg-mint">
-          {block.exercise.gym_photo_url || block.exercise.media_url ? (
-            // eslint-disable-next-line @next/next/no-img-element -- user/exercise media from the API
-            <img
-              src={(block.exercise.gym_photo_url || block.exercise.media_url) as string}
-              alt={block.exercise.name}
-              className="h-full w-full object-cover"
-            />
-          ) : block.cardio ? (
-            <CardioArt size={56} />
-          ) : (
-            <MachineArt size={56} label={block.exercise.name} />
-          )}
-        </div>
+        <ExerciseIcon exercise={block.exercise} size={72} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-[12px] text-muted">{block.exercise.muscle_group ?? (block.cardio ? "Cardio" : "Exercise")}</span>
           <h2 className="m-0 text-[19px] font-extrabold tracking-[-0.01em]">{block.exercise.name}</h2>

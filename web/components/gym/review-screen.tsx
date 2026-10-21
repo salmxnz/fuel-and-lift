@@ -13,7 +13,8 @@ import {
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Button, ErrorCard, Spinner, Switch } from "@/components/ui/primitives"
-import { CardioArt, CheckIcon, CloseIcon, MachineArt, PencilIcon, TrendIcon } from "@/components/ui/icons"
+import { CheckIcon, CloseIcon, PencilIcon, TrendIcon } from "@/components/ui/icons"
+import { ExerciseIcon } from "./exercise-icon"
 import { Sheet } from "@/components/ui/sheet"
 import { api, errorMessage, seg } from "@/lib/api/client"
 import type {
@@ -421,21 +422,7 @@ function SwipeCard({
         Skipped
       </motion.span>
 
-      <div className="flex h-[150px] flex-none items-center justify-center overflow-hidden rounded-card bg-mint">
-        {block.exercise.gym_photo_url || block.exercise.media_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- exercise media from the API
-          <img
-            src={(block.exercise.gym_photo_url || block.exercise.media_url) as string}
-            alt=""
-            draggable={false}
-            className="h-full w-full object-cover"
-          />
-        ) : block.cardio ? (
-          <CardioArt size={110} />
-        ) : (
-          <MachineArt size={120} label={block.exercise.name} />
-        )}
-      </div>
+      <ExerciseIcon exercise={block.exercise} size={150} wide className="rounded-card" />
       <div className="flex flex-col gap-0.5">
         <span className="text-[13px] text-muted">{block.exercise.muscle_group ?? (block.cardio ? "Cardio" : "Exercise")}</span>
         <h2 className="m-0 text-[28px] font-extrabold leading-tight tracking-[-0.02em]">{block.exercise.name}</h2>

@@ -8,7 +8,8 @@
     "start": "next start -p 3000",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "icons": "node scripts/make-icons.mjs"
+    "icons": "node scripts/make-icons.mjs",
+    "pixel-icons": "node scripts/import-pixel-pack.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

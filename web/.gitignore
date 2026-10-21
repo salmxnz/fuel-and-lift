@@ -8,3 +8,6 @@ npm-debug.log*
 .env*
 !.env.example
 *.tsbuildinfo
+# Pixel icon pack (licence: no redistribution). Remove these lines and commit
+# public/pixel once the GitHub repository is private.
+/public/pixel/

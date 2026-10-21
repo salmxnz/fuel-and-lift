@@ -8,6 +8,7 @@ import { PlusIcon, SearchIcon } from "@/components/ui/icons"
 import { api, errorMessage } from "@/lib/api/client"
 import type { Exercise, ExerciseKind, ExerciseResponse, ExercisesResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
+import { ExerciseIcon } from "./exercise-icon"
 
 /** Search the exercise library or create a new exercise. */
 export function ExercisePicker({
@@ -132,7 +133,8 @@ function PickerBody({ onPick }: { onPick: (exercise: Exercise) => void }) {
               onClick={() => onPick(ex)}
               className="flex min-h-[52px] items-center justify-between gap-3 border-b border-line-soft py-2 text-left last:border-b-0"
             >
-              <span className="flex min-w-0 flex-col">
+              <ExerciseIcon exercise={ex} size={40} className="rounded-[10px]" />
+              <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-[15px] font-bold">{ex.name}</span>
                 <span className="text-[12px] text-muted">
                   {ex.matched_alias ? `Matches “${ex.matched_alias}” · ` : ""}

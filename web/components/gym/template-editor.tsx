@@ -28,6 +28,7 @@ import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
 import { parseDecimal } from "@/lib/format"
 import { PAGE_SLIDE, pageVariants, swipeDirection } from "@/lib/motion"
+import { ExerciseIcon } from "./exercise-icon"
 import { ExercisePicker } from "./exercise-picker"
 import { QuickAddSets } from "./quick-add-sets"
 
@@ -482,6 +483,7 @@ function Editor({
         {blocks.map((b, i) => (
           <li key={b.key} className="flex flex-col gap-3 rounded-card bg-white p-3.5">
             <div className="flex items-start gap-2">
+              <ExerciseIcon exercise={b.exercise} size={44} className="rounded-[12px]" />
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="text-[12px] text-muted">
                   {i + 1}. {b.exercise.muscle_group ?? (b.exercise.kind === "cardio" ? "Cardio" : "Exercise")}
