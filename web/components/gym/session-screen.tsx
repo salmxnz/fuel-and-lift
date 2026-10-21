@@ -15,6 +15,7 @@ import { num1, parseDecimal } from "@/lib/format"
 import { ExercisePicker } from "./exercise-picker"
 import { RestTimerPill, useRestTimer } from "./rest-timer"
 import { blockDone, blockPlanText, blockSummary, cardioText, ordinal } from "./session-helpers"
+import { QuickAddSets } from "./quick-add-sets"
 
 const DEFAULT_REST = 90
 const SWIPE_SKIP_PX = 90
@@ -161,6 +162,25 @@ export function SessionScreen({ id }: { id: string }) {
     )
   }
 
+  /** Quick add: several identical working sets, posted one after another. */
+  async function quickSets(block: SessionBlock, count: number, reps: number | null, kg: number | null) {
+    if (!s) return
+    for (let i = 0; i < count; i++) {
+      const ok = await call(
+        `extra-${block.id}`,
+        () =>
+          api.post<SessionResponse>(`sessions/${seg(s.id)}/blocks/${seg(block.id)}/sets`, {
+            warmup: false,
+            target_kg: kg,
+            target_reps: reps != null ? Math.round(reps) : null,
+            to_failure: reps == null,
+          }),
+        s
+      )
+      if (!ok) break
+    }
+  }
+
   async function extraSet(block: SessionBlock) {
     if (!s) return
     const work = block.sets.filter((x) => !x.warmup)
@@ -277,6 +297,7 @@ export function SessionScreen({ id }: { id: string }) {
                       pending={pending}
                       onToggle={(set) => toggleSet(b, set)}
                       onExtra={() => extraSet(b)}
+                      onQuick={(n, reps, kg) => quickSets(b, n, reps, kg)}
                       onSkip={() => setSkipped(b, true)}
                       onCardio={(v) => cardioDone(b, v)}
                     />
@@ -363,6 +384,7 @@ function CurrentBlock({
   pending,
   onToggle,
   onExtra,
+  onQuick,
   onSkip,
   onCardio,
 }: {
@@ -372,6 +394,7 @@ function CurrentBlock({
   pending: Record<string, boolean>
   onToggle: (s: SessionSet) => void
   onExtra: () => void
+  onQuick: (count: number, reps: number | null, kg: number | null) => Promise<void>
   onSkip: () => void
   onCardio: (done: boolean) => void
 }) {
@@ -497,6 +520,16 @@ function CurrentBlock({
         </button>
       </div>
       {!block.cardio ? <span className="-mt-1.5 text-[12px] text-muted">Rest timer starts on tick</span> : null}
+      {!block.cardio ? (
+        <QuickAddSets
+          key={sets.length}
+          remaining={12 - sets.length}
+          defaultReps={String([...sets].reverse().find((x) => !x.warmup && !x.to_failure)?.target_reps ?? 10)}
+          defaultKg={String([...sets].reverse().find((x) => !x.warmup)?.target_kg ?? "")}
+          busy={!!pending[`extra-${block.id}`]}
+          onAdd={onQuick}
+        />
+      ) : null}
     </section>
   )
 }

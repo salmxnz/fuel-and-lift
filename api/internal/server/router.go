@@ -73,6 +73,8 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/templates/{id}":                        h.GetTemplate,
 		"PUT /v1/templates/{id}":                        h.SaveTemplate,
 		"DELETE /v1/templates/{id}":                     h.DeleteTemplate,
+		"GET /v1/templates/{id}/versions/{version}":     h.GetTemplateVersion,
+		"POST /v1/templates/{id}/current":               h.SetCurrentTemplateVersion,
 		"GET /v1/weekly-plan":                           h.GetWeeklyPlan,
 		"PUT /v1/weekly-plan":                           h.PutWeeklyPlan,
 		"POST /v1/sessions":                             h.StartSession,

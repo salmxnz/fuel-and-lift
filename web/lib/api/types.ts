@@ -314,7 +314,10 @@ export type TemplateBlock = {
 export type Template = {
   id: string
   name: string
+  /** The version these blocks belong to. */
   version: number
+  /** The version sessions start from (differs when viewing an older one). */
+  current_version: number
   version_id: string
   blocks: TemplateBlock[]
   updated_at: string

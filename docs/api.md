@@ -277,6 +277,7 @@ type TemplateBlock = {
 }
 
 type Template = { id: string, name: string, version: number, version_id: string,
+                  current_version: number,  // = version unless viewing an older one
                   blocks: TemplateBlock[], updated_at: string }
 ```
 ### `GET /v1/exercises?q=` → `200 {"exercises": Exercise[]}`
@@ -290,6 +291,12 @@ Best 50 results; an empty `q` returns everything by name.
 ### `GET /v1/templates/{id}` → `200 {"template": Template, "versions": [{version, version_id, created_at}]}`
 ### `PUT /v1/templates/{id}` (same body as POST) → `200 {"template": Template}` — saves a **new version**
 ### `DELETE /v1/templates/{id}` → `204` (archived; history keeps it)
+### `GET /v1/templates/{id}/versions/{version}` → `200 {"template": Template}`
+That version's blocks; `template.version` is the one asked for and
+`template.current_version` the one sessions start from. `404` if it doesn't exist.
+### `POST /v1/templates/{id}/current` `{version}` → `200 {"template": Template}`
+Makes an existing version current (nothing is copied). The next `PUT` saves as
+the highest version + 1.
 
 ### Weekly plan
 `GET /v1/weekly-plan` → `200 {"days": {"mon": "template-uuid" | null, "tue": ..., "sun": ...}}`

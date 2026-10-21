@@ -159,6 +159,49 @@ func (h *Handler) GetTemplate(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{"template": t, "versions": versions})
 }
 
+// GetTemplateVersion handles GET /v1/templates/{id}/versions/{version}.
+func (h *Handler) GetTemplateVersion(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	v, err := strconv.Atoi(r.PathValue("version"))
+	if err != nil || v < 1 {
+		httpx.Error(w, http.StatusNotFound, "that version doesn't exist")
+		return
+	}
+	t, err := h.Store.GetTemplateVersion(r.Context(), auth.UserID(r), id, &v)
+	if err != nil {
+		h.storeError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"template": t})
+}
+
+// SetCurrentTemplateVersion handles POST /v1/templates/{id}/current {version}.
+func (h *Handler) SetCurrentTemplateVersion(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		Version int `json:"version"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if in.Version < 1 {
+		badRequest(w, "version must be 1 or more")
+		return
+	}
+	t, err := h.Store.SetCurrentVersion(r.Context(), auth.UserID(r), id, in.Version)
+	if err != nil {
+		h.storeError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"template": t})
+}
+
 // SaveTemplate handles PUT /v1/templates/{id}: a new version.
 func (h *Handler) SaveTemplate(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")

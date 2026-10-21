@@ -147,12 +147,15 @@ type TemplateBlock struct {
 
 // Template is a workout plan at its current version.
 type Template struct {
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Version   int             `json:"version"`
-	VersionID string          `json:"version_id"`
-	Blocks    []TemplateBlock `json:"blocks"`
-	UpdatedAt time.Time       `json:"updated_at"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Version   int    `json:"version"`
+	VersionID string `json:"version_id"`
+	// CurrentVersion is the version sessions start from; it differs from
+	// Version only when an older version is being viewed.
+	CurrentVersion int             `json:"current_version"`
+	Blocks         []TemplateBlock `json:"blocks"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
 // TemplateVersion is one saved version.
@@ -233,10 +236,14 @@ func (s *Store) SaveTemplateVersion(ctx context.Context, userID, id, name string
 	return s.GetTemplate(ctx, userID, id)
 }
 
+// newVersion saves blocks as the next version number (one past the highest,
+// not the current: an older version may have been made current) and makes it
+// current.
 func newVersion(ctx context.Context, tx pgx.Tx, userID, id, name string, blocks []storedBlock) error {
 	var next int
 	err := tx.QueryRow(ctx, `
-		update templates set current_version = current_version + 1, name = coalesce(nullif($3, ''), name), updated_at = now()
+		update templates t set current_version = (select max(version) + 1 from template_versions v where v.template_id = t.id),
+		       name = coalesce(nullif($3, ''), name), updated_at = now()
 		where id = $1::uuid and user_id = $2::uuid and archived_at is null returning current_version`, id, userID, name).Scan(&next)
 	if err != nil {
 		return notFound(err)
@@ -248,24 +255,26 @@ func newVersion(ctx context.Context, tx pgx.Tx, userID, id, name string, blocks 
 
 type templateRow struct {
 	id, name, versionID string
-	version             int
+	version, current    int
 	updated             time.Time
 	blocks              []storedBlock
 }
 
-func (s *Store) templateRows(ctx context.Context, userID string, id *string) ([]templateRow, error) {
+// templateRows loads templates at their current version, or one template at
+// a given version.
+func (s *Store) templateRows(ctx context.Context, userID string, id *string, version *int) ([]templateRow, error) {
 	rows, err := s.Pool.Query(ctx, `
-		select t.id::text, t.name, t.current_version, v.id::text, t.updated_at, v.blocks
-		from templates t join template_versions v on v.template_id = t.id and v.version = t.current_version
+		select t.id::text, t.name, v.version, t.current_version, v.id::text, t.updated_at, v.blocks
+		from templates t join template_versions v on v.template_id = t.id and v.version = coalesce($3::int, t.current_version)
 		where t.user_id = $1::uuid and t.archived_at is null and ($2::uuid is null or t.id = $2::uuid)
-		order by t.name`, userID, id)
+		order by t.name`, userID, id, version)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (templateRow, error) {
 		var t templateRow
 		var raw []byte
-		if err := r.Scan(&t.id, &t.name, &t.version, &t.versionID, &t.updated, &raw); err != nil {
+		if err := r.Scan(&t.id, &t.name, &t.version, &t.current, &t.versionID, &t.updated, &raw); err != nil {
 			return t, err
 		}
 		return t, json.Unmarshal(raw, &t.blocks)
@@ -285,7 +294,7 @@ func (s *Store) expand(ctx context.Context, userID string, rows []templateRow) (
 	}
 	out := make([]Template, 0, len(rows))
 	for _, t := range rows {
-		tpl := Template{ID: t.id, Name: t.name, Version: t.version, VersionID: t.versionID, UpdatedAt: t.updated, Blocks: []TemplateBlock{}}
+		tpl := Template{ID: t.id, Name: t.name, Version: t.version, CurrentVersion: t.current, VersionID: t.versionID, UpdatedAt: t.updated, Blocks: []TemplateBlock{}}
 		for i, b := range t.blocks {
 			tpl.Blocks = append(tpl.Blocks, TemplateBlock{
 				ID: b.ID, Position: i, Exercise: ex[b.ExerciseID], Sets: b.Sets, Cardio: b.Cardio,
@@ -299,7 +308,7 @@ func (s *Store) expand(ctx context.Context, userID string, rows []templateRow) (
 
 // ListTemplates returns the user's templates at their current versions.
 func (s *Store) ListTemplates(ctx context.Context, userID string) ([]Template, error) {
-	rows, err := s.templateRows(ctx, userID, nil)
+	rows, err := s.templateRows(ctx, userID, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +317,12 @@ func (s *Store) ListTemplates(ctx context.Context, userID string) ([]Template, e
 
 // GetTemplate returns one template at its current version.
 func (s *Store) GetTemplate(ctx context.Context, userID, id string) (Template, error) {
-	rows, err := s.templateRows(ctx, userID, &id)
+	return s.GetTemplateVersion(ctx, userID, id, nil)
+}
+
+// GetTemplateVersion returns one template at a given version (nil = current).
+func (s *Store) GetTemplateVersion(ctx context.Context, userID, id string, version *int) (Template, error) {
+	rows, err := s.templateRows(ctx, userID, &id, version)
 	if err != nil {
 		return Template{}, err
 	}
@@ -320,6 +334,22 @@ func (s *Store) GetTemplate(ctx context.Context, userID, id string) (Template, e
 		return Template{}, err
 	}
 	return list[0], nil
+}
+
+// SetCurrentVersion makes an existing version the one sessions start from.
+// Nothing is copied: later saves still get the next free version number.
+func (s *Store) SetCurrentVersion(ctx context.Context, userID, id string, version int) (Template, error) {
+	ct, err := s.Pool.Exec(ctx, `
+		update templates t set current_version = $3, updated_at = now()
+		where t.id = $1::uuid and t.user_id = $2::uuid and t.archived_at is null
+		  and exists (select 1 from template_versions v where v.template_id = t.id and v.version = $3)`, id, userID, version)
+	if err != nil {
+		return Template{}, err
+	}
+	if ct.RowsAffected() == 0 {
+		return Template{}, ErrNotFound
+	}
+	return s.GetTemplate(ctx, userID, id)
 }
 
 // TemplateVersions lists the versions of a template, newest first.

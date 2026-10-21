@@ -454,6 +454,26 @@ func TestAPI(t *testing.T) {
 	if v := get(e.must(me, 200, "GET", "/v1/templates/"+tplID, nil), "versions").([]any); len(v) != 2 {
 		t.Fatalf("versions: %v", v)
 	}
+	// Old versions can be read back and made current; the next save still
+	// gets a fresh number.
+	v1 := e.must(me, 200, "GET", "/v1/templates/"+tplID+"/versions/1", nil)
+	if get(v1, "template", "version").(float64) != 1 || get(v1, "template", "current_version").(float64) != 2 ||
+		get(v1, "template", "blocks", 1, "sets", 1, "target_kg").(float64) != 50 {
+		t.Fatalf("version 1: %v", v1)
+	}
+	e.must(me, 404, "GET", "/v1/templates/"+tplID+"/versions/9", nil)
+	e.must(me, 404, "POST", "/v1/templates/"+tplID+"/current", obj{"version": 9})
+	cur := e.must(me, 200, "POST", "/v1/templates/"+tplID+"/current", obj{"version": 1})
+	if get(cur, "template", "version").(float64) != 1 || get(cur, "template", "current_version").(float64) != 1 {
+		t.Fatalf("set current: %v", cur)
+	}
+	resaved := e.must(me, 200, "PUT", "/v1/templates/"+tplID, obj{"name": "Upper-1", "blocks": []obj{
+		{"exercise_id": lat, "sets": []obj{{"target_kg": 52.5, "target_reps": 10}}},
+	}})
+	if get(resaved, "template", "version").(float64) != 3 {
+		t.Fatalf("save after set-current: %v", resaved)
+	}
+	e.must(me, 200, "POST", "/v1/templates/"+tplID+"/current", obj{"version": 2})
 	hist := e.must(me, 200, "GET", "/v1/progress/exercises/"+lat, nil)
 	if len(get(hist, "points").([]any)) != 1 {
 		t.Fatalf("history: %v", hist)
