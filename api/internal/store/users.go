@@ -51,16 +51,14 @@ type GoogleSignIn struct {
 	InviteTokenHash string
 }
 
-// ErrInviteOnly is returned when a new person has no way in.
-var ErrInviteOnly = errors.New("this app is invite-only")
-
 // ErrInviteInvalid is returned for a friend link that is used, revoked or expired.
 var ErrInviteInvalid = errors.New("this invite link has expired or was already used")
 
 // SignInWithGoogle finds or creates the user for a verified Google identity.
-// An existing user (matched by Google subject, else by email) always gets in.
-// A new user needs ADMIN_EMAILS, an email invite, or a valid friend link. A
-// friend link also makes the two people friends, for new and existing users.
+// Anyone can sign up. An existing user is matched by Google subject, else by
+// email. ADMIN_EMAILS get the admin role and Pro (with no end date). A valid
+// friend link records who invited a new user (referrals) and makes the two
+// people friends; a stale link is ignored rather than blocking sign-in.
 func (s *Store) SignInWithGoogle(ctx context.Context, in GoogleSignIn) (User, bool, error) {
 	var user User
 	created := false
@@ -79,7 +77,8 @@ func (s *Store) SignInWithGoogle(ctx context.Context, in GoogleSignIn) (User, bo
 				update users set google_sub = $2, email = $3, avatar_url = nullif($4, ''),
 				       name = case when name = '' then $5 else name end,
 				       role = $6, last_login_at = now(),
-				       pro_source = case when $6 = 'admin' and plan <> 'pro' then 'admin' else pro_source end,
+				       pro_source = case when $6 = 'admin' and (plan <> 'pro' or pro_until is not null) then 'admin' else pro_source end,
+				       pro_until = case when $6 = 'admin' then null else pro_until end,
 				       plan = case when $6 = 'admin' then 'pro' else plan end
 				where id = $1::uuid returning `+userCols,
 				u.ID, in.Subject, in.Email, in.AvatarURL, in.Name, role))
@@ -90,19 +89,13 @@ func (s *Store) SignInWithGoogle(ctx context.Context, in GoogleSignIn) (User, bo
 			var link *inviteLinkRow
 			if in.InviteTokenHash != "" {
 				l, err := lockOpenLink(ctx, tx, in.InviteTokenHash)
-				if err != nil {
+				switch {
+				case err == nil:
+					link = &l
+				case errors.Is(err, ErrInviteInvalid):
+					// Stale link: sign up anyway, just without the friendship.
+				default:
 					return err
-				}
-				link = &l
-			}
-			var emailInvite bool
-			if !in.MakeAdmin && link == nil {
-				err := tx.QueryRow(ctx, `select true from email_invites where email = $1 and accepted_at is null`, in.Email).Scan(&emailInvite)
-				if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-					return err
-				}
-				if !emailInvite {
-					return ErrInviteOnly
 				}
 			}
 			role, plan := "member", "free"
@@ -125,10 +118,8 @@ func (s *Store) SignInWithGoogle(ctx context.Context, in GoogleSignIn) (User, bo
 				return err
 			}
 			created = true
-			if emailInvite {
-				if _, err := tx.Exec(ctx, `update email_invites set accepted_at = now() where email = $1`, in.Email); err != nil {
-					return err
-				}
+			if link == nil {
+				in.InviteTokenHash = ""
 			}
 		default:
 			return err
@@ -137,9 +128,8 @@ func (s *Store) SignInWithGoogle(ctx context.Context, in GoogleSignIn) (User, bo
 
 		if in.InviteTokenHash != "" {
 			if err := acceptLink(ctx, tx, in.InviteTokenHash, u.ID, created); err != nil {
-				// An existing user with a stale link still signs in; only new
-				// users depend on the link being valid (checked above).
-				if !created && (errors.Is(err, ErrInviteInvalid) || errors.Is(err, ErrConflict)) {
+				// A stale or self-made link never blocks sign-in.
+				if errors.Is(err, ErrInviteInvalid) || errors.Is(err, ErrConflict) {
 					return nil
 				}
 				return err
@@ -178,47 +168,5 @@ func (s *Store) ConsumeRefreshToken(ctx context.Context, hash string) (string, e
 // RevokeRefreshToken revokes by hash (logout). Idempotent.
 func (s *Store) RevokeRefreshToken(ctx context.Context, hash string) error {
 	_, err := s.Pool.Exec(ctx, `update refresh_tokens set revoked_at = now() where token_hash = $1 and revoked_at is null`, hash)
-	return err
-}
-
-// --- email invites (admin) -------------------------------------------------
-
-// EmailInvite is a pre-approved email.
-type EmailInvite struct {
-	ID         string     `json:"id"`
-	Email      string     `json:"email"`
-	CreatedAt  time.Time  `json:"created_at"`
-	AcceptedAt *time.Time `json:"accepted_at"`
-}
-
-// ListEmailInvites returns every email invite, newest first.
-func (s *Store) ListEmailInvites(ctx context.Context) ([]EmailInvite, error) {
-	rows, err := s.Pool.Query(ctx, `select id::text, email::text, created_at, accepted_at from email_invites order by created_at desc`)
-	if err != nil {
-		return nil, err
-	}
-	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (EmailInvite, error) {
-		var i EmailInvite
-		return i, r.Scan(&i.ID, &i.Email, &i.CreatedAt, &i.AcceptedAt)
-	})
-}
-
-// CreateEmailInvite pre-approves an email.
-func (s *Store) CreateEmailInvite(ctx context.Context, email, by string) (EmailInvite, error) {
-	var i EmailInvite
-	err := s.Pool.QueryRow(ctx, `
-		insert into email_invites (email, invited_by) values ($1, $2::uuid)
-		on conflict (email) do update set email = excluded.email
-		returning id::text, email::text, created_at, accepted_at`, email, by).
-		Scan(&i.ID, &i.Email, &i.CreatedAt, &i.AcceptedAt)
-	return i, err
-}
-
-// DeleteEmailInvite removes one.
-func (s *Store) DeleteEmailInvite(ctx context.Context, id string) error {
-	ct, err := s.Pool.Exec(ctx, `delete from email_invites where id = $1::uuid`, id)
-	if err == nil && ct.RowsAffected() == 0 {
-		return ErrNotFound
-	}
 	return err
 }

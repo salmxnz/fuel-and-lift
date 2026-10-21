@@ -5,7 +5,7 @@ import { safeCallbackUrl } from "@/lib/auth/callback-url"
 export const metadata: Metadata = { title: "Sign in" }
 
 const ERRORS: Record<string, string> = {
-  invite_only: "This app is invite-only. Ask a friend for a link.",
+  unverified: "Your Google email isn't verified yet. Verify it with Google, then try again.",
   cancelled: "Sign-in was cancelled. Try again when you're ready.",
   state: "That sign-in link expired. Please try again.",
   google: "Google couldn't sign you in. Please try again.",
@@ -48,7 +48,10 @@ export default async function LoginPage({
           <Tick /> Workout plans that move up when you do
         </li>
         <li className="flex items-center gap-2.5">
-          <Tick /> Private: invite-only, you choose what friends see
+          <Tick /> Free to start, 10 photo estimates a month
+        </li>
+        <li className="flex items-center gap-2.5">
+          <Tick /> Private: you choose what friends see
         </li>
       </ul>
       <div className="flex-1" />
@@ -60,7 +63,7 @@ export default async function LoginPage({
       <div className="flex flex-col gap-2.5">
         <GoogleButton href={href} />
         <p className="m-0 text-center text-[12px] leading-[1.45] text-night-muted">
-          Invite-only. New here? Open the link a friend sent you.
+          New here? Continue with Google to create your account.
         </p>
       </div>
     </NightShell>

@@ -63,7 +63,13 @@ export async function GET(request: NextRequest) {
   }
 
   if (!res.ok) {
-    const reason = res.status === 403 ? "invite_only" : res.status === 400 || res.status === 401 ? "google" : "server"
+    const err = (await res.json().catch(() => null)) as { error?: { code?: string } } | null
+    const reason =
+      err?.error?.code === "email_unverified"
+        ? "unverified"
+        : res.status === 400 || res.status === 401 || res.status === 403
+          ? "google"
+          : "server"
     return fail(request, reason, oauth.invite)
   }
 

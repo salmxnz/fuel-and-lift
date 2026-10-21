@@ -1,6 +1,6 @@
 # Authentication
 
-Google sign-in only, invite-only, cookie-backed sessions with rotating refresh
+Google sign-in only, open sign-up, cookie-backed sessions with rotating refresh
 tokens. Modelled on the nex-dash-forecast backend: the Go API issues tokens, the
 Next.js app is a BFF that keeps them in httpOnly cookies, and the browser's
 JavaScript never sees a token.
@@ -33,9 +33,8 @@ need no round trip.
 3. **Go** exchanges the code at Google's token endpoint (with the client
    secret, which only Go holds), verifies the returned ID token (issuer,
    audience = `GOOGLE_CLIENT_ID`, expiry, signature via Google's JWKS,
-   `email_verified`), then checks the allow-list: the email is in
-   `ADMIN_EMAILS` (becomes `admin`) or has an open invite (becomes `member`).
-   It upserts the user by Google `sub`, issues the token triple and returns
+   `email_verified`). Emails in `ADMIN_EMAILS` become `admin` with Pro; everyone
+   else becomes a `member` on the free plan. It upserts the user by Google `sub`, issues the token triple and returns
    `{access_token, csrf_token, user, onboarded}` plus `Set-Cookie` for the
    refresh and csrf tokens.
 4. **Next** copies access, refresh and csrf into its own `fl_*` cookies and
@@ -64,15 +63,16 @@ token) → Next clears every `fl_*` cookie.
 
 ## Who can get in
 
-- `ADMIN_EMAILS` (comma separated) bootstraps the first admin.
-- **Friend links** are the normal way in. A user shares `${APP_URL}/join/<token>`.
+Anyone with a verified Google account can sign up.
+
+- `ADMIN_EMAILS` (comma separated) are admins and always have Pro.
+- **Friend links** add a friend and count as a referral (8 → Pro for the
+  inviter). A user shares `${APP_URL}/join/<token>`.
   The join page shows who invited you (`GET /v1/invite-links/preview/{token}`,
   no auth). *Continue with Google* goes to `/api/auth/google/start?invite=<token>`;
   the token rides in the `fl_oauth` cookie and is sent to Go as `invite_token`.
   Already signed in? The join page calls `POST /v1/invite-links/accept` instead.
-- Admins can also pre-approve an email with `POST /v1/admin/invites {email}`.
-
-Nobody else can create an account.
+- A used or expired link never blocks sign-in; it just doesn't add the friend.
 
 ## Google Cloud setup
 

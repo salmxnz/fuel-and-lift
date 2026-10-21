@@ -42,7 +42,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
           <p className="m-0 text-[16px] leading-[1.45] text-night-soft">
             {failure === "down"
               ? "The server isn't answering. Try opening the link again in a moment."
-              : `Friend links work once and expire after 14 days. Ask ${preview ? first : "your friend"} to send a new one.`}
+              : `Friend links work once and expire after 14 days. You can still sign up, then ask ${preview ? first : "your friend"} for a new link to add each other.`}
           </p>
         </div>
         <div className="flex-1" />
@@ -50,7 +50,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
           href={session ? "/today" : "/login"}
           className="flex min-h-14 items-center justify-center rounded-btn border border-night-line text-[16px] font-bold text-ink no-underline"
         >
-          {session ? "Go to Today" : "Sign in"}
+          {session ? "Go to Today" : "Sign up or sign in"}
         </Link>
       </NightShell>
     )

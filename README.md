@@ -37,9 +37,9 @@ URI `http://localhost:3000/api/auth/google/callback`. See [docs/auth.md](docs/au
 
 ## Who can get in
 
-The app is invite-only. People in `ADMIN_EMAILS` can always sign in. Everyone
-else needs a friend link (`Me → Add friend`, single use, 14 days) or an email an
-admin added. Opening a link makes you friends.
+Anyone with a Google account can sign up. People in `ADMIN_EMAILS` are admins
+and always have Pro. Friend links (`Me → Add friend`, single use, 14 days) make
+you friends and count toward the inviter's 8 referrals for Pro.
 
 ## Free and Pro
 

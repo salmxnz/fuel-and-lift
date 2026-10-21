@@ -85,7 +85,7 @@ func (h *Handler) GoogleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !id.EmailVerified {
-		httpx.Error(w, http.StatusForbidden, "your Google email address isn't verified")
+		httpx.ErrorCode(w, http.StatusForbidden, "email_unverified", "your Google email address isn't verified")
 		return
 	}
 	var inviteHash string
@@ -96,14 +96,6 @@ func (h *Handler) GoogleSignIn(w http.ResponseWriter, r *http.Request) {
 		Subject: id.Subject, Email: id.Email, Name: id.Name, AvatarURL: id.Picture,
 		MakeAdmin: h.Cfg.IsAdminEmail(id.Email), InviteTokenHash: inviteHash,
 	})
-	if errors.Is(err, store.ErrInviteOnly) {
-		httpx.ErrorCode(w, http.StatusForbidden, "invite_only", "this app is invite-only — ask a friend for a link")
-		return
-	}
-	if errors.Is(err, store.ErrInviteInvalid) {
-		httpx.ErrorCode(w, http.StatusForbidden, "invite_invalid", store.ErrInviteInvalid.Error())
-		return
-	}
 	if err != nil {
 		h.storeError(w, r, err)
 		return

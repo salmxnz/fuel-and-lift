@@ -47,7 +47,7 @@ browser ──/api/v1/*──► Next (proxy.ts → app/api/v1/[...path]) ──
   `/v1/auth/google`, stores access + csrf (from the body) and refresh (from Go's
   `Set-Cookie`) as `fl_*` cookies, and sends you to `/onboarding` or the
   callback URL / `/today`. Failures land on `/login?error=…` (403 →
-  "This app is invite-only. Ask a friend for a link.").
+  "Your Google email isn't verified.").
 - **Silent refresh** (`proxy.ts`, Next 16's middleware): every page and
   `/api/v1` request is checked; an expired `fl_access` with a valid
   `fl_refresh` is refreshed against Go (`/v1/auth/refresh`, refresh + csrf

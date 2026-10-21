@@ -13,7 +13,6 @@ import (
 func NewRouter(h *handlers.Handler) http.Handler {
 	mux := http.NewServeMux()
 	secure := auth.RequireAuth(h.Cfg.JWTSecret)
-	admin := func(f http.HandlerFunc) http.HandlerFunc { return secure(auth.RequireAdmin(f)) }
 
 	open := map[string]http.HandlerFunc{
 		"GET /health":                          h.Health,
@@ -115,15 +114,6 @@ func NewRouter(h *handlers.Handler) http.Handler {
 	}
 	for p, f := range signedIn {
 		mux.HandleFunc(p, secure(f))
-	}
-
-	admins := map[string]http.HandlerFunc{
-		"GET /v1/admin/invites":         h.ListEmailInvites,
-		"POST /v1/admin/invites":        h.CreateEmailInvite,
-		"DELETE /v1/admin/invites/{id}": h.DeleteEmailInvite,
-	}
-	for p, f := range admins {
-		mux.HandleFunc(p, admin(f))
 	}
 
 	return auth.CORS(h.Cfg.AllowedOrigins)(httpx.Recover(httpx.Logger(mux)))

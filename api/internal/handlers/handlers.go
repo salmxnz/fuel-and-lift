@@ -65,8 +65,6 @@ func (h *Handler) storeError(w http.ResponseWriter, r *http.Request, err error) 
 		httpx.Error(w, http.StatusBadRequest, "one of the exercises doesn't exist")
 	case errors.Is(err, store.ErrInviteInvalid):
 		httpx.Error(w, http.StatusGone, store.ErrInviteInvalid.Error())
-	case errors.Is(err, store.ErrInviteOnly):
-		httpx.Error(w, http.StatusForbidden, store.ErrInviteOnly.Error())
 	case errors.Is(err, context.Canceled):
 		// client went away
 	default:

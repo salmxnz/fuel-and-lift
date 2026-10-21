@@ -189,12 +189,27 @@ func TestAPI(t *testing.T) {
 	today := store.LocalToday(time.Now(), "Indian/Mauritius").String()
 
 	// --- who gets in ---------------------------------------------------------------
-	if _, err := e.signIn("stranger@x.test", false, ""); err != store.ErrInviteOnly {
-		t.Fatalf("stranger sign-in: %v, want ErrInviteOnly", err)
+	// Anyone can sign up: no link, no invite.
+	stranger, err := e.signIn("stranger@x.test", false, "")
+	if err != nil {
+		t.Fatalf("stranger sign-in: %v", err)
+	}
+	if get(e.must(stranger, 200, "GET", "/v1/billing", nil), "billing", "plan") != "free" {
+		t.Fatal("a stranger starts on the free plan")
 	}
 	me, err := e.signIn("bhavish@x.test", true, "")
 	if err != nil {
 		t.Fatal(err)
+	}
+	// An admin whose Pro had an old end date gets Pro back on sign-in.
+	if _, err := e.st.Pool.Exec(context.Background(), `update users set pro_until = now() - interval '1 day' where id = $1::uuid`, me.id); err != nil {
+		t.Fatal(err)
+	}
+	if me, err = e.signIn("bhavish@x.test", true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if u, _ := e.st.GetUser(context.Background(), me.id); !u.IsPro(time.Now()) {
+		t.Fatal("admin should be Pro after sign-in")
 	}
 	e.must(user{}, 401, "GET", "/v1/auth/me", nil)
 	if get(e.must(me, 200, "GET", "/v1/auth/me", nil), "onboarded") != false {
@@ -304,7 +319,8 @@ func TestAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.signIn("other@x.test", false, token); err != store.ErrInviteInvalid {
+	// A used link no longer blocks sign-up; it just doesn't add a friend.
+	if _, err := e.signIn("other@x.test", false, token); err != nil {
 		t.Fatalf("reused link: %v", err)
 	}
 	e.must(ravi, 201, "POST", "/v1/onboarding", onboarding("Ravi"))
@@ -446,8 +462,8 @@ func TestAPI(t *testing.T) {
 		t.Fatalf("cheer: %v", ch)
 	}
 	e.must(ravi, 200, "DELETE", "/v1/feed/"+workout["id"].(string)+"/cheer", nil)
-	stranger, _ := e.signIn("friend0@x.test", false, "")
-	e.must(stranger, 404, "POST", "/v1/feed/"+workout["id"].(string)+"/cheer", nil)
+	outsider, _ := e.signIn("friend0@x.test", false, "")
+	e.must(outsider, 404, "POST", "/v1/feed/"+workout["id"].(string)+"/cheer", nil)
 
 	e.must(me, 200, "PUT", "/v1/sharing", obj{"workouts": false, "records": false})
 	for _, it := range get(e.must(ravi, 200, "GET", "/v1/feed", nil), "items").([]any) {
@@ -470,14 +486,9 @@ func TestAPI(t *testing.T) {
 		t.Fatalf("calories progress: %v", cp)
 	}
 
-	// --- notifications and admin -------------------------------------------------
+	// --- notifications ----------------------------------------------------------
 	e.must(me, 400, "PUT", "/v1/notification-prefs", obj{"quiet_from": "22:00"})
 	e.must(me, 200, "PUT", "/v1/notification-prefs", obj{"friend_workouts": true, "cheers": true, "quiet_from": "22:00", "quiet_to": "07:00"})
 	e.must(me, 201, "POST", "/v1/push/subscriptions", obj{"endpoint": "https://push.example/abc", "keys": obj{"p256dh": "x", "auth": "y"}})
 	e.must(me, 204, "DELETE", "/v1/push/subscriptions", obj{"endpoint": "https://push.example/abc"})
-	e.must(ravi, 403, "GET", "/v1/admin/invites", nil)
-	e.must(me, 201, "POST", "/v1/admin/invites", obj{"email": "Newbie@X.test"})
-	if _, err := e.signIn("newbie@x.test", false, ""); err != nil {
-		t.Fatalf("email invite didn't let them in: %v", err)
-	}
 }

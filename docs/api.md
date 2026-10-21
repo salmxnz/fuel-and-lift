@@ -24,9 +24,11 @@ Sign in with Google. Send **one** of:
 ```
 Either form may add `"invite_token": "<token from /join/<token>>"`.
 
-The email must be verified by Google and the person must be an existing user,
-listed in `ADMIN_EMAILS`, have an open email invite, or bring a valid
-`invite_token`; otherwise `403 {"error":{"message":"this app is invite-only"}}`.
+Anyone with a verified Google email can sign up; an unverified email gets
+`403 {"error":{"message":"…","code":"email_unverified"}}`. People in
+`ADMIN_EMAILS` become `admin` with Pro (no end date). A valid `invite_token`
+makes the inviter and the new user friends and counts toward the inviter's
+referrals; a used or expired token is ignored and sign-in still succeeds.
 
 `200`:
 ```json
@@ -363,7 +365,7 @@ type InviteLink = { id: string, url: string, status: "open" | "accepted" | "revo
 - `DELETE /v1/invite-links/{id}` → `204` (revoke)
 - `GET /v1/invite-links/preview/{token}` (**no auth**) → `200 {"inviter": {"name", "avatar_url"}, "valid": bool}`
 - `POST /v1/invite-links/accept` `{token}` (signed-in user) → `200 {"friend": Friend, "billing": Billing}`
-- New users: pass `invite_token` in `POST /v1/auth/google`; the link replaces the invite-only check.
+- New users: pass `invite_token` in `POST /v1/auth/google` to become friends with the inviter and count as their referral.
 
 ### Friends and sharing
 ```ts
@@ -406,12 +408,6 @@ type NotificationPrefs = {
 - `POST /v1/push/subscriptions` `{endpoint, keys: {p256dh, auth}, user_agent?}` → `201`
 - `DELETE /v1/push/subscriptions` `{endpoint}` → `204`
 - `GET /v1/notification-prefs` / `PUT /v1/notification-prefs` → `{"prefs": NotificationPrefs}`
-
-## Admin (role `admin`)
-
-- `GET /v1/admin/invites` → `{"invites": [{id, email, created_at, accepted_at}]}`
-- `POST /v1/admin/invites` `{email}` → `201 {"invite": ...}`
-- `DELETE /v1/admin/invites/{id}` → `204`
 
 ## System
 
