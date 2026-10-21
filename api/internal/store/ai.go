@@ -11,6 +11,7 @@ type AIRecord struct {
 	UserID       string
 	Kind         string
 	HasImage     bool
+	ImageCount   int
 	InputText    string
 	Answers      map[string]string
 	PreviousID   *string
@@ -37,11 +38,11 @@ func (s *Store) RecordAI(ctx context.Context, r AIRecord) (string, error) {
 	var id string
 	err := s.Pool.QueryRow(ctx, `
 		insert into ai_estimates (user_id, kind, has_image, input_text, answers, previous_id, provider, model, result, ok, error,
-		                          input_tokens, output_tokens, cost_usd, latency_ms)
-		values ($1::uuid, $2, $3, nullif($4, ''), $5, $6::uuid, nullif($7, ''), nullif($8, ''), $9, $10, nullif($11, ''), $12, $13, $14, $15)
+		                          input_tokens, output_tokens, cost_usd, latency_ms, image_count)
+		values ($1::uuid, $2, $3, nullif($4, ''), $5, $6::uuid, nullif($7, ''), nullif($8, ''), $9, $10, nullif($11, ''), $12, $13, $14, $15, $16)
 		returning id::text`,
 		r.UserID, r.Kind, r.HasImage, r.InputText, answers, r.PreviousID, r.Provider, r.Model, result, r.OK, r.Error,
-		r.InputTokens, r.OutputTokens, r.CostUSD, r.LatencyMS).Scan(&id)
+		r.InputTokens, r.OutputTokens, r.CostUSD, r.LatencyMS, r.ImageCount).Scan(&id)
 	return id, err
 }
 

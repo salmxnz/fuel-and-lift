@@ -72,6 +72,27 @@ func TestMealPhotos(t *testing.T) {
 	again := logMeal(get(e.must(u, 200, "POST", "/v1/ai/meal-estimate", obj{"image": img}), "estimate_id"))
 	e.must(other, 404, "DELETE", "/v1/photos/"+get(again, "entry", "photos", 0, "id").(string), nil)
 
+	// Up to 3 photos per estimate; it counts once toward the monthly limit,
+	// and each photo counts toward storage.
+	e.must(u, 400, "POST", "/v1/ai/meal-estimate", obj{"images": []obj{img, img, img, img}})
+	used := func() float64 {
+		return get(e.must(u, 200, "GET", "/v1/billing", nil), "billing", "photo_estimates", "used_this_month").(float64)
+	}
+	before := used()
+	objects := e.ph.count()
+	multi := e.must(u, 200, "POST", "/v1/ai/meal-estimate", obj{"images": []obj{img, img, img}, "text": "rice and curry"})
+	if used() != before+1 || e.ph.count() != objects+3 {
+		t.Fatalf("multi-photo estimate: used %v→%v, objects %d→%d", before, used(), objects, e.ph.count())
+	}
+	if last := e.ai.last.Load(); len(last.Images) != 3 {
+		t.Fatalf("AI got %d images", len(last.Images))
+	}
+	// One slot left of 2: one photo kept, two dropped.
+	mlog := logMeal(get(multi, "estimate_id"))
+	if len(get(mlog, "entry", "photos").([]any)) != 1 || get(mlog, "photos_skipped").(float64) != 2 {
+		t.Fatalf("multi-photo log: %v", mlog)
+	}
+
 	// Never-logged estimates are cleaned up after a day.
 	e.must(u, 200, "POST", "/v1/ai/meal-estimate", obj{"image": img})
 	keys, err := e.st.TakeStalePendingPhotos(context.Background(), time.Now().Add(time.Hour), 100)

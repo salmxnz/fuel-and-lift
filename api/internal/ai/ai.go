@@ -23,7 +23,7 @@ type Image struct {
 type Request struct {
 	Kind     string            // photo | text | restaurant
 	Text     string            // what the user typed
-	Image    *Image            // optional photo
+	Images   []Image           // 0–3 photos of the same meal
 	Answers  map[string]string // question id → option id, when refining
 	Previous json.RawMessage   // the estimate being refined
 	Context  string            // the user's saved foods and portions, to anchor guesses
@@ -299,7 +299,11 @@ func UserPrompt(req Request) string {
 	case "restaurant":
 		b.WriteString("A restaurant or fast-food order.\n")
 	case "photo":
-		b.WriteString("A photo of a meal.\n")
+		if len(req.Images) > 1 {
+			fmt.Fprintf(&b, "%d photos of one meal, from different angles or of different parts (for example the plate, a side, the packaging). Count each food once, even if it shows in several photos.\n", len(req.Images))
+		} else {
+			b.WriteString("A photo of a meal.\n")
+		}
 	default:
 		b.WriteString("A meal described in words.\n")
 	}

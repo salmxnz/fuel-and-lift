@@ -233,13 +233,16 @@ type Food = {
 ### `POST /v1/ai/meal-estimate`
 ```json
 { "text": "fish with rice, 1 plate, 2 big bites of fish, some curry",
-  "image": { "media_type": "image/jpeg", "data": "<base64>" },
+  "images": [ { "media_type": "image/jpeg", "data": "<base64>" } ],
   "kind": "photo",
   "answers": { "rice_portion": "normal" },
   "previous_estimate_id": "uuid" }
 ```
-`kind` is `photo`, `text` or `restaurant`. `image` is optional (resize to ~768 px
-on the phone first; max 2 MB). Send `answers` + `previous_estimate_id` to refine.
+`kind` is `photo`, `text` or `restaurant`. `images` is optional: 1–3 photos of
+the same meal (the plate, a side, the packaging), each resized to ~768 px on the
+phone first, max 2 MB each. A single `"image": {...}` is still accepted. An
+estimate counts once toward the free monthly photo estimates however many photos
+it has. Send `answers` + `previous_estimate_id` to refine.
 
 A refine (with `previous_estimate_id`) may also send the user's edits, which the
 AI treats as fact (all optional, `400` without `previous_estimate_id`):

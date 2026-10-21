@@ -1,17 +1,23 @@
 "use client"
 
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button, ErrorCard, PageHeader, Spinner } from "@/components/ui/primitives"
-import { CameraIcon } from "@/components/ui/icons"
+import { CameraIcon, CloseIcon, PlusIcon } from "@/components/ui/icons"
 import { prepareImage, type PreparedImage } from "@/lib/image"
 import { targetFromParams } from "@/lib/meal-target"
+import { cn } from "@/lib/cn"
 import { toEntryItems } from "@/lib/items"
+import { EASE_OUT, SPRING_SNAPPY } from "@/lib/motion"
 import { ItemsEditor, TotalsRow } from "./items-editor"
 import { CorrectionCard, LogFooter, QuestionsCard, TitleInput } from "./estimate-parts"
+import { PhotoCarousel } from "./photo-carousel"
 import { useEstimate, useLogActions } from "./use-estimate"
+
+const MAX_PHOTOS = 3
 
 /** AI-Estimate.dc.html for both "Take a photo" and "Describe it". */
 export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
@@ -19,25 +25,35 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
   const target = useMemo(() => targetFromParams(new URLSearchParams(params.toString())), [params])
   const est = useEstimate(mode)
   const actions = useLogActions({ target, origin: "ai", estimateId: est.estimate?.estimate_id })
-  const [photo, setPhoto] = useState<PreparedImage | null>(null)
+  // Up to 3 photos of the meal, then "Estimate" sends them together.
+  const [photos, setPhotos] = useState<(PreparedImage & { key: string })[]>([])
+  const [focus, setFocus] = useState<string | null>(null)
   const [preparing, setPreparing] = useState(false)
   const [note, setNote] = useState("")
   const cameraInput = useRef<HTMLInputElement>(null)
   const libraryInput = useRef<HTMLInputElement>(null)
+  const reduce = useReducedMotion()
 
-  // Free the preview's object URL when it changes or we leave.
+  // Free the previews' object URLs when we leave.
+  const photosRef = useRef(photos)
   useEffect(() => {
-    if (!photo) return
-    return () => URL.revokeObjectURL(photo.previewUrl)
-  }, [photo])
+    photosRef.current = photos
+  }, [photos])
+  useEffect(() => () => photosRef.current.forEach((p) => URL.revokeObjectURL(p.previewUrl)), [])
 
-  async function onFile(file: File | undefined) {
-    if (!file) return
+  async function addFiles(files: FileList | null) {
+    const room = MAX_PHOTOS - photos.length
+    const list = Array.from(files ?? []).slice(0, Math.max(0, room))
+    if ((files?.length ?? 0) > room) toast(`Up to ${MAX_PHOTOS} photos: added the first ${room}.`)
+    if (list.length === 0) return
     setPreparing(true)
     try {
-      const prepared = await prepareImage(file)
-      setPhoto(prepared)
-      await est.run({ image: { media_type: prepared.mediaType, data: prepared.data }, text: note.trim() || undefined })
+      for (const file of list) {
+        const prepared = await prepareImage(file)
+        const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+        setPhotos((ps) => [...ps, { ...prepared, key }])
+        setFocus(key)
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't use that photo.")
     } finally {
@@ -47,8 +63,25 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
     }
   }
 
+  function removePhoto(key: string) {
+    setPhotos((ps) => {
+      const gone = ps.find((p) => p.key === key)
+      if (gone) URL.revokeObjectURL(gone.previewUrl)
+      return ps.filter((p) => p.key !== key)
+    })
+  }
+
+  async function estimate() {
+    if (photos.length === 0) return
+    await est.run({
+      images: photos.map((p) => ({ media_type: p.mediaType, data: p.data })),
+      text: note.trim() || undefined,
+    })
+  }
+
   const hasResult = est.status === "ready" || est.status === "refining"
-  const busy = est.status === "loading" || preparing
+  const busy = est.status === "loading"
+  const carousel = photos.map((p, i) => ({ key: p.key, src: p.previewUrl, alt: `${target.label} photo ${i + 1}` }))
   const entryItems = toEntryItems(est.items)
 
   return (
@@ -61,23 +94,136 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
         titleClassName="text-[20px] tracking-[-0.01em]"
       />
 
-      {photo ? (
-        <figure className="relative m-0 h-[172px] overflow-hidden rounded-card bg-[#553646]">
-          {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview */}
-          <img src={photo.previewUrl} alt={`Your ${target.label.toLowerCase()} photo`} className="h-full w-full object-cover" />
-          {busy ? (
-            <figcaption className="absolute inset-0 flex items-center justify-center gap-2 bg-[rgba(46,26,36,0.55)] text-[15px] font-semibold text-white">
-              <Spinner size={18} /> Finding each item…
-            </figcaption>
-          ) : null}
-        </figure>
+      {photos.length > 0 && (busy || hasResult) ? (
+        <PhotoCarousel
+          photos={carousel}
+          overlay={
+            busy ? (
+              <span className="flex items-center gap-2">
+                <Spinner size={18} /> Finding each item…
+              </span>
+            ) : null
+          }
+        />
       ) : null}
 
       {!hasResult && !busy ? (
         mode === "photo" ? (
           <section className="flex flex-col gap-3">
+            {photos.length === 0 ? (
+              <>
+                <label className="flex cursor-pointer items-center gap-3.5 rounded-[20px] border border-[rgba(46,26,36,0.12)] bg-pink p-4 text-ink transition-transform duration-150 ease-out focus-within:outline-2 focus-within:outline-ink active:scale-[0.98]">
+                  <span className="flex h-[54px] w-[54px] flex-none items-center justify-center rounded-btn bg-ink text-pink">
+                    {preparing ? <Spinner size={22} /> : <CameraIcon size={26} />}
+                  </span>
+                  <span className="flex flex-1 flex-col gap-0.5">
+                    <span className="text-[18px] font-extrabold">Take a photo</span>
+                    <span className="text-[13px]">Up to 3: the plate, a side, the packaging</span>
+                  </span>
+                  <input
+                    ref={cameraInput}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="sr-only"
+                    onChange={(e) => void addFiles(e.target.files)}
+                  />
+                </label>
+                <label className="flex min-h-[48px] cursor-pointer items-center justify-center rounded-tile border border-line text-[15px] font-semibold transition-transform duration-150 ease-out focus-within:outline-2 focus-within:outline-ink active:scale-[0.98]">
+                  Choose from library
+                  <input
+                    ref={libraryInput}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="sr-only"
+                    onChange={(e) => void addFiles(e.target.files)}
+                  />
+                </label>
+              </>
+            ) : (
+              <>
+                <PhotoCarousel photos={carousel} onRemove={removePhoto} scrollTo={focus} />
+                <div className="flex items-center gap-2" aria-label="Your photos">
+                  <AnimatePresence initial={false}>
+                    {photos.map((p, i) => (
+                      <motion.div
+                        key={p.key}
+                        layout
+                        initial={reduce ? { opacity: 0 } : { opacity: 0, transform: "scale(0.96)" }}
+                        animate={{ opacity: 1, transform: "scale(1)" }}
+                        exit={reduce ? { opacity: 0 } : { opacity: 0, transform: "scale(0.96)" }}
+                        transition={{ duration: 0.18, ease: EASE_OUT, layout: SPRING_SNAPPY }}
+                        className="relative"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setFocus(p.key)}
+                          aria-label={`Show photo ${i + 1}`}
+                          className={cn(
+                            "block h-16 w-16 overflow-hidden rounded-[12px] border-2 transition-transform duration-150 ease-out active:scale-[0.97]",
+                            focus === p.key ? "border-ink" : "border-transparent"
+                          )}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview */}
+                          <img src={p.previewUrl} alt="" className="h-full w-full object-cover" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Remove photo ${i + 1}`}
+                          onClick={() => removePhoto(p.key)}
+                          className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-ink text-white"
+                        >
+                          <CloseIcon size={12} />
+                        </button>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  {photos.length < MAX_PHOTOS ? (
+                    <>
+                      <label
+                        className="flex h-16 w-16 flex-none cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[12px] border-[1.5px] border-dashed border-dash text-[11px] font-semibold text-ink transition-transform duration-150 ease-out focus-within:outline-2 focus-within:outline-ink active:scale-[0.97]"
+                        aria-label="Take another photo"
+                      >
+                        {preparing ? <Spinner size={18} /> : <CameraIcon size={20} />}
+                        Camera
+                        <input
+                          ref={cameraInput}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="sr-only"
+                          onChange={(e) => void addFiles(e.target.files)}
+                        />
+                      </label>
+                      <label
+                        className="flex h-16 w-16 flex-none cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[12px] border-[1.5px] border-dashed border-dash text-[11px] font-semibold text-ink transition-transform duration-150 ease-out focus-within:outline-2 focus-within:outline-ink active:scale-[0.97]"
+                        aria-label="Add from library"
+                      >
+                        <PlusIcon size={20} />
+                        Library
+                        <input
+                          ref={libraryInput}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="sr-only"
+                          onChange={(e) => void addFiles(e.target.files)}
+                        />
+                      </label>
+                    </>
+                  ) : null}
+                </div>
+                <span className="text-[12px] text-muted">
+                  {photos.length < MAX_PHOTOS
+                    ? `${photos.length} of ${MAX_PHOTOS} photos. Add another angle, a side dish or the packaging.`
+                    : `${MAX_PHOTOS} of ${MAX_PHOTOS} photos.`}
+                </span>
+              </>
+            )}
+
             <label htmlFor="photo-note" className="text-[13px] font-semibold text-muted">
-              Anything the photo won&apos;t show? <span className="font-normal">(optional)</span>
+              Describe it <span className="font-normal">(optional)</span>
             </label>
             <textarea
               id="photo-note"
@@ -85,36 +231,14 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
               onChange={(e) => setNote(e.target.value)}
               rows={2}
               maxLength={300}
-              placeholder="Cooked in ghee, 2 big bites of fish already eaten"
+              placeholder="Cooked in olive oil, half portion, 2 bites already eaten"
               className="rounded-tile border border-line bg-white px-3.5 py-3 text-[15px]"
             />
-            <label className="flex cursor-pointer items-center gap-3.5 rounded-[20px] border border-[rgba(46,26,36,0.12)] bg-pink p-4 text-ink focus-within:outline-2 focus-within:outline-ink">
-              <span className="flex h-[54px] w-[54px] flex-none items-center justify-center rounded-btn bg-ink text-pink">
-                <CameraIcon size={26} />
-              </span>
-              <span className="flex flex-1 flex-col gap-0.5">
-                <span className="text-[18px] font-extrabold">{photo ? "Take another photo" : "Take a photo"}</span>
-                <span className="text-[13px]">I find each item, you check the numbers</span>
-              </span>
-              <input
-                ref={cameraInput}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="sr-only"
-                onChange={(e) => onFile(e.target.files?.[0])}
-              />
-            </label>
-            <label className="flex min-h-[48px] cursor-pointer items-center justify-center rounded-tile border border-line text-[15px] font-semibold focus-within:outline-2 focus-within:outline-ink">
-              Choose from library
-              <input
-                ref={libraryInput}
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={(e) => onFile(e.target.files?.[0])}
-              />
-            </label>
+            {photos.length > 0 ? (
+              <Button onClick={() => void estimate()} disabled={preparing}>
+                Estimate from {photos.length} photo{photos.length === 1 ? "" : "s"}
+              </Button>
+            ) : null}
           </section>
         ) : (
           <form
@@ -147,7 +271,7 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
         )
       ) : null}
 
-      {busy && !photo ? (
+      {busy && photos.length === 0 ? (
         <div role="status" className="flex items-center gap-2 rounded-card bg-white p-4 text-[15px]">
           <Spinner size={18} /> Working it out…
         </div>

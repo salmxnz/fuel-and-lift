@@ -56,7 +56,8 @@ func TestOpenRouter(t *testing.T) {
 	}))
 	defer srv.Close()
 	p := &OpenRouter{APIKey: "k", ModelID: "google/gemini-2.5-flash", BaseURL: srv.URL}
-	est, usage, err := p.Estimate(context.Background(), Request{Kind: "photo", Text: "lunch", Image: &Image{MediaType: "image/jpeg", Data: "AAAA"}})
+	imgs := []Image{{MediaType: "image/jpeg", Data: "AAAA"}, {MediaType: "image/jpeg", Data: "BBBB"}, {MediaType: "image/png", Data: "CCCC"}}
+	est, usage, err := p.Estimate(context.Background(), Request{Kind: "photo", Text: "lunch", Images: imgs})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,8 +66,13 @@ func TestOpenRouter(t *testing.T) {
 	}
 	msgs := got["messages"].([]any)
 	user := msgs[1].(map[string]any)["content"].([]any)
-	if len(user) != 2 || !strings.HasPrefix(user[1].(map[string]any)["image_url"].(map[string]any)["url"].(string), "data:image/jpeg;base64,") {
-		t.Fatalf("image not sent: %v", user)
+	// The prompt, then every photo in order.
+	if len(user) != 4 || !strings.HasPrefix(user[1].(map[string]any)["image_url"].(map[string]any)["url"].(string), "data:image/jpeg;base64,AAAA") ||
+		user[3].(map[string]any)["image_url"].(map[string]any)["url"].(string) != "data:image/png;base64,CCCC" {
+		t.Fatalf("images not sent: %v", user)
+	}
+	if prompt := user[0].(map[string]any)["text"].(string); !strings.Contains(prompt, "3 photos of one meal") || !strings.Contains(prompt, "Count each food once") {
+		t.Fatalf("prompt: %s", prompt)
 	}
 }
 

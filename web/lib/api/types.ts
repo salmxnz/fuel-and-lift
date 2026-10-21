@@ -231,7 +231,8 @@ export type EstimateKind = "photo" | "text" | "restaurant"
 
 export type MealEstimateRequest = {
   text?: string
-  image?: { media_type: string; data: string }
+  /** 1–3 photos of the same meal. */
+  images?: { media_type: string; data: string }[]
   kind: EstimateKind
   answers?: Record<string, string>
   previous_estimate_id?: string

@@ -79,10 +79,10 @@ func (o *OpenRouter) Estimate(ctx context.Context, req Request) (Estimate, Usage
 		base = "https://openrouter.ai/api/v1"
 	}
 	content := []map[string]any{{"type": "text", "text": UserPrompt(req)}}
-	if req.Image != nil {
+	for _, img := range req.Images {
 		content = append(content, map[string]any{
 			"type":      "image_url",
-			"image_url": map[string]string{"url": "data:" + req.Image.MediaType + ";base64," + req.Image.Data},
+			"image_url": map[string]string{"url": "data:" + img.MediaType + ";base64," + img.Data},
 		})
 	}
 	body := map[string]any{
@@ -157,10 +157,10 @@ func (a *Anthropic) Estimate(ctx context.Context, req Request) (Estimate, Usage,
 		base = "https://api.anthropic.com"
 	}
 	var content []map[string]any
-	if req.Image != nil {
+	for _, img := range req.Images {
 		content = append(content, map[string]any{
 			"type":   "image",
-			"source": map[string]string{"type": "base64", "media_type": req.Image.MediaType, "data": req.Image.Data},
+			"source": map[string]string{"type": "base64", "media_type": img.MediaType, "data": img.Data},
 		})
 	}
 	content = append(content, map[string]any{"type": "text", "text": UserPrompt(req)})

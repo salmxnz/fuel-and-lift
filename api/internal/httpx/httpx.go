@@ -42,7 +42,13 @@ func NoContent(w http.ResponseWriter) { w.WriteHeader(http.StatusNoContent) }
 // Decode reads a JSON body into dst, rejecting unknown fields and bodies over
 // MaxBody. An empty body decodes to the zero value.
 func Decode(w http.ResponseWriter, r *http.Request, dst any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, MaxBody)
+	return DecodeLimit(w, r, dst, MaxBody)
+}
+
+// DecodeLimit is Decode with a different size limit (meal estimates carry up
+// to three photos).
+func DecodeLimit(w http.ResponseWriter, r *http.Request, dst any, limit int64) error {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil && !errors.Is(err, io.EOF) {

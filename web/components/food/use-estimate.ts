@@ -104,7 +104,7 @@ export function useEstimate(kind: EstimateKind) {
   }, [])
 
   const run = useCallback(
-    async (input: { text?: string; image?: MealEstimateRequest["image"] }) => {
+    async (input: { text?: string; images?: MealEstimateRequest["images"] }) => {
       setStatus("loading")
       setError(null)
       setAnswers({})
@@ -113,7 +113,11 @@ export function useEstimate(kind: EstimateKind) {
       titleEditedRef.current = false
       setTitleEdited(false)
       try {
-        const body: MealEstimateRequest = { kind, ...(input.text ? { text: input.text } : {}), ...(input.image ? { image: input.image } : {}) }
+        const body: MealEstimateRequest = {
+          kind,
+          ...(input.text ? { text: input.text } : {}),
+          ...(input.images?.length ? { images: input.images } : {}),
+        }
         apply(await api.post<MealEstimateResponse>("ai/meal-estimate", body))
       } catch (err) {
         handleError(err, false)

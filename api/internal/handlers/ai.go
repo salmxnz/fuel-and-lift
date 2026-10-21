@@ -20,6 +20,9 @@ import (
 
 const maxImageBytes = 2 << 20
 
+// maxImages is how many photos one meal estimate takes.
+const maxImages = 3
+
 var validImageTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true}
 var validAIKinds = map[string]bool{"photo": true, "text": true, "restaurant": true}
 
@@ -83,7 +86,8 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Kind               string            `json:"kind"`
 		Text               string            `json:"text"`
-		Image              *ai.Image         `json:"image"`
+		Image              *ai.Image         `json:"image"`  // one photo (older clients)
+		Images             []ai.Image        `json:"images"` // up to 3 photos of the same meal
 		Answers            map[string]string `json:"answers"`
 		PreviousEstimateID *string           `json:"previous_estimate_id"`
 		// Refine-only: the user's correction, their name for the dish and
@@ -92,24 +96,33 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 		Title      string          `json:"title"`
 		Items      json.RawMessage `json:"items"`
 	}
-	if !decode(w, r, &in) {
+	if err := httpx.DecodeLimit(w, r, &in, maxImages*(maxImageBytes*4/3+1024)+64<<10); err != nil {
+		badRequest(w, "invalid body: "+err.Error())
 		return
+	}
+	images := in.Images
+	if in.Image != nil {
+		images = append([]ai.Image{*in.Image}, images...)
 	}
 	in.Text = strings.TrimSpace(in.Text)
 	if utf8.RuneCountInString(in.Text) > 1000 {
 		badRequest(w, "text is limited to 1000 characters")
 		return
 	}
-	if in.Image != nil {
-		if !validImageTypes[in.Image.MediaType] {
-			badRequest(w, "image must be JPEG, PNG or WebP")
+	if len(images) > maxImages {
+		badRequest(w, fmt.Sprintf("send at most %d photos", maxImages))
+		return
+	}
+	for _, img := range images {
+		if !validImageTypes[img.MediaType] {
+			badRequest(w, "images must be JPEG, PNG or WebP")
 			return
 		}
-		if base64.StdEncoding.DecodedLen(len(in.Image.Data)) > maxImageBytes {
-			httpx.Error(w, http.StatusRequestEntityTooLarge, "the photo is over 2 MB — resize it first")
+		if base64.StdEncoding.DecodedLen(len(img.Data)) > maxImageBytes {
+			httpx.Error(w, http.StatusRequestEntityTooLarge, "a photo is over 2 MB — resize it first")
 			return
 		}
-		if _, err := base64.StdEncoding.DecodeString(in.Image.Data); err != nil {
+		if _, err := base64.StdEncoding.DecodeString(img.Data); err != nil {
 			badRequest(w, "image data must be base64")
 			return
 		}
@@ -144,7 +157,7 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserID(r)
 	ctx := r.Context()
 
-	req := ai.Request{Text: in.Text, Image: in.Image, Answers: in.Answers, Kind: in.Kind}
+	req := ai.Request{Text: in.Text, Images: images, Answers: in.Answers, Kind: in.Kind}
 	if in.PreviousEstimateID != nil {
 		if !isUUID(*in.PreviousEstimateID) {
 			httpx.Error(w, http.StatusNotFound, "that estimate doesn't exist")
@@ -176,7 +189,7 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Kind == "" {
 		req.Kind = "text"
-		if in.Image != nil {
+		if len(images) > 0 {
 			req.Kind = "photo"
 		}
 	}
@@ -184,7 +197,7 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "kind must be photo, text or restaurant")
 		return
 	}
-	if in.Image == nil && req.Text == "" && req.Previous == nil {
+	if len(images) == 0 && req.Text == "" && req.Previous == nil {
 		badRequest(w, "send a photo or describe the meal")
 		return
 	}
@@ -207,7 +220,8 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 		httpx.ErrorCode(w, http.StatusTooManyRequests, "rate_day", "you've hit today's AI limit — it resets at midnight")
 		return
 	}
-	if in.Image != nil && a.photoLimit != nil && a.usage.PhotosThisMonth >= *a.photoLimit {
+	// One estimate counts once, however many photos it has.
+	if len(images) > 0 && a.photoLimit != nil && a.usage.PhotosThisMonth >= *a.photoLimit {
 		httpx.ErrorCode(w, http.StatusPaymentRequired, "photo_limit",
 			fmt.Sprintf("you've used your %d free photo estimates this month — they reset on %s", *a.photoLimit, a.resetsOn.Format("2 January")))
 		return
@@ -231,7 +245,7 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 	req.Context = h.aiContext(ctx, userID)
 
 	res, failed, err := h.AI.Estimate(ctx, req)
-	base := store.AIRecord{UserID: userID, Kind: req.Kind, HasImage: in.Image != nil, InputText: req.Text,
+	base := store.AIRecord{UserID: userID, Kind: req.Kind, HasImage: len(images) > 0, ImageCount: len(images), InputText: req.Text,
 		Answers: req.Answers, PreviousID: in.PreviousEstimateID}
 	for _, f := range failed {
 		rec := base
@@ -257,11 +271,9 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
-	if in.Image != nil {
-		h.keepEstimatePhotos(context.WithoutCancel(ctx), userID, id, []ai.Image{*in.Image})
-	}
+	h.keepEstimatePhotos(context.WithoutCancel(ctx), userID, id, images)
 	a.usage.CallsToday++
-	if in.Image != nil {
+	if len(images) > 0 {
 		a.usage.PhotosThisMonth++
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{
