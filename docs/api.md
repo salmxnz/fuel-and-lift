@@ -335,7 +335,7 @@ type Proposal = { exercise_id: string, exercise_name: string, from_kg: number, t
 ## Progress
 
 - `GET /v1/progress/weight?from=&to=` → `{"weigh_ins": WeighIn[], "trend": [{date, weight_kg}], "plan": [{date, weight_kg}], "goal": Goal|null}`
-- `GET /v1/progress/calories?from=&to=` → `{"days": [{date, kcal, protein_g, target_kcal}]}`
+- `GET /v1/progress/calories?from=&to=` → `{"days": [{date, kcal, protein_g, target_kcal, logged}]}` (`logged`: at least one entry that day)
 - `GET /v1/progress/exercises/{exercise_id}` → `{"exercise": Exercise, "points": [{date, top_kg, top_reps, e1rm_kg}]}`
 - `GET /v1/progress/records` → `{"records": [{exercise_id, exercise_name, kg, reps, date}]}`
 

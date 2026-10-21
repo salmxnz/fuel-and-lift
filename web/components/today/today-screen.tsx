@@ -1,16 +1,18 @@
 "use client"
 
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useAddFlow } from "@/components/food/add-flow"
 import { CalendarIcon, PlusIcon } from "@/components/ui/icons"
 import { Button, ErrorCard, Skeleton, TextInput } from "@/components/ui/primitives"
 import { Sheet } from "@/components/ui/sheet"
-import type { DayResponse, Entry, MealSlotsResponse, SavedMealsResponse } from "@/lib/api/types"
+import { DayDot, WeekPager } from "@/components/ui/week-pager"
+import type { DayResponse, Entry, MealSlotsResponse, ProgressCaloriesResponse, SavedMealsResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
-import { cn } from "@/lib/cn"
-import { formatLong, isISODate, parseISODate, todayISO, weekDays, weekdayLetter } from "@/lib/dates"
+import { addDays, formatLong, isISODate, parseISODate, startOfWeek, todayISO } from "@/lib/dates"
+import { PAGE_SLIDE, pageVariants, swipeDirection } from "@/lib/motion"
 import { CalorieCard } from "./calorie-card"
 import { EntrySheet } from "./entry-sheet"
 import { MealList } from "./meal-list"
@@ -34,6 +36,20 @@ export function TodayScreen() {
   const [editing, setEditing] = useState<Entry | null>(null)
   const [oneOffOpen, setOneOffOpen] = useState(false)
   const dateInput = useRef<HTMLInputElement>(null)
+  const reduce = useReducedMotion()
+
+  // Which way the day changed, so the new one slides in from that side.
+  const [dir, setDir] = useState(0)
+  function goTo(d: string) {
+    if (d === date || d > today) return
+    setDir(d > date ? 1 : -1)
+    router.replace(d === today ? "/today" : `/today?date=${d}`, { scroll: false })
+  }
+
+  // Dots under days with something logged, for the week in view.
+  const [visibleWeek, setVisibleWeek] = useState(() => startOfWeek(date))
+  const calories = useApi<ProgressCaloriesResponse>(`progress/calories?from=${visibleWeek}&to=${addDays(visibleWeek, 6)}`)
+  const logged = useMemo(() => new Set((calories.data?.days ?? []).filter((d) => d.logged).map((d) => d.date)), [calories.data])
 
   // New food from the + menu goes to the day on screen.
   useEffect(() => {
@@ -54,8 +70,6 @@ export function TodayScreen() {
     router.replace(date === today ? "/today" : `/today?date=${date}`, { scroll: false })
   }, [addParam, openFood, router, date, today])
 
-  const week = weekDays(date)
-
   return (
     <div className="flex flex-col gap-3.5">
       <header className="flex items-end justify-between">
@@ -67,12 +81,13 @@ export function TodayScreen() {
         </div>
         <div className="flex items-center gap-2">
           {!isToday ? (
-            <Link
-              href="/today"
-              className="flex min-h-[44px] items-center rounded-[12px] bg-white px-3 text-[14px] font-semibold text-ink no-underline"
+            <button
+              type="button"
+              onClick={() => goTo(today)}
+              className="flex min-h-[44px] items-center rounded-[12px] bg-white px-3 text-[14px] font-semibold text-ink transition-transform duration-150 ease-out active:scale-[0.97]"
             >
               Today
-            </Link>
+            </button>
           ) : null}
           <label className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-[12px] bg-white text-ink">
             <span className="sr-only">Pick a date</span>
@@ -84,7 +99,7 @@ export function TodayScreen() {
               max={today}
               onChange={(e) => {
                 const v = e.target.value
-                if (isISODate(v)) router.push(v === today ? "/today" : `/today?date=${v}`)
+                if (isISODate(v)) goTo(v)
               }}
               onClick={(e) => {
                 try {
@@ -99,84 +114,85 @@ export function TodayScreen() {
         </div>
       </header>
 
-      <nav aria-label="This week" className="grid grid-cols-7 gap-1">
-        {week.map((d) => {
-          const current = d === date
-          const future = d > today
-          return (
-            <Link
-              key={d}
-              href={d === today ? "/today" : `/today?date=${d}`}
-              aria-current={current ? "date" : undefined}
-              aria-label={formatLong(d)}
-              scroll={false}
-              className={cn(
-                "flex min-h-[48px] flex-col items-center gap-0.5 rounded-[12px] py-2 text-[12px] no-underline",
-                current ? "bg-ink text-pink" : "text-muted",
-                future && !current && "opacity-50"
-              )}
-            >
-              <span aria-hidden="true">{weekdayLetter(d)}</span>
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "text-[15px]",
-                  current ? "font-bold text-white" : "font-semibold text-ink",
-                  d === today && !current && "underline decoration-pink decoration-[3px] underline-offset-4"
-                )}
-              >
-                {parseISODate(d).getDate()}
-              </span>
-            </Link>
-          )
-        })}
-      </nav>
+      <WeekPager
+        selected={date}
+        onSelect={goTo}
+        maxDate={today}
+        label="Pick a day"
+        pillId="today-day"
+        onWeekChange={setVisibleWeek}
+        renderDay={(d) => <DayDot on={logged.has(d) || (d === date && !!day.data?.day.meals.some((m) => m.entries.length > 0))} />}
+      />
 
-      {day.error && !day.data ? (
-        <ErrorCard message={day.error.message} onRetry={() => void day.reload()} />
-      ) : !day.data ? (
-        <div role="status" className="flex flex-col gap-3.5">
-          <span className="sr-only">Loading your day…</span>
-          <Skeleton className="h-[152px] rounded-card" />
-          <Skeleton className="h-6 w-24" />
-          <Skeleton className="h-[110px] rounded-card" />
-          <Skeleton className="h-[86px] rounded-card" />
-        </div>
-      ) : (
-        <>
-          <CalorieCard day={day.data.day} />
 
-          <div className="-mb-1 mt-0.5 flex items-center justify-between">
-            <h2 className="m-0 text-[17px] font-extrabold">Meals</h2>
-            <button
-              type="button"
-              onClick={() => setOneOffOpen(true)}
-              className="flex min-h-[36px] items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-dash px-3 text-[13px] font-semibold text-ink"
-            >
-              <PlusIcon size={16} />
-              {isToday ? "Add a meal today" : "Add a meal"}
-            </button>
-          </div>
-
-          {day.data.day.meals.length === 0 ? (
-            <div className="flex flex-col items-start gap-3 rounded-card border-[1.5px] border-dashed border-dash p-4">
-              <span className="text-[15px]">No meals set up yet.</span>
-              <Link href="/meals" className="text-[14px] font-semibold text-protein">
-                Set up your meals
-              </Link>
+      {/* Swipe the day sideways to go to the day before or after. */}
+      <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+        <motion.div
+          key={date}
+          custom={dir}
+          variants={reduce ? undefined : pageVariants}
+          initial={reduce ? { opacity: 0 } : "enter"}
+          animate={reduce ? { opacity: 1 } : "center"}
+          exit={reduce ? { opacity: 0 } : "exit"}
+          transition={PAGE_SLIDE}
+          drag="x"
+          dragDirectionLock
+          dragConstraints={{ left: 0, right: 0 }}
+          // Rubber band past today: there's nothing to swipe to.
+          dragElastic={isToday ? { left: 0.06, right: 0.3 } : 0.3}
+          onDragEnd={(_, info) => {
+            const d = swipeDirection(info.offset.x, info.velocity.x, window.innerWidth)
+            if (d !== 0) goTo(addDays(date, d))
+          }}
+          className="flex flex-col gap-3.5"
+        >
+          {day.error && !day.data ? (
+            <ErrorCard message={day.error.message} onRetry={() => void day.reload()} />
+          ) : !day.data ? (
+            <div role="status" className="flex flex-col gap-3.5">
+              <span className="sr-only">Loading your day…</span>
+              <Skeleton className="h-[152px] rounded-card" />
+              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-[110px] rounded-card" />
+              <Skeleton className="h-[86px] rounded-card" />
             </div>
           ) : (
-            <MealList
-              day={day.data.day}
-              isPastDay={isPast}
-              savedMeals={saved.data?.saved_meals}
-              onAdd={(target) => openFood(target)}
-              onEdit={setEditing}
-              onDayChange={(d) => day.setData({ day: d })}
-            />
+            <>
+              <CalorieCard day={day.data.day} />
+
+              <div className="-mb-1 mt-0.5 flex items-center justify-between">
+                <h2 className="m-0 text-[17px] font-extrabold">Meals</h2>
+                <button
+                  type="button"
+                  onClick={() => setOneOffOpen(true)}
+                  className="flex min-h-[36px] items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-dash px-3 text-[13px] font-semibold text-ink"
+                >
+                  <PlusIcon size={16} />
+                  {isToday ? "Add a meal today" : "Add a meal"}
+                </button>
+              </div>
+
+              {day.data.day.meals.length === 0 ? (
+                <div className="flex flex-col items-start gap-3 rounded-card border-[1.5px] border-dashed border-dash p-4">
+                  <span className="text-[15px]">No meals set up yet.</span>
+                  <Link href="/meals" className="text-[14px] font-semibold text-protein">
+                    Set up your meals
+                  </Link>
+                </div>
+              ) : (
+                <MealList
+                  day={day.data.day}
+                  isPastDay={isPast}
+                  savedMeals={saved.data?.saved_meals}
+                  onAdd={(target) => openFood(target)}
+                  onEdit={setEditing}
+                  onDayChange={(d) => day.setData({ day: d })}
+                />
+              )}
+            </>
           )}
-        </>
-      )}
+        </motion.div>
+      </AnimatePresence>
 
       <EntrySheet
         entry={editing}

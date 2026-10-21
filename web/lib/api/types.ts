@@ -401,7 +401,7 @@ export type ProgressWeightResponse = {
   plan: WeightPoint[]
   goal: Goal | null
 }
-export type CalorieDay = { date: string; kcal: number; protein_g: number; target_kcal: number }
+export type CalorieDay = { date: string; kcal: number; protein_g: number; target_kcal: number; logged: boolean }
 export type ProgressCaloriesResponse = { days: CalorieDay[] }
 export type ExercisePoint = { date: string; top_kg: number; top_reps: number; e1rm_kg: number }
 export type ProgressExerciseResponse = { exercise: Exercise; points: ExercisePoint[] }

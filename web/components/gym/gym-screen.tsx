@@ -17,8 +17,8 @@ import type {
   WeeklyPlan,
 } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
-import { addDays, formatDayMonth, relativeDay, todayISO, weekdayKey, WEEKDAY_KEYS, type WeekdayKey } from "@/lib/dates"
-import { cn } from "@/lib/cn"
+import { addDays, formatDayMonth, relativeDay, todayISO, weekdayKey, type WeekdayKey } from "@/lib/dates"
+import { GymWeek } from "./gym-week"
 
 const DAY_NAMES: Record<WeekdayKey, string> = {
   mon: "Monday",
@@ -127,49 +127,17 @@ export function GymScreen() {
       ) : null}
 
       {/* Weekly plan */}
-      <section aria-labelledby="week-title" className="flex flex-col rounded-card bg-white px-3.5 py-1">
-        <h2 id="week-title" className="m-0 pb-1 pt-3 text-[13px] font-semibold text-muted">
-          Your week
-        </h2>
-        {plan.error && !plan.data ? (
-          <p className="m-0 py-3 text-[14px] text-danger">{plan.error.message}</p>
-        ) : !plan.data ? (
-          <div className="flex flex-col gap-2 py-2">
-            {WEEKDAY_KEYS.map((d) => (
-              <Skeleton key={d} className="h-9" />
-            ))}
-          </div>
-        ) : (
-          WEEKDAY_KEYS.map((d) => {
-            const id = `plan-${d}`
-            const value = plan.data!.days[d] ?? ""
-            return (
-              <div key={d} className="flex min-h-[52px] items-center gap-3 border-b border-line-soft last:border-b-0">
-                <label htmlFor={id} className={cn("w-[92px] flex-none text-[15px]", d === todayKey ? "font-bold" : "")}>
-                  {DAY_NAMES[d]}
-                </label>
-                <select
-                  id={id}
-                  value={value}
-                  onChange={(e) => setDay(d, e.target.value || null)}
-                  className={cn(
-                    "min-h-[44px] min-w-0 flex-1 rounded-[12px] border border-line bg-white px-2.5 text-[15px]",
-                    value ? "font-semibold text-ink" : "text-muted"
-                  )}
-                >
-                  <option value="">Rest</option>
-                  {list.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                  {value && !byId.has(value) ? <option value={value}>Archived template</option> : null}
-                </select>
-              </div>
-            )
-          })
-        )}
-      </section>
+      {plan.error && !plan.data ? (
+        <p className="m-0 rounded-card bg-white p-3.5 text-[14px] text-danger">{plan.error.message}</p>
+      ) : (
+        <GymWeek
+          plan={plan.data ?? null}
+          templates={list}
+          onSetDay={setDay}
+          onStart={(id) => void start(id)}
+          starting={starting}
+        />
+      )}
 
       {/* Templates */}
       <div className="-mb-1 mt-1 flex items-center justify-between">
