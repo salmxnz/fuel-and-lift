@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { publicUrl } from "@/lib/auth/public-origin"
 import { EnvError, getEnv } from "@/config/env"
 import { safeCallbackUrl } from "@/lib/auth/callback-url"
 import { AUTH_COOKIES, AUTH_MAX_AGE, cookieSecure } from "@/lib/auth/cookies.shared"
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     env = getEnv()
   } catch (err) {
     console.error(err instanceof EnvError ? err.message : err)
-    return NextResponse.redirect(new URL("/login?error=config", request.url))
+    return NextResponse.redirect(publicUrl("/login?error=config", request))
   }
 
   const params = request.nextUrl.searchParams

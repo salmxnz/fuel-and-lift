@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { publicUrl } from "@/lib/auth/public-origin"
 import { DEFAULT_AFTER_LOGIN, safeCallbackUrl } from "@/lib/auth/callback-url"
 import { AUTH_COOKIES, writeAuthCookies } from "@/lib/auth/cookies.shared"
 import { resolveProxyAuth } from "@/lib/auth/proxy-auth"
@@ -80,18 +81,18 @@ export async function proxy(request: NextRequest) {
   // Signed in but on /login: go where they were heading.
   if (pathname === "/login" && auth.authenticated) {
     const to = safeCallbackUrl(request.nextUrl.searchParams.get("callbackUrl"))
-    return withRefresh(NextResponse.redirect(new URL(to, request.url)), auth.refreshed)
+    return withRefresh(NextResponse.redirect(publicUrl(to, request)), auth.refreshed)
   }
 
   // Signed in on the landing page: straight into the app.
   if (pathname === "/" && auth.authenticated) {
-    return withRefresh(NextResponse.redirect(new URL(DEFAULT_AFTER_LOGIN, request.url)), auth.refreshed)
+    return withRefresh(NextResponse.redirect(publicUrl(DEFAULT_AFTER_LOGIN, request)), auth.refreshed)
   }
 
   if (isPublicPath(pathname)) return next(request, auth.refreshed)
 
   if (!auth.authenticated) {
-    const login = new URL("/login", request.url)
+    const login = publicUrl("/login", request)
     const target = `${pathname}${search}`
     if (target !== "/" && target !== DEFAULT_AFTER_LOGIN) {
       login.searchParams.set("callbackUrl", safeCallbackUrl(target))

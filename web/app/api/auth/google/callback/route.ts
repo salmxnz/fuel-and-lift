@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { publicUrl } from "@/lib/auth/public-origin"
 import { EnvError, getEnv } from "@/config/env"
 import type { AuthGoogleRequest, AuthGoogleResponse } from "@/lib/api/types"
 import { safeCallbackUrl } from "@/lib/auth/callback-url"
@@ -9,7 +10,7 @@ import { extractGoCookies } from "@/lib/auth/set-cookie"
 export const dynamic = "force-dynamic"
 
 function fail(request: NextRequest, error: string, invite?: string | null) {
-  const target = new URL("/login", request.url)
+  const target = publicUrl("/login", request)
   target.searchParams.set("error", error)
   if (invite) target.searchParams.set("invite", invite)
   const res = NextResponse.redirect(target)

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { isSameOrigin } from "@/lib/auth/public-origin"
 import { getApiEnv } from "@/config/env"
 import { AUTH_COOKIES } from "@/lib/auth/cookies.shared"
 
@@ -46,7 +47,7 @@ async function forward(request: NextRequest, ctx: Ctx): Promise<NextResponse> {
   // State-changing requests must come from our own pages.
   if (method !== "GET") {
     const origin = request.headers.get("origin")
-    if (origin && origin !== request.nextUrl.origin) {
+    if (origin && !isSameOrigin(origin, request)) {
       return jsonError(403, "Cross-site request blocked")
     }
   }
