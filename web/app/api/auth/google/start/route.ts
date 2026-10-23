@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { publicOrigin, publicUrl } from "@/lib/auth/public-origin"
+import { publicUrl, signInOrigin } from "@/lib/auth/public-origin"
 import { EnvError, getEnv } from "@/config/env"
 import { safeCallbackUrl } from "@/lib/auth/callback-url"
 import { AUTH_COOKIES, AUTH_MAX_AGE, cookieSecure } from "@/lib/auth/cookies.shared"
@@ -23,17 +23,18 @@ export async function GET(request: NextRequest) {
 
   const params = request.nextUrl.searchParams
 
-  // The fl_oauth cookie must live on the host Google sends people back to
-  // (APP_URL). Started from another one (adebite.com vs www.adebite.com), the
-  // callback can't see it and fails with "link expired", so hop over first.
+  // Sign in on the origin the browser is already on (APP_URL or its www twin)
+  // so the fl_oauth cookie, Google's redirect and the session cookies all land
+  // on one site. Anywhere else (a preview URL, a LAN IP), hop to APP_URL first.
   // `hop` stops a loop if a proxy reports an unexpected host.
-  const appOrigin = new URL(env.appUrl).origin
-  if (publicOrigin(request) !== appOrigin && !params.has("hop")) {
-    const hop = new URL("/api/auth/google/start", appOrigin)
+  const origin = signInOrigin(request, env.appUrl)
+  if (!origin && !params.has("hop")) {
+    const hop = new URL("/api/auth/google/start", env.appUrl)
     hop.search = request.nextUrl.search
     hop.searchParams.set("hop", "1")
     return NextResponse.redirect(hop)
   }
+  const redirectUri = `${origin ?? env.appUrl}/api/auth/google/callback`
 
   const inviteRaw = params.get("invite")
   const invite = inviteRaw && INVITE_RE.test(inviteRaw) ? inviteRaw : null
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
 
   const google = new URL("https://accounts.google.com/o/oauth2/v2/auth")
   google.searchParams.set("client_id", env.googleClientId)
-  google.searchParams.set("redirect_uri", `${env.appUrl}/api/auth/google/callback`)
+  google.searchParams.set("redirect_uri", redirectUri)
   google.searchParams.set("response_type", "code")
   google.searchParams.set("scope", "openid email profile")
   google.searchParams.set("state", state)
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
   google.searchParams.set("prompt", "select_account")
 
   const response = NextResponse.redirect(google)
-  response.cookies.set(AUTH_COOKIES.oauth, encodeOAuthCookie({ state, verifier, callbackUrl, invite }), {
+  response.cookies.set(AUTH_COOKIES.oauth, encodeOAuthCookie({ state, verifier, callbackUrl, invite, redirectUri }), {
     httpOnly: true,
     secure: cookieSecure(),
     sameSite: "lax", // must survive the top-level redirect back from Google

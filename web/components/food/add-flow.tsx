@@ -13,6 +13,8 @@ type AddFlow = {
   date: string
   setDate: (date: string) => void
   menuOpen: boolean
+  /** The + menu, the food sheet or the weigh-in sheet is open. */
+  flowOpen: boolean
   openMenu: () => void
   openFood: (target?: FoodSheetTarget) => void
   openWeighIn: () => void
@@ -48,10 +50,11 @@ export function AddFlowProvider({ children }: { children: React.ReactNode }) {
     setWeighOpen(true)
   }, [])
   const publishDay = useCallback((day: Day) => setLastDay(day), [])
+  const flowOpen = menuOpen || food.open || weighOpen
 
   const value = useMemo<AddFlow>(
-    () => ({ date, setDate, menuOpen, openMenu, openFood, openWeighIn, lastDay, publishDay }),
-    [date, setDate, menuOpen, openMenu, openFood, openWeighIn, lastDay, publishDay]
+    () => ({ date, setDate, menuOpen, flowOpen, openMenu, openFood, openWeighIn, lastDay, publishDay }),
+    [date, setDate, menuOpen, flowOpen, openMenu, openFood, openWeighIn, lastDay, publishDay]
   )
 
   return (

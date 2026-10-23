@@ -23,6 +23,8 @@ export type OAuthCookie = {
   verifier: string
   callbackUrl: string
   invite: string | null
+  /** The exact redirect_uri sent to Google; the code exchange must repeat it. */
+  redirectUri: string | null
 }
 
 export function encodeOAuthCookie(value: OAuthCookie): string {
@@ -43,6 +45,8 @@ export function decodeOAuthCookie(raw: string | undefined): OAuthCookie | null {
       verifier: parsed.verifier,
       callbackUrl: typeof parsed.callbackUrl === "string" ? parsed.callbackUrl : "/today",
       invite: typeof parsed.invite === "string" ? parsed.invite : null,
+      redirectUri:
+        typeof parsed.redirectUri === "string" && parsed.redirectUri.endsWith("/api/auth/google/callback") ? parsed.redirectUri : null,
     }
   } catch {
     return null

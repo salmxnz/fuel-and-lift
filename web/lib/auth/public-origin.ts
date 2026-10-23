@@ -41,3 +41,18 @@ export function publicUrl(path: string, request: NextRequest): URL {
 export function isSameOrigin(origin: string, request: NextRequest): boolean {
   return origin === publicOrigin(request) || origin === envOrigin() || origin === request.nextUrl.origin
 }
+
+/**
+ * Where Google sign-in should run for this request: the browser's own origin
+ * when it is APP_URL or its www/no-www twin (adebite.com vs www.adebite.com),
+ * else null. Signing in on the same origin matters for the installed app: on
+ * iOS, ending up on another origin leaves you in an in-app browser with the
+ * session cookies on the wrong site.
+ */
+export function signInOrigin(request: NextRequest, appUrl: string): string | null {
+  const app = new URL(appUrl)
+  const here = new URL(publicOrigin(request))
+  const bare = (host: string) => host.replace(/^www\./, "")
+  const twin = here.protocol === app.protocol && here.port === app.port && bare(here.hostname) === bare(app.hostname)
+  return twin ? here.origin : null
+}

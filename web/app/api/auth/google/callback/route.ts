@@ -44,10 +44,12 @@ export async function GET(request: NextRequest) {
     return fail(request, "state", oauth?.invite)
   }
 
+  // Repeat the redirect_uri the start route used (this origin or APP_URL).
+  const redirectUri = oauth.redirectUri ?? `${env.appUrl}/api/auth/google/callback`
   const body: AuthGoogleRequest = {
     code,
     code_verifier: oauth.verifier,
-    redirect_uri: `${env.appUrl}/api/auth/google/callback`,
+    redirect_uri: redirectUri,
     ...(oauth.invite ? { invite_token: oauth.invite } : {}),
   }
 
@@ -84,7 +86,8 @@ export async function GET(request: NextRequest) {
   }
 
   const destination = data.onboarded ? safeCallbackUrl(oauth.callbackUrl) : "/onboarding"
-  const response = NextResponse.redirect(new URL(destination, env.appUrl))
+  // Stay on the origin sign-in ran on, so an installed app keeps its session.
+  const response = NextResponse.redirect(new URL(destination, new URL(redirectUri).origin))
   writeAuthCookies(response.cookies, {
     accessToken: data.access_token,
     csrfToken: go.csrfToken ?? data.csrf_token,

@@ -69,6 +69,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const [step, setStep] = useState<number | null>(() => (me.profile && !me.profile.tour_done_at ? 0 : null))
   const [loggedNote, setLoggedNote] = useState(false)
 
+  // Step 1 ("Log your first meal"): closing the + menu or the food sheet,
+  // logged or not, moves on to the next step by itself.
+  const { flowOpen } = useAddFlow()
+  const [prevFlowOpen, setPrevFlowOpen] = useState(flowOpen)
+  if (flowOpen !== prevFlowOpen) {
+    setPrevFlowOpen(flowOpen)
+    if (!flowOpen && step === 0) setStep(1)
+  }
+
   const finish = useCallback(() => {
     setStep(null)
     void api.patch("profile", { tour_done: true }).catch(() => undefined)
@@ -156,7 +165,7 @@ function Spotlight({ step, note, onNext, onSkip }: { step: number; note: string 
   const router = useRouter()
   const pathname = usePathname()
   const reduce = useReducedMotion()
-  const { openMenu, menuOpen } = useAddFlow()
+  const { openMenu, flowOpen } = useAddFlow()
   const rect = useTargetRect(s.target)
   const titleId = useId()
   const primary = useRef<HTMLButtonElement>(null)
@@ -185,8 +194,8 @@ function Spotlight({ step, note, onNext, onSkip }: { step: number; note: string 
     return () => window.removeEventListener("keydown", onKey)
   }, [onSkip])
 
-  // Out of the way while the + menu is open (step 1's "Show me").
-  if (menuOpen) return null
+  // Out of the way while the + menu or a food/weigh-in sheet is open.
+  if (flowOpen) return null
   if (!shown) return null
 
   const pad = 6
