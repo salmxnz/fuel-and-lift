@@ -1,7 +1,8 @@
 // "Add to Home Screen" helpers shared by the landing page and onboarding.
 //
 // Chromium fires beforeinstallprompt once the PWA is installable; we keep the
-// event so our own button can call prompt(). The listener is registered when
+// event so our own button can call prompt(). We don't preventDefault(), so
+// Chrome still shows its own install bar too. The listener is registered when
 // this module first loads (not in an effect) so an early event isn't missed.
 // iOS has no install API: there we can only show the Share → Add to Home
 // Screen steps, and only Safari can do it reliably.
@@ -21,7 +22,6 @@ const emit = () => listeners.forEach((l) => l())
 
 if (typeof window !== "undefined") {
   window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault()
     deferred = e as BeforeInstallPromptEvent
     emit()
   })

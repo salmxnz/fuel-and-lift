@@ -6,6 +6,7 @@ import { InstallGuide } from "./install-guide"
 import { PhonePlaceholder } from "./phone-placeholder"
 import { MarqueeRow, ScreenshotCarousel, type Slide } from "./screenshot-carousel"
 import { StandaloneRedirect } from "./standalone-redirect"
+import { InstallPopup } from "@/components/pwa/install-popup"
 
 // Placeholders for now: add `image: { src: "/landing/…png", alt: "…" }` to a
 // slide to swap the sketch for a real screenshot.
@@ -41,6 +42,8 @@ export function LandingPage() {
   return (
     <div className="min-h-dvh overflow-x-clip bg-ground text-ink">
       <StandaloneRedirect />
+      {/* Slides up once they've scrolled past the hero's own install button. */}
+      <InstallPopup delayMs={12000} afterScrollPx={900} />
 
       <header className={cn(CONTENT, "flex items-center justify-between gap-4")} style={{ paddingTop: "calc(var(--safe-top) + 14px)" }}>
         <Link href="/" aria-label="adebite home" className="flex h-11 items-center">

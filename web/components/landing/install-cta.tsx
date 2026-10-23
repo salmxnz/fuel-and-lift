@@ -23,10 +23,13 @@ export function InstallCta({
   tone = "light",
   align = "start",
   showNote = true,
+  fullWidth = false,
 }: {
   tone?: "light" | "dark"
   align?: "start" | "center"
   showNote?: boolean
+  /** Always stretch the button (inside the install popup). */
+  fullWidth?: boolean
 }) {
   const platform = useInstallPlatform()
   const { canPrompt, justInstalled, prompt } = useInstallPrompt()
@@ -34,7 +37,7 @@ export function InstallCta({
   const [accepted, setAccepted] = useState(false)
 
   const variant = tone === "dark" ? "white" : "primary"
-  const buttonClass = cn("w-full sm:w-auto sm:min-w-[260px]", PRESS)
+  const buttonClass = cn(fullWidth ? "w-full" : "w-full sm:w-auto sm:min-w-[260px]", PRESS)
   const noteClass = cn("m-0 text-[13px] leading-[1.45]", tone === "dark" ? "text-night-muted" : "text-muted")
 
   let action: React.ReactNode
