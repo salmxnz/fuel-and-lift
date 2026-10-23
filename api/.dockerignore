@@ -1,0 +1,10 @@
+# Secrets never go into the build context; pass them as env vars at run time.
+.env
+.env.*
+!.env.example
+
+bin/
+*.test
+coverage.out
+Dockerfile
+.dockerignore
