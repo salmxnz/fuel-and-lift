@@ -5,9 +5,13 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Everything but the landing page (/) stays out of search engines.
+        source: "/:path+",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      {
         source: "/:path*",
         headers: [
-          { key: "X-Robots-Tag", value: "noindex, nofollow" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },

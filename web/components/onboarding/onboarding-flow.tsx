@@ -15,6 +15,7 @@ import { CM_PER_IN, kcal, kgToLb, lbToKg, num1, parseDecimal, round1 } from "@/l
 import { enablePush, isStandalone, needsIOSInstall, pushSupport } from "@/lib/push"
 import { PAGE_SLIDE, pageVariants } from "@/lib/motion"
 import { PacePicker, usePlanPreview } from "./pace-picker"
+import { useInstallPrompt } from "@/lib/install"
 import { Logo } from "@/components/brand/logo"
 
 const STORE_KEY = "fl:onboarding:v1"
@@ -654,19 +655,10 @@ function InstallStep({ next }: { next: () => void }) {
   const ios = useSyncExternalStore(subscribeNoop, needsIOSInstall, () => false)
   const standalone = useSyncExternalStore(subscribeNoop, isStandalone, () => false)
   const supported = useSyncExternalStore(subscribeNoop, () => pushSupport().ok, () => false)
-  const [installEvent, setInstallEvent] = useState<(Event & { prompt: () => Promise<void> }) | null>(null)
+  const install = useInstallPrompt()
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [enabled, setEnabled] = useState(false)
-
-  useEffect(() => {
-    const onPrompt = (e: Event) => {
-      e.preventDefault()
-      setInstallEvent(e as Event & { prompt: () => Promise<void> })
-    }
-    window.addEventListener("beforeinstallprompt", onPrompt)
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt)
-  }, [])
 
   async function turnOn() {
     setBusy(true)
@@ -693,15 +685,8 @@ function InstallStep({ next }: { next: () => void }) {
         </section>
       ) : (
         <section className="flex flex-col gap-3 rounded-card bg-white p-4">
-          {installEvent && !standalone ? (
-            <Button
-              variant="outline"
-              size="md"
-              onClick={async () => {
-                await installEvent.prompt().catch(() => undefined)
-                setInstallEvent(null)
-              }}
-            >
+          {install.canPrompt && !standalone ? (
+            <Button variant="outline" size="md" onClick={() => void install.prompt()}>
               Install the app
             </Button>
           ) : null}

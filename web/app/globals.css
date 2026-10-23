@@ -292,6 +292,33 @@ input[type="number"]::-webkit-inner-spin-button {
 .spin {
   animation: spin 0.8s linear infinite;
 }
+
+/* ------------------------------------------------------------ Landing */
+
+/* Hero entrance: set --i on each child for a 50ms stagger. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.rise {
+  animation: rise 280ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+
+/* The track holds the slides twice; moving it by half loops seamlessly. */
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  animation: marquee var(--marquee-duration, 60s) linear infinite;
+}
+.marquee-track[data-paused="true"] {
+  animation-play-state: paused;
+}
 }
 
 @media (prefers-reduced-motion: reduce) {

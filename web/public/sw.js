@@ -2,16 +2,18 @@
  *
  * - install: precache the app shell (offline page, manifest, icons)
  * - navigations: network first, falling back to the cached offline page
- * - /_next/static/*: cache first (file names are content-hashed)
+ * - /_next/static/*: cache first in production (file names are content-hashed);
+ *   skipped on localhost/LAN dev servers, where names are reused
  * - API traffic (/api/*) is never cached: it carries the user's data
  * - push: show a notification from the JSON payload {title, body, url}
  * - notificationclick: focus an open window on that url, or open one
  */
 
-const VERSION = "fl-v2"
+const VERSION = "fl-v3"
 const SHELL_CACHE = `${VERSION}-shell`
 const STATIC_CACHE = `${VERSION}-static`
 const OFFLINE_URL = "/offline"
+const IS_DEV = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)|\.local$/.test(self.location.hostname)
 
 const SHELL = [
   OFFLINE_URL,
@@ -69,7 +71,9 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-  if (url.pathname.startsWith("/_next/static/")) {
+  // In dev, chunk names stay the same while their contents change, so caching
+  // them serves stale JS and CSS. Only production builds get cache-first.
+  if (url.pathname.startsWith("/_next/static/") && !IS_DEV) {
     event.respondWith(
       caches.open(STATIC_CACHE).then(async (cache) => {
         const hit = await cache.match(request)

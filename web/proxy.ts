@@ -14,6 +14,7 @@ import type { RefreshedTokens } from "@/lib/auth/refresh-access"
 /** Reachable without a session. */
 function isPublicPath(pathname: string): boolean {
   return (
+    pathname === "/" ||
     pathname === "/login" ||
     pathname === "/offline" ||
     pathname.startsWith("/join/") ||
@@ -80,6 +81,11 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/login" && auth.authenticated) {
     const to = safeCallbackUrl(request.nextUrl.searchParams.get("callbackUrl"))
     return withRefresh(NextResponse.redirect(new URL(to, request.url)), auth.refreshed)
+  }
+
+  // Signed in on the landing page: straight into the app.
+  if (pathname === "/" && auth.authenticated) {
+    return withRefresh(NextResponse.redirect(new URL(DEFAULT_AFTER_LOGIN, request.url)), auth.refreshed)
   }
 
   if (isPublicPath(pathname)) return next(request, auth.refreshed)
