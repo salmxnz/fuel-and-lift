@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { publicUrl } from "@/lib/auth/public-origin"
+import { publicOrigin, publicUrl } from "@/lib/auth/public-origin"
 import { EnvError, getEnv } from "@/config/env"
 import { safeCallbackUrl } from "@/lib/auth/callback-url"
 import { AUTH_COOKIES, AUTH_MAX_AGE, cookieSecure } from "@/lib/auth/cookies.shared"
@@ -22,6 +22,19 @@ export async function GET(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams
+
+  // The fl_oauth cookie must live on the host Google sends people back to
+  // (APP_URL). Started from another one (adebite.com vs www.adebite.com), the
+  // callback can't see it and fails with "link expired", so hop over first.
+  // `hop` stops a loop if a proxy reports an unexpected host.
+  const appOrigin = new URL(env.appUrl).origin
+  if (publicOrigin(request) !== appOrigin && !params.has("hop")) {
+    const hop = new URL("/api/auth/google/start", appOrigin)
+    hop.search = request.nextUrl.search
+    hop.searchParams.set("hop", "1")
+    return NextResponse.redirect(hop)
+  }
+
   const inviteRaw = params.get("invite")
   const invite = inviteRaw && INVITE_RE.test(inviteRaw) ? inviteRaw : null
   const callbackUrl = safeCallbackUrl(params.get("callbackUrl"))
