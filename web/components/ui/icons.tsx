@@ -122,6 +122,25 @@ export const StoreIcon = (p: IconProps) => (
     <path d="M10 19v-5h4v5" />
   </Svg>
 )
+/** The Shop (community). Not StoreIcon, which is restaurants. */
+export const ShopIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5.5 8h13l-1 12h-11Z" />
+    <path d="M9 10.5V7a3 3 0 0 1 6 0v3.5" />
+  </Svg>
+)
+export const LockIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="5.5" y="10.5" width="13" height="9.5" rx="2" />
+    <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+  </Svg>
+)
+export const GlobeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M3.5 12h17M12 3.5c2.3 2.4 3.4 5.2 3.4 8.5s-1.1 6.1-3.4 8.5c-2.3-2.4-3.4-5.2-3.4-8.5s1.1-6.1 3.4-8.5Z" />
+  </Svg>
+)
 export const ChatIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M5 5h14v10H9l-4 4Z" />

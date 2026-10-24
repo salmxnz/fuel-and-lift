@@ -9,6 +9,7 @@ import (
 	"github.com/salmxnz/fuel-and-lift/api/internal/httpx"
 	"github.com/salmxnz/fuel-and-lift/api/internal/nutrition"
 	"github.com/salmxnz/fuel-and-lift/api/internal/push"
+	"github.com/salmxnz/fuel-and-lift/api/internal/splits"
 	"github.com/salmxnz/fuel-and-lift/api/internal/store"
 )
 
@@ -96,9 +97,35 @@ func (h *Handler) Onboard(w http.ResponseWriter, r *http.Request) {
 		Units          string `json:"units"`
 		CoachVoice     string `json:"coach_voice"`
 		WeighInCadence string `json:"weigh_in_cadence"`
+		// Split is a preset key (null = their own workouts); GymDays are the
+		// weekdays they train.
+		Split   *string  `json:"split"`
+		GymDays []string `json:"gym_days"`
 	}
 	if !decode(w, r, &in) {
 		return
+	}
+	var split *splits.Split
+	var gymDays []int
+	if in.Split != nil && *in.Split != "" {
+		s, ok := splits.Get(*in.Split)
+		if !ok {
+			badRequest(w, "unknown split")
+			return
+		}
+		days, msg := splitDays(s, in.GymDays)
+		if msg != "" {
+			badRequest(w, msg)
+			return
+		}
+		split, gymDays = &s, days
+	} else {
+		days, ok := parseDays(in.GymDays)
+		if !ok {
+			badRequest(w, `gym_days must be different weekdays like "mon"`)
+			return
+		}
+		gymDays = days
 	}
 	name, ok := cleanName(in.DisplayName, 40)
 	if !ok {
@@ -148,7 +175,7 @@ func (h *Handler) Onboard(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
-	h.seedStarterTemplates(r.Context(), userID)
+	h.seedGym(r.Context(), userID, split, gymDays)
 	if upgraded != "" {
 		h.Notifier.Notify([]string{upgraded}, push.Message{
 			Title: "You've got Pro, for good",

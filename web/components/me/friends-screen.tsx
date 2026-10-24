@@ -241,11 +241,19 @@ export function FriendsScreen() {
                   />
                 </div>
                 {open ? (
-                  <div className="flex items-center justify-between gap-2 pb-3">
-                    <span className="text-[12px] text-muted">Friends since {formatDayMonth(f.since)}</span>
-                    <Button variant="danger" size="sm" onClick={() => removeFriend(f.id, f.name)}>
-                      Remove friend
-                    </Button>
+                  <div className="flex flex-col gap-2 pb-3">
+                    <Link
+                      href={`/people/${f.id}`}
+                      className="flex min-h-[44px] items-center justify-between rounded-tile bg-ground px-3 text-[14px] font-semibold no-underline"
+                    >
+                      See their routines and meals <ChevronRightIcon size={16} className="text-muted" />
+                    </Link>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[12px] text-muted">Friends since {formatDayMonth(f.since)}</span>
+                      <Button variant="danger" size="sm" onClick={() => removeFriend(f.id, f.name)}>
+                        Remove friend
+                      </Button>
+                    </div>
                   </div>
                 ) : null}
               </div>

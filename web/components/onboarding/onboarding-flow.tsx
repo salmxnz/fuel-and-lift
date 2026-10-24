@@ -8,7 +8,9 @@ import { BackButton } from "@/components/ui/back-button"
 import { CheckIcon } from "@/components/ui/icons"
 import { IOSInstallSteps } from "@/components/settings/notifications-screen"
 import { ApiError, api, errorMessage } from "@/lib/api/client"
-import type { ActivityLevel, Mode, OnboardingRequest, Pace, PlanPreviewRequest, Sex } from "@/lib/api/types"
+import type { ActivityLevel, Mode, OnboardingRequest, Pace, PlanPreviewRequest, Sex, Split, SplitsResponse } from "@/lib/api/types"
+import { useApi } from "@/lib/api/use-api"
+import { assignDays, dayRange } from "@/lib/splits"
 import { cn } from "@/lib/cn"
 import { formatMonthYear, localTimeZone, todayISO, WEEKDAY_KEYS, type WeekdayKey } from "@/lib/dates"
 import { CM_PER_IN, kcal, kgToLb, lbToKg, num1, parseDecimal, round1 } from "@/lib/format"
@@ -33,6 +35,10 @@ type Answers = {
   mode: Mode | null
   goalKg: number | null
   pace: Pace
+  /** The preset split picked (null = none). */
+  split: Split | null
+  /** They chose "My own" instead of a split. */
+  ownWorkouts: boolean
   gymDays: WeekdayKey[]
 }
 
@@ -49,6 +55,8 @@ const EMPTY: Answers = {
   mode: null,
   goalKg: null,
   pace: "standard",
+  split: null,
+  ownWorkouts: false,
   gymDays: [],
 }
 
@@ -76,7 +84,7 @@ function load(defaultName: string): Answers {
 function stepsFor(a: Answers): string[] {
   const s = ["name", "sex", "dob", "height", "weight", "activity", "mode"]
   if (a.mode && a.mode !== "maintain") s.push("goal", "pace")
-  s.push("summary", "gym", "install", "done")
+  s.push("summary", "split", "gym", "install", "done")
   return s
 }
 
@@ -190,6 +198,7 @@ function Flow({ a, set, onFinished }: { a: Answers; set: (p: Partial<Answers>) =
           {step === "goal" && <GoalStep a={a} set={set} next={next} />}
           {step === "pace" && <PaceStep a={a} set={set} next={next} />}
           {step === "summary" && <SummaryStep a={a} next={next} />}
+          {step === "split" && <SplitStep a={a} set={set} next={next} />}
           {step === "gym" && <GymStep a={a} set={set} next={next} />}
           {step === "install" && <InstallStep next={next} />}
           {step === "done" && <DoneStep a={a} onFinished={onFinished} />}
@@ -622,11 +631,90 @@ function Macro({ label, g, color }: { label: string; g: number; color: string })
   )
 }
 
-function GymStep({ a, set, next }: StepProps) {
-  const toggle = (d: WeekdayKey) => set({ gymDays: a.gymDays.includes(d) ? a.gymDays.filter((x) => x !== d) : [...a.gymDays, d] })
+function summarizeExercises(names: string[]): string {
+  return names.length > 3 ? `${names.slice(0, 3).join(", ")} +${names.length - 3}` : names.join(", ")
+}
+
+function SplitStep({ a, set, next }: StepProps) {
+  const res = useApi<SplitsResponse>("splits")
+  const splits = res.data?.splits ?? []
+  // Picking a split starts the days at its usual week; they can change them next.
+  const pick = (sp: Split | null) =>
+    set({ split: sp, ownWorkouts: !sp, gymDays: sp ? [...sp.default_days] : a.split ? [] : a.gymDays })
+  const reduce = useReducedMotion()
   return (
     <>
-      <Title sub="Optional. You'll pick a template for each day in the Gym tab.">Which days do you usually train?</Title>
+      <Title sub="Pick a split and we'll set up its workouts and your week. You can change it, or share it with a friend, later.">
+        How do you like to train?
+      </Title>
+      <div role="radiogroup" aria-label="Gym split" className="flex flex-col gap-2">
+        {res.loading ? (
+          [0, 1, 2].map((i) => <div key={i} className="skeleton h-16 rounded-btn" aria-hidden="true" />)
+        ) : res.error ? (
+          <div role="alert" className="flex items-center justify-between gap-3 rounded-btn bg-white p-4 text-[14px] text-muted">
+            Couldn&apos;t load the splits.
+            <Button size="sm" variant="outline" onClick={() => void res.reload()}>
+              Try again
+            </Button>
+          </div>
+        ) : (
+          splits.map((sp) => {
+            const selected = a.split?.key === sp.key
+            return (
+              <div key={sp.key} className="flex flex-col">
+                <Choice selected={selected} onClick={() => pick(sp)} title={sp.name} sub={`${dayRange(sp)} · ${sp.description}`} />
+                <AnimatePresence initial={false}>
+                  {selected ? (
+                    <motion.ul
+                      key="workouts"
+                      className="m-0 flex list-none flex-col gap-1 overflow-hidden px-4"
+                      initial={reduce ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                      animate={reduce ? { opacity: 1 } : { opacity: 1, height: "auto" }}
+                      exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                      transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+                    >
+                      {sp.workouts.map((w) => (
+                        <li key={w.name} className="flex flex-col py-1.5 first:pt-3 text-[13px]">
+                          <span className="font-bold">{w.name}</span>
+                          <span className="text-muted">{summarizeExercises(w.exercises)}</span>
+                        </li>
+                      ))}
+                    </motion.ul>
+                  ) : null}
+                </AnimatePresence>
+              </div>
+            )
+          })
+        )}
+        <Choice
+          selected={!a.split && a.ownWorkouts}
+          onClick={() => pick(null)}
+          title="My own"
+          sub="Start with two simple workouts and build from there"
+        />
+      </div>
+      <Footer onContinue={next} disabled={!a.split && !a.ownWorkouts} />
+    </>
+  )
+}
+
+function GymStep({ a, set, next }: StepProps) {
+  const toggle = (d: WeekdayKey) => set({ gymDays: a.gymDays.includes(d) ? a.gymDays.filter((x) => x !== d) : [...a.gymDays, d] })
+  const sp = a.split
+  const n = a.gymDays.length
+  const fits = !sp || (n >= sp.min_days && n <= sp.max_days)
+  const plan = sp ? assignDays(sp, a.gymDays) : {}
+  return (
+    <>
+      <Title
+        sub={
+          sp
+            ? `${sp.name} works on ${dayRange(sp)}. Each day gets its workout; change them any time in the Gym tab.`
+            : "Optional. Upper-1 and Lower-1 take turns on these days; change them any time in the Gym tab."
+        }
+      >
+        Which days do you usually train?
+      </Title>
       <div className="grid grid-cols-7 gap-1.5" role="group" aria-label="Gym days">
         {WEEKDAY_KEYS.map((d) => {
           const on = a.gymDays.includes(d)
@@ -646,7 +734,22 @@ function GymStep({ a, set, next }: StepProps) {
           )
         })}
       </div>
-      <Footer onContinue={next} onSkip={() => set({ gymDays: [], step: "install" })} />
+      {sp && n > 0 ? (
+        <ul aria-label="Your week" className="m-0 flex list-none flex-col rounded-card bg-white px-3.5 py-1">
+          {WEEKDAY_KEYS.filter((d) => plan[d]).map((d) => (
+            <li key={d} className="flex min-h-[40px] items-center justify-between border-b border-line-soft text-[14px] last:border-b-0">
+              <span className="font-semibold text-muted">{DAY_LABEL[d]}</span>
+              <span className="font-bold">{plan[d]}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {!fits ? (
+        <p role="status" className="m-0 text-[14px] font-semibold text-danger">
+          Pick {dayRange(sp!)} for {sp!.name}.
+        </p>
+      ) : null}
+      <Footer onContinue={next} disabled={!fits} onSkip={() => set({ gymDays: [], step: "install" })} />
     </>
   )
 }
@@ -732,6 +835,8 @@ function DoneStep({ a, onFinished }: { a: Answers; onFinished: () => void }) {
       display_name: a.name.trim(),
       timezone: localTimeZone(),
       units: a.weightUnit === "lb" || a.heightUnit === "ftin" ? "imperial" : "metric",
+      split: a.split?.key ?? null,
+      gym_days: a.gymDays,
     }
     try {
       await api.post("onboarding", body)

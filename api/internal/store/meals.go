@@ -437,16 +437,24 @@ type SavedMeal struct {
 	Items             []SavedItem `json:"items"`
 	Base              Macros      `json:"base"`
 	LastUsedAt        *time.Time  `json:"last_used_at"`
+	Community
+	ownerID string
 }
 
-const savedCols = `id::text, name, default_meal_slot_id::text, items, last_used_at`
+const savedCols = `sm.id::text, sm.name, sm.default_meal_slot_id::text, sm.items, sm.last_used_at, sm.user_id::text,
+	sm.visibility, sm.published_at, sm.add_count, sm.hidden_at is not null, ` + copiedFromCols
+
+var savedFrom = ` from saved_meals sm ` + copiedFromJoin("sm")
 
 func scanSaved(r pgx.CollectableRow) (SavedMeal, error) {
 	var m SavedMeal
 	var raw []byte
-	if err := r.Scan(&m.ID, &m.Name, &m.DefaultMealSlotID, &raw, &m.LastUsedAt); err != nil {
+	var cf copiedFrom
+	if err := r.Scan(&m.ID, &m.Name, &m.DefaultMealSlotID, &raw, &m.LastUsedAt, &m.ownerID,
+		&m.Visibility, &m.PublishedAt, &m.AddCount, &m.Hidden, &cf.id, &cf.name, &cf.avatar); err != nil {
 		return m, err
 	}
+	m.CopiedFrom = cf.person()
 	if err := json.Unmarshal(raw, &m.Items); err != nil {
 		return m, err
 	}
@@ -465,8 +473,8 @@ func scanSaved(r pgx.CollectableRow) (SavedMeal, error) {
 
 // ListSavedMeals returns saved meals, most recently used first.
 func (s *Store) ListSavedMeals(ctx context.Context, userID string) ([]SavedMeal, error) {
-	rows, err := s.Pool.Query(ctx, `select `+savedCols+` from saved_meals
-		where user_id = $1::uuid and archived_at is null order by last_used_at desc nulls last, created_at desc`, userID)
+	rows, err := s.Pool.Query(ctx, `select `+savedCols+savedFrom+`
+		where sm.user_id = $1::uuid and sm.archived_at is null order by sm.last_used_at desc nulls last, sm.created_at desc`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -479,7 +487,7 @@ func (s *Store) ListSavedMeals(ctx context.Context, userID string) ([]SavedMeal,
 
 // GetSavedMeal returns one saved meal.
 func (s *Store) GetSavedMeal(ctx context.Context, userID, id string) (SavedMeal, error) {
-	rows, err := s.Pool.Query(ctx, `select `+savedCols+` from saved_meals where id = $1::uuid and user_id = $2::uuid and archived_at is null`, id, userID)
+	rows, err := s.Pool.Query(ctx, `select `+savedCols+savedFrom+` where sm.id = $1::uuid and sm.user_id = $2::uuid and sm.archived_at is null`, id, userID)
 	if err != nil {
 		return SavedMeal{}, err
 	}
@@ -487,8 +495,9 @@ func (s *Store) GetSavedMeal(ctx context.Context, userID, id string) (SavedMeal,
 	return m, notFound(err)
 }
 
-// SaveMeal creates (id == "") or replaces a saved meal.
-func (s *Store) SaveMeal(ctx context.Context, userID, id, name string, slotID *string, items []SavedItem) (SavedMeal, error) {
+// SaveMeal creates (id == "") or replaces a saved meal. visibility only
+// applies when creating (nil = private); see SetVisibility.
+func (s *Store) SaveMeal(ctx context.Context, userID, id, name string, slotID *string, items []SavedItem, visibility *string) (SavedMeal, error) {
 	if slotID != nil {
 		var ok bool
 		if err := s.Pool.QueryRow(ctx, `select exists(select 1 from meal_slots where id = $1::uuid and user_id = $2::uuid)`, *slotID, userID).Scan(&ok); err != nil {
@@ -499,20 +508,24 @@ func (s *Store) SaveMeal(ctx context.Context, userID, id, name string, slotID *s
 		}
 	}
 	raw, _ := json.Marshal(items)
-	var rows pgx.Rows
 	var err error
 	if id == "" {
-		rows, err = s.Pool.Query(ctx, `insert into saved_meals (user_id, name, default_meal_slot_id, items) values ($1::uuid, $2, $3::uuid, $4) returning `+savedCols,
-			userID, name, slotID, raw)
+		vis := "private"
+		if visibility != nil {
+			vis = *visibility
+		}
+		err = s.Pool.QueryRow(ctx, `insert into saved_meals (user_id, name, default_meal_slot_id, items, visibility, published_at)
+			values ($1::uuid, $2, $3::uuid, $4, $5, case when $5 <> 'private' then now() end) returning id::text`,
+			userID, name, slotID, raw, vis).Scan(&id)
 	} else {
-		rows, err = s.Pool.Query(ctx, `update saved_meals set name = $3, default_meal_slot_id = $4::uuid, items = $5, updated_at = now()
-			where id = $1::uuid and user_id = $2::uuid and archived_at is null returning `+savedCols, id, userID, name, slotID, raw)
+		var got string
+		err = s.Pool.QueryRow(ctx, `update saved_meals set name = $3, default_meal_slot_id = $4::uuid, items = $5, updated_at = now()
+			where id = $1::uuid and user_id = $2::uuid and archived_at is null returning id::text`, id, userID, name, slotID, raw).Scan(&got)
 	}
 	if err != nil {
-		return SavedMeal{}, err
+		return SavedMeal{}, notFound(err)
 	}
-	m, err := pgx.CollectExactlyOneRow(rows, scanSaved)
-	return m, notFound(err)
+	return s.GetSavedMeal(ctx, userID, id)
 }
 
 // ArchiveSavedMeal removes a saved meal from the list.

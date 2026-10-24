@@ -9,6 +9,7 @@ import { ChevronRightIcon, DumbbellIcon, PlusIcon } from "@/components/ui/icons"
 import { Sheet } from "@/components/ui/sheet"
 import { api, errorMessage } from "@/lib/api/client"
 import type {
+  RoutinesResponse,
   SessionResponse,
   SessionsResponse,
   Template,
@@ -19,6 +20,10 @@ import type {
 import { useApi } from "@/lib/api/use-api"
 import { addDays, formatDayMonth, relativeDay, todayISO, weekdayKey, type WeekdayKey } from "@/lib/dates"
 import { GymWeek } from "./gym-week"
+import { IncomingRoutines, IncomingTemplates } from "@/components/share/incoming-shares"
+import { VisibilityBadge } from "@/components/community/visibility-select"
+import { ShopLink } from "@/components/community/shop-link"
+import { RoutinesSection } from "./routines-section"
 
 const DAY_NAMES: Record<WeekdayKey, string> = {
   mon: "Monday",
@@ -41,6 +46,7 @@ export function GymScreen() {
   const today = todayISO()
   const templates = useApi<TemplatesResponse>("templates")
   const plan = useApi<WeeklyPlan>("weekly-plan")
+  const routines = useApi<RoutinesResponse>("routines")
   const sessions = useApi<SessionsResponse>(`sessions?from=${addDays(today, -14)}&to=${today}`)
   const [starting, setStarting] = useState<string | null>(null)
   const [newOpen, setNewOpen] = useState(false)
@@ -84,7 +90,23 @@ export function GymScreen() {
     <div className="flex flex-col gap-3.5">
       <header className="flex items-end justify-between">
         <h1 className="m-0 text-[30px] font-extrabold tracking-[-0.02em]">Gym</h1>
+        <ShopLink kind="routine" />
       </header>
+
+      <IncomingRoutines
+        onAdded={(r) => {
+          routines.setData((prev) => ({ routines: [r, ...(prev?.routines ?? [])] }))
+          void templates.reload()
+        }}
+      />
+
+      <IncomingTemplates
+        onAdded={(t) =>
+          templates.setData((prev) => ({
+            templates: [...(prev?.templates ?? []), t].sort((a, b) => a.name.localeCompare(b.name)),
+          }))
+        }
+      />
 
       {/* Today */}
       {templates.loading || plan.loading || sessions.loading ? (
@@ -139,6 +161,13 @@ export function GymScreen() {
         />
       )}
 
+      <RoutinesSection
+        routines={routines}
+        plan={plan.data ?? null}
+        onPlanChange={(days) => plan.setData({ days })}
+        onTemplatesChanged={() => void templates.reload()}
+      />
+
       {/* Templates */}
       <div className="-mb-1 mt-1 flex items-center justify-between">
         <h2 className="m-0 text-[17px] font-extrabold">Templates</h2>
@@ -161,8 +190,11 @@ export function GymScreen() {
           {list.map((t) => (
             <li key={t.id} className="flex items-center gap-2 rounded-card bg-white p-2 pl-4">
               <Link href={`/gym/templates/${t.id}`} className="flex min-h-[56px] min-w-0 flex-1 flex-col justify-center no-underline">
-                <span className="text-[16px] font-bold">
-                  {t.name} <span className="text-[12px] font-semibold text-muted">v{t.version}</span>
+                <span className="flex flex-wrap items-center gap-1.5 text-[16px] font-bold">
+                  <span>
+                    {t.name} <span className="text-[12px] font-semibold text-muted">v{t.version}</span>
+                  </span>
+                  <VisibilityBadge visibility={t.visibility} hidden={t.hidden} />
                 </span>
                 <span className="truncate text-[13px] text-muted">{summarizeTemplate(t)}</span>
               </Link>

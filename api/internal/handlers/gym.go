@@ -72,6 +72,8 @@ func (h *Handler) CreateExercise(w http.ResponseWriter, r *http.Request) {
 type templateBody struct {
 	Name   string             `json:"name"`
 	Blocks []store.BlockInput `json:"blocks"`
+	// Visibility is read when creating; PUT …/visibility changes it later.
+	Visibility *string `json:"visibility"`
 }
 
 func checkTemplate(in templateBody) (string, string) {
@@ -131,10 +133,20 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, msg)
 		return
 	}
-	t, err := h.Store.CreateTemplate(r.Context(), auth.UserID(r), name, in.Blocks)
+	if !validVisibility(w, in.Visibility) {
+		return
+	}
+	userID := auth.UserID(r)
+	t, err := h.Store.CreateTemplate(r.Context(), userID, name, in.Blocks)
 	if err != nil {
 		h.storeError(w, r, err)
 		return
+	}
+	if in.Visibility != nil && *in.Visibility != "private" {
+		if t.Community, err = h.Store.SetVisibility(r.Context(), userID, "template", t.ID, *in.Visibility); err != nil {
+			h.storeError(w, r, err)
+			return
+		}
 	}
 	httpx.JSON(w, http.StatusCreated, map[string]any{"template": t})
 }

@@ -56,6 +56,7 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"POST /v1/saved-meals":                  h.SaveMeal,
 		"PUT /v1/saved-meals/{id}":              h.SaveMeal,
 		"DELETE /v1/saved-meals/{id}":           h.DeleteSavedMeal,
+		"PUT /v1/saved-meals/{id}/visibility":   h.SetVisibility("meal"),
 		"GET /v1/foods":                         h.ListFoods,
 		"POST /v1/foods":                        h.CreateFood,
 		"GET /v1/foods/barcode/{code}":          h.FoodByBarcode,
@@ -77,6 +78,7 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/templates/{id}/versions/{version}":     h.GetTemplateVersion,
 		"POST /v1/templates/{id}/current":               h.SetCurrentTemplateVersion,
 		"POST /v1/templates/{id}/share":                 h.ShareTemplate,
+		"PUT /v1/templates/{id}/visibility":             h.SetVisibility("template"),
 		"GET /v1/weekly-plan":                           h.GetWeeklyPlan,
 		"PUT /v1/weekly-plan":                           h.PutWeeklyPlan,
 		"POST /v1/sessions":                             h.StartSession,
@@ -89,6 +91,25 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"POST /v1/sessions/{id}/accept-all":             h.AcceptAll,
 		"POST /v1/sessions/{id}/finish":                 h.FinishSession,
 		"POST /v1/sessions/{id}/apply":                  h.ApplyProposals,
+
+		// splits and routines
+		"GET /v1/splits":                   h.GetSplits,
+		"POST /v1/splits/{key}/apply":      h.ApplySplit,
+		"GET /v1/routines":                 h.ListRoutines,
+		"POST /v1/routines":                h.SaveRoutine,
+		"GET /v1/routines/{id}":            h.GetRoutine,
+		"PUT /v1/routines/{id}":            h.SaveRoutine,
+		"DELETE /v1/routines/{id}":         h.DeleteRoutine,
+		"POST /v1/routines/{id}/apply":     h.ApplyRoutine,
+		"POST /v1/routines/{id}/share":     h.ShareRoutine,
+		"PUT /v1/routines/{id}/visibility": h.SetVisibility("routine"),
+
+		// the Shop and people's profiles
+		"GET /v1/shop":                     h.Shop,
+		"GET /v1/shop/{kind}/{id}":         h.GetShopItem,
+		"POST /v1/shop/{kind}/{id}/add":    h.AddShopItem,
+		"POST /v1/shop/{kind}/{id}/report": h.ReportShopItem,
+		"GET /v1/people/{id}":              h.GetPerson,
 
 		// progress
 		"GET /v1/progress/weight":         h.WeightProgress,
@@ -127,6 +148,16 @@ func NewRouter(h *handlers.Handler) http.Handler {
 	}
 	for p, f := range signedIn {
 		mux.HandleFunc(p, secure(f))
+	}
+
+	admin := map[string]http.HandlerFunc{
+		"GET /v1/admin/reports":                   h.ListReports,
+		"POST /v1/admin/shop/{kind}/{id}/hide":    h.HideShopItem,
+		"DELETE /v1/admin/shop/{kind}/{id}/hide":  h.HideShopItem,
+		"POST /v1/admin/shop/{kind}/{id}/dismiss": h.DismissReports,
+	}
+	for p, f := range admin {
+		mux.HandleFunc(p, secure(auth.RequireAdmin(f)))
 	}
 
 	return auth.CORS(h.Cfg.AllowedOrigins)(httpx.Recover(httpx.Logger(mux)))

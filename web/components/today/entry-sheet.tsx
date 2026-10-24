@@ -10,21 +10,27 @@ import { api, errorMessage, seg } from "@/lib/api/client"
 import type { Day, DayResponse, Entry, EntryDayResponse, MealSlot } from "@/lib/api/types"
 import { fromEntryItem, toEntryItems, type EditableItem } from "@/lib/items"
 import { parseDecimal } from "@/lib/format"
+import { ShareIcon } from "@/components/ui/icons"
 
 export function EntrySheet({
   entry,
   slots,
   onClose,
   onDayChange,
+  onShare,
 }: {
   entry: Entry | null
   slots: MealSlot[]
   onClose: () => void
   onDayChange: (day: Day) => void
+  /** Share or split this meal with friends. */
+  onShare: (entry: Entry) => void
 }) {
   return (
     <Sheet open={!!entry} onClose={onClose} title="Edit entry">
-      {entry ? <EntryForm key={entry.id} entry={entry} slots={slots} onClose={onClose} onDayChange={onDayChange} /> : null}
+      {entry ? (
+        <EntryForm key={entry.id} entry={entry} slots={slots} onClose={onClose} onDayChange={onDayChange} onShare={onShare} />
+      ) : null}
     </Sheet>
   )
 }
@@ -36,11 +42,13 @@ function EntryForm({
   slots,
   onClose,
   onDayChange,
+  onShare,
 }: {
   entry: Entry
   slots: MealSlot[]
   onClose: () => void
   onDayChange: (day: Day) => void
+  onShare: (entry: Entry) => void
 }) {
   const [name, setName] = useState(entry.name)
   const [meal, setMeal] = useState<string>(entry.meal_slot_id ?? ONE_OFF)
@@ -210,6 +218,9 @@ function EntryForm({
           {error}
         </p>
       ) : null}
+      <Button variant="outline" size="md" onClick={() => onShare(entry)} disabled={saving || deleting}>
+        <ShareIcon size={18} /> Share or split with a friend
+      </Button>
       <div className="grid grid-cols-2 gap-2">
         <Button variant="danger" onClick={remove} loading={deleting} disabled={saving}>
           Delete

@@ -16,6 +16,9 @@ import { PAGE_SLIDE, pageVariants, swipeDirection } from "@/lib/motion"
 import { CalorieCard } from "./calorie-card"
 import { EntrySheet } from "./entry-sheet"
 import { MealList } from "./meal-list"
+import { IncomingMeals } from "@/components/share/incoming-shares"
+import { ShareMealSheet } from "@/components/share/share-meal-sheet"
+import { ShopLink } from "@/components/community/shop-link"
 
 export function TodayScreen() {
   const router = useRouter()
@@ -34,6 +37,7 @@ export function TodayScreen() {
   const flow = useAddFlow()
   const { setDate, lastDay, openFood } = flow
   const [editing, setEditing] = useState<Entry | null>(null)
+  const [sharing, setSharing] = useState<Entry | null>(null)
   const [oneOffOpen, setOneOffOpen] = useState(false)
   const dateInput = useRef<HTMLInputElement>(null)
   const reduce = useReducedMotion()
@@ -89,6 +93,7 @@ export function TodayScreen() {
               Today
             </button>
           ) : null}
+          <ShopLink kind="meal" />
           <label className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-[12px] bg-white text-ink">
             <span className="sr-only">Pick a date</span>
             <CalendarIcon size={20} />
@@ -124,6 +129,12 @@ export function TodayScreen() {
         renderDay={(d) => <DayDot on={logged.has(d) || (d === date && !!day.data?.day.meals.some((m) => m.entries.length > 0))} />}
       />
 
+      <IncomingMeals
+        slots={slots.data?.meal_slots ?? []}
+        viewing={date}
+        onDayChange={(d) => day.setData({ day: d })}
+        onGoTo={goTo}
+      />
 
       {/* Swipe the day sideways to go to the day before or after. */}
       <AnimatePresence mode="popLayout" initial={false} custom={dir}>
@@ -199,7 +210,13 @@ export function TodayScreen() {
         slots={slots.data?.meal_slots ?? []}
         onClose={() => setEditing(null)}
         onDayChange={(d) => day.setData({ day: d })}
+        onShare={(e) => {
+          setEditing(null)
+          setSharing(e)
+        }}
       />
+
+      <ShareMealSheet entry={sharing} onClose={() => setSharing(null)} onDayChange={(d) => day.setData({ day: d })} />
 
       <OneOffMealSheet
         open={oneOffOpen}

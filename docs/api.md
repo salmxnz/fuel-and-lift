@@ -103,11 +103,21 @@ Body = everything onboarding collected:
 ```json
 { "display_name": "Bhavish", "sex": "male", "date_of_birth": "2002-05-14", "height_cm": 175,
   "weight_kg": 53, "activity_level": 4, "mode": "gain", "goal_weight_kg": 70, "pace": "standard",
-  "timezone": "Indian/Mauritius", "units": "metric" }
+  "timezone": "Indian/Mauritius", "units": "metric",
+  "split": "ppl", "gym_days": ["mon", "wed", "fri"] }
 ```
 Creates the profile, the first weigh-in, the goal and the default meal slots
 (Breakfast, Lunch, Dinner, Snacks). `201 {"profile": Profile, "goal": Goal}`.
 Calling it again returns `409`.
+
+It also fills the Gym tab:
+- `split` (a key from `GET /v1/splits`): that split's workouts, a private routine, and the week
+  on `gym_days` (the split's `default_days` when empty). An unknown split, or a day count outside
+  its `min_days`..`max_days`, is `400` ("Push Pull Legs needs 3 to 6 days").
+- `split` null or absent: two starter workouts, Upper-1 and Lower-1, put alternately on
+  `gym_days` when given.
+
+`gym_days` are different weekdays, `"mon"` to `"sun"`.
 
 ### `GET /v1/profile` → `200 {"profile": Profile}`
 ### `PATCH /v1/profile` (any subset of Profile fields) → `200 {"profile": Profile}`
@@ -154,7 +164,7 @@ type Entry = Macros & {
   meal_slot_id: string | null     // null for a one-off meal
   meal_name: string               // slot name, or the one-off name ("Late snack")
   name: string                    // "Usual breakfast", "Fish curry with rice"
-  origin: "saved" | "ai" | "manual" | "search" | "barcode" | "restaurant"
+  origin: "saved" | "ai" | "manual" | "search" | "barcode" | "restaurant" | "shared"
   saved_meal_id: string | null
   ai_estimate_id: string | null
   items: EntryItem[]
@@ -209,11 +219,12 @@ type SavedMeal = {
   items: (EntryItem & { id: string, is_addon: boolean })[],
   base: Macros,                  // non-add-on items only
   last_used_at: string | null
-}
+} & Community                    // see "The Shop"
 ```
 ### `GET /v1/saved-meals` → `200 {"saved_meals": SavedMeal[]}` (most recently used first)
-### `POST /v1/saved-meals` `{name, default_meal_slot_id?, items}` → `201 {"saved_meal": SavedMeal}`
-### `PUT /v1/saved-meals/{id}` (same body) → `200 {"saved_meal": SavedMeal}`
+### `POST /v1/saved-meals` `{name, default_meal_slot_id?, items, visibility?}` → `201 {"saved_meal": SavedMeal}`
+### `PUT /v1/saved-meals/{id}` (same body; `visibility` is ignored) → `200 {"saved_meal": SavedMeal}`
+### `PUT /v1/saved-meals/{id}/visibility` `{visibility}` → `200 {visibility, published_at, hidden}`
 ### `DELETE /v1/saved-meals/{id}` → `204`
 ### `POST /v1/days/{date}/saved-meals/{id}` `{meal_slot_id?, meal_name?, addon_ids: []}`
 Logs the base items plus the chosen add-ons as one entry. `201 {"entry": Entry, "day": Day}`
@@ -304,7 +315,7 @@ type TemplateBlock = {
 
 type Template = { id: string, name: string, version: number, version_id: string,
                   current_version: number,  // = version unless viewing an older one
-                  blocks: TemplateBlock[], updated_at: string }
+                  blocks: TemplateBlock[], updated_at: string } & Community  // see "The Shop"
 ```
 ### `GET /v1/exercises?q=` → `200 {"exercises": Exercise[]}`
 Ranked search over the shared library and your own exercises: every word must
@@ -313,7 +324,7 @@ with a small typo allowed ("raise calf", "calf rasie", "stair master", "rdl").
 Best 50 results; an empty `q` returns everything by name.
 ### `POST /v1/exercises` `{name, kind, muscle_group?, equipment?}` → `201 {"exercise": Exercise}`
 ### `GET /v1/templates` → `200 {"templates": Template[]}`
-### `POST /v1/templates` `{name, blocks: [{exercise_id, sets, cardio, rest_seconds, notes}]}` → `201 {"template": Template}`
+### `POST /v1/templates` `{name, blocks: [{exercise_id, sets, cardio, rest_seconds, notes}], visibility?}` → `201 {"template": Template}`
 ### `GET /v1/templates/{id}` → `200 {"template": Template, "versions": [{version, version_id, created_at}]}`
 ### `PUT /v1/templates/{id}` (same body as POST) → `200 {"template": Template}` — saves a **new version**
 ### `DELETE /v1/templates/{id}` → `204` (archived; history keeps it)
@@ -323,10 +334,52 @@ That version's blocks; `template.version` is the one asked for and
 ### `POST /v1/templates/{id}/current` `{version}` → `200 {"template": Template}`
 Makes an existing version current (nothing is copied). The next `PUT` saves as
 the highest version + 1.
+### `PUT /v1/templates/{id}/visibility` `{visibility}` → `200 {visibility, published_at, hidden}`
+Doesn't make a new version.
 
 ### Weekly plan
 `GET /v1/weekly-plan` → `200 {"days": {"mon": "template-uuid" | null, "tue": ..., "sun": ...}}`
+(`WeeklyPlanDays` below means that `days` object.)
 `PUT /v1/weekly-plan` (same shape) → `200`
+
+### Splits and routines
+A **split** is a preset week (Push Pull Legs, Bro Split…). Its workouts are
+cycled over the days you train: PPL on Mon/Wed/Fri is Push, Pull, Legs; on six
+days it goes round twice. A **routine** is your own named week of workouts. It
+points at your templates (editing a workout changes the routine) and becomes
+your week when you apply it.
+
+```ts
+type Split = {
+  key: string, name: string, description: string,
+  min_days: number, max_days: number, default_days: Weekday[],   // Weekday = "mon" … "sun"
+  workouts: { name: string, exercises: string[] }[],
+  rotation: number[]          // indexes into workouts, cycled over the chosen days in week order
+}
+
+type Routine = {
+  id: string, name: string, description: string | null,
+  preset: string | null,      // the split it was made from
+  days: Record<Weekday, { template_id: string, name: string } | null>,
+  created_at: string, updated_at: string,
+  templates?: Template[]      // Shop detail only
+} & Community
+```
+- `GET /v1/splits` → `200 {"splits": Split[]}`
+- `POST /v1/splits/{key}/apply` `{days?: Weekday[], apply_to_week?: bool = true}` → `201 {"routine": Routine, "days": WeeklyPlanDays}`
+  New workouts (only those the days use) and a routine. With `apply_to_week` it replaces your week.
+  Each apply makes new workouts. `400` when the day count doesn't fit the split.
+- `GET /v1/routines` → `200 {"routines": Routine[]}` (most recently changed first)
+- `POST /v1/routines` `{name, description?, visibility?, days: {mon: template_id | null, …}}` → `201 {"routine": Routine}`
+  Name up to 40, description up to 200. A workout that isn't yours is `404`.
+- `GET /v1/routines/{id}` → `200 {"routine": Routine}`
+- `PUT /v1/routines/{id}` (same body; `visibility` ignored) → `200 {"routine": Routine}`
+- `DELETE /v1/routines/{id}` → `204` (its workouts and your week stay)
+- `POST /v1/routines/{id}/apply` → `200 {"days": WeeklyPlanDays}`. Replaces your week; `400` if it has no training days.
+- `POST /v1/routines/{id}/share` `{friend_ids}` → `201 {"shared_with": number}` (see Sharing)
+- `PUT /v1/routines/{id}/visibility` `{visibility}` → `200 {visibility, published_at, hidden}`
+
+Deleting a workout also takes it off your routines.
 
 ### Sessions
 
@@ -449,6 +502,128 @@ type FeedItem = { id: string, actor: { id: string, name: string, avatar_url: str
 Activity is written when it happens (finishing a session, a new record, a weigh-in
 milestone) and only if the actor's sharing allows that kind. Turning a sharing
 switch off hides that kind from the feed immediately, including older items.
+
+### Sharing a meal, a template or a routine with friends
+Send a logged meal or a gym template to friends; it waits for them until
+they add it or say no thanks. What's sent is a copy taken at that moment:
+later edits on either side stay their own. Shares from someone who is no
+longer a friend disappear.
+
+```ts
+type Share = {
+  id: string, kind: "meal" | "template" | "routine",
+  from: { id: string, name: string, avatar_url: string | null },
+  split_ways: number | null,     // meal split between this many people (you included); null = shared whole
+  created_at: string,
+  meal: (Macros & { date: string, name: string, meal_name: string, items: EntryItem[] }) | null,  // the friend's part
+  template: { name: string, exercises: string[] } | null,
+  routine: { name: string, description: string | null,
+             days: Record<Weekday, number | null>,                // index into workouts
+             workouts: { name: string, exercises: string[] }[] } | null
+}
+```
+- `POST /v1/entries/{id}/share` `{friend_ids: [...], split: bool}` → `201 {"entry": Entry, "day": Day, "shared_with": number}`
+  - `split: true` — you ate it together: the meal is divided equally between
+    you and every friend picked, your own entry shrinks to your part now
+    (items, grams and macros scaled) and each friend is offered the same part.
+    A meal can only be split once: `409` code `already_split`.
+  - `split: false` — you each had the same: every friend is offered the whole meal.
+  - 1 to 10 friends; anyone who isn't a friend is `403` code `not_friends`.
+    Sending the same meal to someone it's still waiting for does nothing.
+- `POST /v1/templates/{id}/share` `{friend_ids: [...]}` → `201 {"shared_with": number}`
+  (the current version, with your sets and target weights)
+- `POST /v1/routines/{id}/share` `{friend_ids: [...]}` → `201 {"shared_with": number}`
+  (a copy of each of its workouts)
+- `GET /v1/shares?kind=meal|template|routine` → `200 {"shares": Share[]}` (waiting for you, newest first, 20 at most; no `kind` = all)
+- `POST /v1/shares/{id}/accept`
+  - meal: `{meal_slot_id | meal_name, date?}` → `201 {"entry": Entry, "day": Day}`. Logged with
+    `origin: "shared"` on `date`, which defaults to the day it was eaten and is
+    never later than your today.
+  - template: `{}` → `201 {"template": Template}`. A copy in your templates;
+    library exercises are reused, the sender's own exercises are matched by
+    name in yours or created. If you already have a template with that name,
+    the copy gets the sender's first name: "Lower-1 (Sam)".
+  - routine: `{}` → `201 {"routine": Routine}`. Copies of its workouts (as for a
+    template) and a routine using them. Your week isn't changed until you apply it.
+- `DELETE /v1/shares/{id}` → `204` (no thanks)
+
+The friend gets a push ("Bhavish split Pizza with you", "Bhavish shared a
+workout with you") that opens Today or Gym, where waiting shares are shown.
+
+## The Shop (community)
+Workouts (templates), saved meals and routines each have a visibility:
+**private** (the default), **friends** (your friends see it on your profile and
+in their Shop), or **public** (everyone, in the Shop). Making a routine visible
+shows its workouts too, whatever their own setting. Other people see the
+current version of what you share. Adding something makes a private copy in
+your account that credits you.
+
+```ts
+type Visibility = "private" | "friends" | "public"
+type Person = { id: string, name: string, avatar_url: string | null }
+
+type Community = {
+  visibility: Visibility,
+  published_at: string | null,  // first time it left private ("newest" sorts on this; switching back doesn't move it)
+  add_count: number,            // people who added it (once each)
+  hidden: boolean,              // a moderator removed it from the Shop; only you still see it
+  copied_from: Person | null    // you added it from this person
+}
+
+type ShopKind = "routine" | "template" | "meal"
+
+type ShopItem = {
+  kind: ShopKind, id: string, name: string, creator: Person,
+  visibility: Visibility, add_count: number, published_at: string | null,
+  added: boolean,               // you've added it before
+  mine: boolean, hidden: boolean,
+  names: string[],              // template: exercises; meal: items (no add-ons); routine: its workouts
+  macros?: Macros,              // meal
+  days?: Record<Weekday, string | null>,   // routine: workout name per day
+  description?: string | null   // routine
+}
+```
+- `GET /v1/shop?kind=routine|template|meal&sort=new|popular&q=&offset=` → `200 {"items": ShopItem[], "next_offset": number | null}`
+  Everything public plus your friends' friends-only items; never your own, nor hidden items.
+  `q` matches anywhere in the name (case-insensitive). 30 per page, `offset` up to 300.
+  `kind` is required.
+- `GET /v1/shop/{kind}/{id}` → `200 {item: ShopItem, template?: Template, saved_meal?: SavedMeal, routine?: Routine}`
+  The item in full (a routine with its `templates`), creator's custom exercises included.
+  Yours, or shared with you; `404` otherwise. Admins can open anything, hidden items included.
+- `POST /v1/shop/{kind}/{id}/add` → `201 {"template": Template} | {"saved_meal": SavedMeal} | {"routine": Routine}`
+  A private copy with `copied_from` set. A routine comes with copies of its workouts; your
+  week isn't changed. Your own item is `409` code `own_item`.
+- `POST /v1/shop/{kind}/{id}/report` `{reason: "spam" | "offensive" | "unsafe" | "other", note?}` → `201 {}`
+  Note up to 300 characters. Reporting again while it's open does nothing. `404` for your
+  own items or ones you can't see.
+
+### People
+`GET /v1/people/{id}` → `200 PersonView`
+```ts
+type PersonView = {
+  person: Person, is_me: boolean, is_friend: boolean,
+  friends_since: string | null,
+  routines: ShopItem[], templates: ShopItem[], meals: ShopItem[]   // what they share with you, newest first
+}
+```
+On your own id, it shows what you share (friends + public). `404` unless it's you,
+a friend, or someone with something public.
+
+### Moderation (admins only; others get `403`)
+```ts
+type ReportGroup = {
+  kind: ShopKind, item_id: string, name: string, creator: Person,
+  visibility: Visibility, hidden: boolean,
+  count: number, reasons: Record<string, number>,
+  notes: string[],              // newest 5
+  first_reported_at: string
+}
+```
+- `GET /v1/admin/reports` → `200 {"reports": ReportGroup[]}` (open reports, most reported first)
+- `POST /v1/admin/shop/{kind}/{id}/hide` → `200 {"hidden": true}`. Out of the Shop, profiles and adds
+  for everyone but the owner (who gets a push). Closes its open reports.
+- `DELETE /v1/admin/shop/{kind}/{id}/hide` → `200 {"hidden": false}`
+- `POST /v1/admin/shop/{kind}/{id}/dismiss` → `204` (closes the reports, nothing hidden)
 
 ## Notifications (Web Push)
 

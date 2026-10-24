@@ -384,8 +384,12 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 			store.EntryItem
 			IsAddon bool `json:"is_addon"`
 		} `json:"items"`
+		Visibility *string `json:"visibility"` // creating only; see PUT …/visibility
 	}
 	if !decode(w, r, &in) {
+		return
+	}
+	if !validVisibility(w, in.Visibility) {
 		return
 	}
 	name, ok := cleanName(in.Name, 60)
@@ -418,7 +422,7 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 		}
 		items[i] = store.SavedItem{ID: itemID, EntryItem: it, IsAddon: in.Items[i].IsAddon}
 	}
-	m, err := h.Store.SaveMeal(r.Context(), auth.UserID(r), id, name, in.DefaultMealSlotID, items)
+	m, err := h.Store.SaveMeal(r.Context(), auth.UserID(r), id, name, in.DefaultMealSlotID, items, in.Visibility)
 	if err != nil {
 		h.storeError(w, r, err)
 		return

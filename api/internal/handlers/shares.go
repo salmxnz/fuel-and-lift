@@ -125,12 +125,12 @@ func (h *Handler) ShareTemplate(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, map[string]any{"shared_with": len(ids)})
 }
 
-// ListShares handles GET /v1/shares?kind=meal|template: what friends sent
-// that's still waiting for an answer.
+// ListShares handles GET /v1/shares?kind=meal|template|routine: what friends
+// sent that's still waiting for an answer.
 func (h *Handler) ListShares(w http.ResponseWriter, r *http.Request) {
 	kind := r.URL.Query().Get("kind")
-	if kind != "" && kind != "meal" && kind != "template" {
-		badRequest(w, "kind must be meal or template")
+	if kind != "" && kind != "meal" && kind != "template" && kind != "routine" {
+		badRequest(w, "kind must be meal, template or routine")
 		return
 	}
 	list, err := h.Store.IncomingShares(r.Context(), auth.UserID(r), kind)
@@ -143,7 +143,7 @@ func (h *Handler) ListShares(w http.ResponseWriter, r *http.Request) {
 
 // AcceptShare handles POST /v1/shares/{id}/accept. A meal takes
 // {meal_slot_id | meal_name, date?} (date defaults to the day it was eaten,
-// never later than the user's today); a template takes {}.
+// never later than the user's today); a template or routine takes {}.
 func (h *Handler) AcceptShare(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -171,6 +171,15 @@ func (h *Handler) AcceptShare(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		httpx.JSON(w, http.StatusCreated, map[string]any{"template": t})
+		return
+	}
+	if kind == "routine" {
+		rt, err := h.Store.AcceptRoutineShare(ctx, userID, id)
+		if err != nil {
+			h.storeError(w, r, err)
+			return
+		}
+		httpx.JSON(w, http.StatusCreated, map[string]any{"routine": rt})
 		return
 	}
 

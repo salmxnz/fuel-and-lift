@@ -19,6 +19,9 @@ import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
 import { kcal, parseDecimal } from "@/lib/format"
 import { targetBody, targetFromParams } from "@/lib/meal-target"
+import { VisibilityBadge, VisibilitySelect } from "@/components/community/visibility-select"
+import { ShopLink } from "@/components/community/shop-link"
+import type { Visibility } from "@/lib/api/types"
 
 export function SavedMealsScreen() {
   const params = useSearchParams()
@@ -38,6 +41,7 @@ export function SavedMealsScreen() {
         backLabel={pickMode ? "Back" : "Back to Me"}
         eyebrow={pickMode ? target.label : "Me"}
         title={pickMode ? "My meals" : "Saved meals"}
+        right={pickMode ? undefined : <ShopLink kind="meal" />}
       />
       <p className="m-0 text-[14px] leading-[1.45] text-muted">
         {pickMode
@@ -79,6 +83,11 @@ export function SavedMealsScreen() {
                     {base.map((i) => i.name).join(", ") || "No items"}
                     {addons.length > 0 ? ` · ${addons.length} add-on${addons.length === 1 ? "" : "s"}` : ""}
                   </span>
+                  {m.visibility !== "private" || m.hidden ? (
+                    <span className="flex">
+                      <VisibilityBadge visibility={m.visibility} hidden={m.hidden} />
+                    </span>
+                  ) : null}
                 </button>
                 {pickMode ? (
                   <button
@@ -124,6 +133,11 @@ export function SavedMealsScreen() {
               saved.setData((prev) => ({ saved_meals: (prev?.saved_meals ?? []).filter((x) => x.id !== id) }))
               setEditing(null)
             }}
+            onVisibility={(id, v) =>
+              saved.setData((prev) => ({
+                saved_meals: (prev?.saved_meals ?? []).map((x) => (x.id === id ? { ...x, visibility: v } : x)),
+              }))
+            }
           />
         ) : null}
       </Sheet>
@@ -234,11 +248,14 @@ function SavedMealForm({
   meal,
   onSaved,
   onDeleted,
+  onVisibility,
 }: {
   meal: SavedMeal | null
   onSaved: (m: SavedMeal, isNew: boolean) => void
   onDeleted: (id: string) => void
+  onVisibility: (id: string, v: Visibility) => void
 }) {
+  const [visibility, setVisibility] = useState<Visibility>(meal?.visibility ?? "private")
   const slots = useApi<MealSlotsResponse>("meal-slots")
   const [name, setName] = useState(meal?.name ?? "")
   const [slotId, setSlotId] = useState<string>(meal?.default_meal_slot_id ?? "")
@@ -287,7 +304,7 @@ function SavedMealForm({
     setBusy("save")
     setError(null)
     try {
-      const body = { name: n, default_meal_slot_id: slotId || null, items: out }
+      const body = { name: n, default_meal_slot_id: slotId || null, items: out, ...(meal ? {} : { visibility }) }
       const res = meal
         ? await api.put<SavedMealResponse>(`saved-meals/${seg(meal.id)}`, body)
         : await api.post<SavedMealResponse>("saved-meals", body)
@@ -400,6 +417,19 @@ function SavedMealForm({
         >
           <PlusIcon size={18} /> Add an item
         </button>
+      </div>
+
+      <div className="rounded-tile bg-white p-3">
+        <VisibilitySelect
+          value={visibility}
+          onChange={(v) => {
+            setVisibility(v)
+            if (meal) onVisibility(meal.id, v)
+          }}
+          path={meal ? `saved-meals/${seg(meal.id)}/visibility` : undefined}
+          hidden={meal?.hidden}
+        />
+        {meal?.copied_from ? <p className="m-0 mt-2 text-[12px] text-muted">Added from {meal.copied_from.name}&apos;s meal.</p> : null}
       </div>
 
       {error ? (

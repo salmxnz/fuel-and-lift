@@ -95,6 +95,10 @@ export type OnboardingRequest = PlanPreviewRequest & {
   display_name: string
   timezone: string
   units: Units
+  /** A preset split key (GET splits); null = their own workouts. */
+  split?: string | null
+  /** The weekdays they train. */
+  gym_days?: Weekday[]
 }
 
 export type OnboardingResponse = { profile: Profile; goal: Goal }
@@ -129,7 +133,7 @@ export type EntryItem = Macros & {
   source: ItemSource
 }
 
-export type EntryOrigin = "saved" | "ai" | "manual" | "search" | "barcode" | "restaurant"
+export type EntryOrigin = "saved" | "ai" | "manual" | "search" | "barcode" | "restaurant" | "shared"
 
 export type Entry = Macros & {
   id: string
@@ -191,7 +195,7 @@ export type SavedMeal = {
   items: SavedMealItem[]
   base: Macros
   last_used_at: string | null
-}
+} & Community
 
 /** Items sent when creating/updating a saved meal: ids are server-assigned. */
 export type SavedMealItemInput = EntryItem & { is_addon: boolean }
@@ -200,6 +204,8 @@ export type SavedMealRequest = {
   name: string
   default_meal_slot_id?: string | null
   items: SavedMealItemInput[]
+  /** Read when creating only; PUT saved-meals/{id}/visibility changes it. */
+  visibility?: Visibility
 }
 
 export type SavedMealsResponse = { saved_meals: SavedMeal[] }
@@ -331,7 +337,7 @@ export type Template = {
   version_id: string
   blocks: TemplateBlock[]
   updated_at: string
-}
+} & Community
 
 export type TemplateVersion = { version: number; version_id: string; created_at: string }
 
@@ -343,7 +349,7 @@ export type TemplateBlockInput = {
   notes: string | null
 }
 
-export type TemplateRequest = { name: string; blocks: TemplateBlockInput[] }
+export type TemplateRequest = { name: string; blocks: TemplateBlockInput[]; visibility?: Visibility }
 
 export type ExercisesResponse = { exercises: Exercise[] }
 export type ExerciseResponse = { exercise: Exercise }
@@ -359,6 +365,46 @@ export type TemplateDetailResponse = { template: Template; versions: TemplateVer
 
 export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"
 export type WeeklyPlan = { days: Record<Weekday, string | null> }
+
+/** A preset week: its workouts cycle over the days you train. */
+export type Split = {
+  key: string
+  name: string
+  description: string
+  min_days: number
+  max_days: number
+  default_days: Weekday[]
+  workouts: { name: string; exercises: string[] }[]
+  /** Indexes into workouts, cycled over the chosen days in week order. */
+  rotation: number[]
+}
+export type SplitsResponse = { splits: Split[] }
+export type ApplySplitResponse = { routine: Routine; days: Record<Weekday, string | null> }
+
+export type RoutineDay = { template_id: string; name: string }
+
+/** A named week of the user's own workouts. */
+export type Routine = {
+  id: string
+  name: string
+  description: string | null
+  /** The split it was made from. */
+  preset: string | null
+  days: Record<Weekday, RoutineDay | null>
+  created_at: string
+  updated_at: string
+  /** Shop detail only. */
+  templates?: Template[]
+} & Community
+export type RoutinesResponse = { routines: Routine[] }
+export type RoutineResponse = { routine: Routine }
+export type RoutineRequest = {
+  name: string
+  description?: string | null
+  /** Read when creating only. */
+  visibility?: Visibility
+  days: Record<Weekday, string | null>
+}
 
 export type SessionSet = {
   id: string
@@ -495,6 +541,28 @@ export type Friend = {
 export type FriendsResponse = { friends: Friend[] }
 export type FriendResponse = { friend: Friend }
 
+/** A meal, template or routine a friend sent, waiting for an answer. */
+export type Share = {
+  id: string
+  kind: "meal" | "template" | "routine"
+  from: { id: string; name: string; avatar_url: string | null }
+  /** Meal split between this many people (sender included); null = shared whole. */
+  split_ways: number | null
+  created_at: string
+  /** The recipient's part (already divided when split). */
+  meal: (Macros & { date: string; name: string; meal_name: string; items: EntryItem[] }) | null
+  template: { name: string; exercises: string[] } | null
+  routine: {
+    name: string
+    description: string | null
+    /** Index into workouts per day. */
+    days: Record<Weekday, number | null>
+    workouts: { name: string; exercises: string[] }[]
+  } | null
+}
+export type SharesResponse = { shares: Share[] }
+export type ShareEntryResponse = { entry: Entry; day: Day; shared_with: number }
+
 export type FeedKind = "workout_finished" | "record" | "weight_milestone" | "streak"
 export type FeedItem = {
   id: string
@@ -528,3 +596,78 @@ export type PushSubscriptionRequest = {
   keys: { p256dh: string; auth: string }
   user_agent?: string
 }
+
+// ---------------------------------------------------------------- Shop (community)
+
+export type Visibility = "private" | "friends" | "public"
+export type Person = { id: string; name: string; avatar_url: string | null }
+
+/** How an item shows up to other people. */
+export type Community = {
+  visibility: Visibility
+  /** First time it left private. */
+  published_at: string | null
+  /** People who added it (once each). */
+  add_count: number
+  /** A moderator removed it from the Shop; only the owner still sees it. */
+  hidden: boolean
+  /** Added from this person's item. */
+  copied_from: Person | null
+}
+export type VisibilityResponse = { visibility: Visibility; published_at: string | null; hidden: boolean }
+
+export type ShopKind = "routine" | "template" | "meal"
+export type ShopSort = "new" | "popular"
+
+export type ShopItem = {
+  kind: ShopKind
+  id: string
+  name: string
+  creator: Person
+  visibility: Visibility
+  add_count: number
+  published_at: string | null
+  /** The viewer added it before. */
+  added: boolean
+  mine: boolean
+  hidden: boolean
+  /** template: exercises; meal: items; routine: its workouts. */
+  names: string[]
+  macros?: Macros
+  days?: Record<Weekday, string | null>
+  description?: string | null
+}
+export type ShopResponse = { items: ShopItem[]; next_offset: number | null }
+export type ShopDetailResponse = {
+  item: ShopItem
+  template?: Template
+  saved_meal?: SavedMeal
+  routine?: Routine
+}
+export type ShopAddResponse = { template?: Template; saved_meal?: SavedMeal; routine?: Routine }
+
+export type ReportReason = "spam" | "offensive" | "unsafe" | "other"
+
+export type PersonViewResponse = {
+  person: Person
+  is_me: boolean
+  is_friend: boolean
+  friends_since: string | null
+  routines: ShopItem[]
+  templates: ShopItem[]
+  meals: ShopItem[]
+}
+
+export type ReportGroup = {
+  kind: ShopKind
+  item_id: string
+  name: string
+  creator: Person
+  visibility: Visibility
+  hidden: boolean
+  count: number
+  reasons: Partial<Record<ReportReason, number>>
+  notes: string[]
+  first_reported_at: string
+}
+export type ReportsResponse = { reports: ReportGroup[] }

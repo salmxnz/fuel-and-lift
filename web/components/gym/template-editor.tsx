@@ -12,8 +12,11 @@ import {
   ChevronUpIcon,
   CloseIcon,
   PlusIcon,
+  ShareIcon,
   TrashIcon,
 } from "@/components/ui/icons"
+import { ShareTemplateSheet } from "@/components/share/share-template-sheet"
+import { VisibilitySelect } from "@/components/community/visibility-select"
 import { api, errorMessage, seg } from "@/lib/api/client"
 import type {
   Cardio,
@@ -393,6 +396,8 @@ function Editor({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [visibility, setVisibility] = useState(template.visibility)
 
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange])
 
@@ -454,7 +459,7 @@ function Editor({
       <PageHeader
         back="/gym"
         backLabel="Back to Gym"
-        eyebrow={`Template · v${template.version}`}
+        eyebrow={`Template · v${template.version}${template.copied_from ? ` · from ${template.copied_from.name}` : ""}`}
         title={
           <label className="block">
             <span className="sr-only">Template name</span>
@@ -469,7 +474,19 @@ function Editor({
             />
           </label>
         }
+        right={
+          <button
+            type="button"
+            aria-label={`Share ${template.name} with a friend`}
+            onClick={() => setShareOpen(true)}
+            className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-white text-ink transition-transform duration-[160ms] ease-out active:scale-[0.97]"
+          >
+            <ShareIcon size={20} />
+          </button>
+        }
       />
+
+      <ShareTemplateSheet template={template} open={shareOpen} unsaved={dirty} onClose={() => setShareOpen(false)} />
 
       {pager}
 
@@ -658,6 +675,16 @@ function Editor({
       >
         <PlusIcon size={18} /> Add exercise
       </button>
+
+      <section aria-label="Sharing" className="rounded-card bg-white p-3.5">
+        <VisibilitySelect
+          value={visibility}
+          onChange={setVisibility}
+          path={`templates/${seg(template.id)}/visibility`}
+          hidden={template.hidden}
+          note="They see your last saved version."
+        />
+      </section>
 
       <Button variant="danger" size="md" onClick={remove} loading={deleting}>
         {confirmDelete ? "Tap again to archive this template" : "Archive template"}

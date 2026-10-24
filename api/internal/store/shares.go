@@ -21,12 +21,22 @@ var ErrNotFriends = errors.New("you can only share with friends")
 // Share is something a friend sent, as the recipient sees it.
 type Share struct {
 	ID        string          `json:"id"`
-	Kind      string          `json:"kind"` // meal | template
+	Kind      string          `json:"kind"` // meal | template | routine
 	From      Person          `json:"from"`
 	SplitWays *int            `json:"split_ways"` // meals split between this many people; null = shared whole
 	CreatedAt time.Time       `json:"created_at"`
 	Meal      *SharedMeal     `json:"meal"`
 	Template  *SharedTemplate `json:"template"`
+	Routine   *SharedRoutine  `json:"routine"`
+}
+
+// SharedRoutine is a routine with a snapshot of each of its workouts.
+type SharedRoutine struct {
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	// Days maps a weekday to an index into Workouts (null = rest).
+	Days     map[string]*int  `json:"days"`
+	Workouts []SharedTemplate `json:"workouts"`
 }
 
 // SharedMeal is the friend's part of a meal: items already scaled when split.
@@ -82,16 +92,19 @@ func checkFriends(ctx context.Context, tx pgx.Tx, userID string, friendIDs []str
 	return nil
 }
 
-func insertShares(ctx context.Context, tx pgx.Tx, from, kind string, entryID, templateID *string, split *int, payload any, to []string) error {
+// shareRef is what a share was made from: one of the three is set.
+type shareRef struct{ entryID, templateID, routineID *string }
+
+func insertShares(ctx context.Context, tx pgx.Tx, from, kind string, ref shareRef, split *int, payload any, to []string) error {
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
 	for _, id := range to {
 		if _, err := tx.Exec(ctx, `
-			insert into shares (from_user, to_user, kind, entry_id, template_id, split_ways, payload)
-			values ($1::uuid, $2::uuid, $3, $4::uuid, $5::uuid, $6, $7) on conflict do nothing`,
-			from, id, kind, entryID, templateID, split, raw); err != nil {
+			insert into shares (from_user, to_user, kind, entry_id, template_id, routine_id, split_ways, payload)
+			values ($1::uuid, $2::uuid, $3, $4::uuid, $5::uuid, $6::uuid, $7, $8) on conflict do nothing`,
+			from, id, kind, ref.entryID, ref.templateID, ref.routineID, split, raw); err != nil {
 			return err
 		}
 	}
@@ -146,7 +159,7 @@ func (s *Store) ShareMeal(ctx context.Context, userID, entryID string, friendIDs
 		}
 		out = e
 		meal := SharedMeal{Date: e.Date, Name: e.Name, MealName: e.MealName, Items: e.Items, Macros: e.Macros}
-		return insertShares(ctx, tx, userID, "meal", &entryID, nil, ways, meal, friendIDs)
+		return insertShares(ctx, tx, userID, "meal", shareRef{entryID: &entryID}, ways, meal, friendIDs)
 	})
 	return out, err
 }
@@ -157,21 +170,75 @@ func (s *Store) ShareTemplate(ctx context.Context, userID, templateID string, fr
 	if err != nil {
 		return t, err
 	}
-	payload := SharedTemplate{Name: t.Name, Exercises: []string{}, Blocks: []sharedBlock{}}
-	for _, b := range t.Blocks {
-		if b.Exercise.ID == "" {
-			continue // an exercise that no longer exists
+	payload := snapshotTemplate(t)
+	err = s.tx(ctx, func(tx pgx.Tx) error {
+		if err := checkFriends(ctx, tx, userID, friendIDs); err != nil {
+			return err
 		}
-		payload.Exercises = append(payload.Exercises, b.Exercise.Name)
-		payload.Blocks = append(payload.Blocks, sharedBlock{Exercise: b.Exercise, Sets: b.Sets, Cardio: b.Cardio, RestSeconds: b.RestSeconds, Notes: b.Notes})
+		return insertShares(ctx, tx, userID, "template", shareRef{templateID: &templateID}, nil, payload, friendIDs)
+	})
+	return t, err
+}
+
+// snapshotRoutine is a routine with each workout snapshotted.
+func (s *Store) snapshotRoutine(ctx context.Context, r Routine) (SharedRoutine, error) {
+	out := SharedRoutine{Name: r.Name, Description: r.Description, Days: map[string]*int{}, Workouts: []SharedTemplate{}}
+	var ids []string
+	for _, d := range Weekdays {
+		if day := r.Days[d]; day != nil {
+			ids = append(ids, day.TemplateID)
+		}
+	}
+	rows, err := s.templateRowsByIDs(ctx, ids)
+	if err != nil {
+		return out, err
+	}
+	tpls, err := s.expand(ctx, rows)
+	if err != nil {
+		return out, err
+	}
+	index := map[string]int{}
+	for _, d := range Weekdays {
+		out.Days[d] = nil
+		day := r.Days[d]
+		if day == nil {
+			continue
+		}
+		i, ok := index[day.TemplateID]
+		if !ok {
+			for _, t := range tpls {
+				if t.ID == day.TemplateID {
+					i = len(out.Workouts)
+					index[t.ID] = i
+					out.Workouts = append(out.Workouts, snapshotTemplate(t))
+					ok = true
+				}
+			}
+		}
+		if ok {
+			out.Days[d] = &i
+		}
+	}
+	return out, nil
+}
+
+// ShareRoutine sends a copy of a routine and its workouts to friends.
+func (s *Store) ShareRoutine(ctx context.Context, userID, routineID string, friendIDs []string) (Routine, error) {
+	r, err := s.GetRoutine(ctx, userID, routineID)
+	if err != nil {
+		return r, err
+	}
+	payload, err := s.snapshotRoutine(ctx, r)
+	if err != nil {
+		return r, err
 	}
 	err = s.tx(ctx, func(tx pgx.Tx) error {
 		if err := checkFriends(ctx, tx, userID, friendIDs); err != nil {
 			return err
 		}
-		return insertShares(ctx, tx, userID, "template", nil, &templateID, nil, payload, friendIDs)
+		return insertShares(ctx, tx, userID, "routine", shareRef{routineID: &routineID}, nil, payload, friendIDs)
 	})
-	return t, err
+	return r, err
 }
 
 const shareCols = `sh.id::text, sh.kind, u.id::text, coalesce(p.display_name, u.name), u.avatar_url, sh.split_ways, sh.created_at, sh.payload`
@@ -196,12 +263,17 @@ func scanShare(r pgx.CollectableRow) (Share, error) {
 		if err := json.Unmarshal(raw, sh.Template); err != nil {
 			return sh, err
 		}
+	case "routine":
+		sh.Routine = &SharedRoutine{}
+		if err := json.Unmarshal(raw, sh.Routine); err != nil {
+			return sh, err
+		}
 	}
 	return sh, nil
 }
 
 // IncomingShares returns what friends sent the user that's still waiting,
-// newest first. kind "" means both kinds. Shares from someone who is no
+// newest first. kind "" means every kind. Shares from someone who is no
 // longer a friend are hidden.
 func (s *Store) IncomingShares(ctx context.Context, userID, kind string) ([]Share, error) {
 	rows, err := s.Pool.Query(ctx, `
@@ -221,6 +293,11 @@ func (s *Store) IncomingShares(ctx context.Context, userID, kind string) ([]Shar
 	for i := range out {
 		if out[i].Template != nil {
 			out[i].Template.Blocks = nil // the list only needs names
+		}
+		if out[i].Routine != nil {
+			for j := range out[i].Routine.Workouts {
+				out[i].Routine.Workouts[j].Blocks = nil
+			}
 		}
 	}
 	return out, err
@@ -298,25 +375,11 @@ func (s *Store) AcceptTemplateShare(ctx context.Context, userID, id string) (Tem
 		if sh.Template == nil {
 			return ErrNotFound
 		}
-		ids := make([]string, 0, len(sh.Template.Blocks))
-		for _, b := range sh.Template.Blocks {
-			ids = append(ids, b.Exercise.ID)
-		}
-		visible, err := exercisesByID(ctx, tx, userID, ids)
+		w, err := copyWorkout(ctx, tx, userID, *sh.Template, sh.From.Name)
 		if err != nil {
 			return err
 		}
-		blocks := make([]BlockInput, 0, len(sh.Template.Blocks))
-		for _, b := range sh.Template.Blocks {
-			exID := b.Exercise.ID
-			if _, ok := visible[exID]; !ok {
-				if exID, err = ownExercise(ctx, tx, userID, b.Exercise); err != nil {
-					return err
-				}
-			}
-			blocks = append(blocks, BlockInput{ExerciseID: exID, Sets: b.Sets, Cardio: b.Cardio, RestSeconds: b.RestSeconds, Notes: b.Notes})
-		}
-		if tplID, err = createTemplate(ctx, tx, userID, sh.Template.Name, blocks); err != nil {
+		if tplID, err = createTemplate(ctx, tx, userID, w.Name, w.Blocks); err != nil {
 			return err
 		}
 		return respond(ctx, tx, id, "accepted")
@@ -325,6 +388,71 @@ func (s *Store) AcceptTemplateShare(ctx context.Context, userID, id string) (Tem
 		return Template{}, err
 	}
 	return s.GetTemplate(ctx, userID, tplID)
+}
+
+// AcceptRoutineShare copies a shared routine and its workouts into the
+// user's account. Their week is left alone until they apply it.
+func (s *Store) AcceptRoutineShare(ctx context.Context, userID, id string) (Routine, error) {
+	var routineID string
+	err := s.tx(ctx, func(tx pgx.Tx) error {
+		sh, err := lockShare(ctx, tx, userID, id)
+		if err != nil {
+			return err
+		}
+		if sh.Routine == nil {
+			return ErrNotFound
+		}
+		seed, err := routineSeedFrom(ctx, tx, userID, *sh.Routine, sh.From.Name)
+		if err != nil {
+			return err
+		}
+		if routineID, err = seedRoutine(ctx, tx, userID, seed); err != nil {
+			return err
+		}
+		return respond(ctx, tx, id, "accepted")
+	})
+	if err != nil {
+		return Routine{}, err
+	}
+	return s.GetRoutine(ctx, userID, routineID)
+}
+
+// routineSeedFrom copies a routine snapshot's workouts into userID's account
+// and maps its days onto them.
+func routineSeedFrom(ctx context.Context, tx pgx.Tx, userID string, r SharedRoutine, fromName string) (RoutineSeed, error) {
+	seed := RoutineSeed{Name: r.Name, Description: r.Description, Days: map[int]int{}, MakeRoutine: true}
+	for _, t := range r.Workouts {
+		w, err := copyWorkout(ctx, tx, userID, t, fromName)
+		if err != nil {
+			return seed, err
+		}
+		seed.Workouts = append(seed.Workouts, w)
+	}
+	for i, d := range Weekdays {
+		if w := r.Days[d]; w != nil && *w >= 0 && *w < len(seed.Workouts) {
+			seed.Days[i] = *w
+		}
+	}
+	return seed, nil
+}
+
+// copyName keeps a shared template's name unless the user already has one
+// called that, then adds the sender's first name: "Lower-1 (Sam)".
+func copyName(ctx context.Context, tx pgx.Tx, userID, name, from string) (string, error) {
+	var taken bool
+	if err := tx.QueryRow(ctx, `select exists(select 1 from templates where user_id = $1::uuid and archived_at is null and lower(name) = lower($2))`,
+		userID, name).Scan(&taken); err != nil || !taken {
+		return name, err
+	}
+	first := strings.Fields(from)
+	if len(first) == 0 {
+		return name, nil
+	}
+	suffix := " (" + first[0] + ")"
+	if r := []rune(name); len(r)+len([]rune(suffix)) > 40 {
+		name = strings.TrimSpace(string(r[:max(0, 40-len([]rune(suffix)))]))
+	}
+	return name + suffix, nil
 }
 
 // ownExercise finds the user's exercise with e's name, or creates it.

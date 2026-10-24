@@ -103,6 +103,25 @@ func exercisesByID(ctx context.Context, q interface {
 	return m, nil
 }
 
+// LibraryExerciseIDs maps shared-library exercise names to their ids. Names
+// not in the library are left out.
+func (s *Store) LibraryExerciseIDs(ctx context.Context, names []string) (map[string]string, error) {
+	rows, err := s.Pool.Query(ctx, `select name, id::text from exercises where owner_id is null and name = any($1)`, names)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var name, id string
+		if err := rows.Scan(&name, &id); err != nil {
+			return nil, err
+		}
+		out[name] = id
+	}
+	return out, rows.Err()
+}
+
 // --- templates -----------------------------------------------------------------
 
 // PlannedSet is one set in a template.
@@ -156,6 +175,8 @@ type Template struct {
 	CurrentVersion int             `json:"current_version"`
 	Blocks         []TemplateBlock `json:"blocks"`
 	UpdatedAt      time.Time       `json:"updated_at"`
+	Community
+	ownerID string
 }
 
 // TemplateVersion is one saved version.
@@ -261,50 +282,83 @@ func newVersion(ctx context.Context, tx pgx.Tx, userID, id, name string, blocks 
 }
 
 type templateRow struct {
-	id, name, versionID string
-	version, current    int
-	updated             time.Time
-	blocks              []storedBlock
+	id, owner, name, versionID string
+	version, current           int
+	updated                    time.Time
+	blocks                     []storedBlock
+	community                  Community
 }
 
-// templateRows loads templates at their current version, or one template at
-// a given version.
+// templateSelect selects templateRows at the version version (SQL).
+func templateSelect(version string) string {
+	return `
+		select t.id::text, t.user_id::text, t.name, v.version, t.current_version, v.id::text, t.updated_at, v.blocks,
+		       t.visibility, t.published_at, t.add_count, t.hidden_at is not null, ` + copiedFromCols + `
+		from templates t join template_versions v on v.template_id = t.id and v.version = ` + version + `
+		` + copiedFromJoin("t")
+}
+
+func scanTemplateRow(r pgx.CollectableRow) (templateRow, error) {
+	var t templateRow
+	var raw []byte
+	var cf copiedFrom
+	if err := r.Scan(&t.id, &t.owner, &t.name, &t.version, &t.current, &t.versionID, &t.updated, &raw,
+		&t.community.Visibility, &t.community.PublishedAt, &t.community.AddCount, &t.community.Hidden,
+		&cf.id, &cf.name, &cf.avatar); err != nil {
+		return t, err
+	}
+	t.community.CopiedFrom = cf.person()
+	return t, json.Unmarshal(raw, &t.blocks)
+}
+
+// templateRows loads the user's templates at their current version, or one
+// of them at a given version.
 func (s *Store) templateRows(ctx context.Context, userID string, id *string, version *int) ([]templateRow, error) {
-	rows, err := s.Pool.Query(ctx, `
-		select t.id::text, t.name, v.version, t.current_version, v.id::text, t.updated_at, v.blocks
-		from templates t join template_versions v on v.template_id = t.id and v.version = coalesce($3::int, t.current_version)
+	rows, err := s.Pool.Query(ctx, templateSelect("coalesce($3::int, t.current_version)")+`
 		where t.user_id = $1::uuid and t.archived_at is null and ($2::uuid is null or t.id = $2::uuid)
 		order by t.name`, userID, id, version)
 	if err != nil {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (templateRow, error) {
-		var t templateRow
-		var raw []byte
-		if err := r.Scan(&t.id, &t.name, &t.version, &t.current, &t.versionID, &t.updated, &raw); err != nil {
-			return t, err
-		}
-		return t, json.Unmarshal(raw, &t.blocks)
-	})
+	return pgx.CollectRows(rows, scanTemplateRow)
 }
 
-func (s *Store) expand(ctx context.Context, userID string, rows []templateRow) ([]Template, error) {
-	var ids []string
-	for _, t := range rows {
-		for _, b := range t.blocks {
-			ids = append(ids, b.ExerciseID)
-		}
-	}
-	ex, err := exercisesByID(ctx, s.Pool, userID, ids)
+// templateRowsByIDs loads templates at their current version whoever owns
+// them: only for callers that already checked the viewer may see them.
+func (s *Store) templateRowsByIDs(ctx context.Context, ids []string) ([]templateRow, error) {
+	rows, err := s.Pool.Query(ctx, templateSelect("t.current_version")+`
+		where t.id = any($1::uuid[]) and t.archived_at is null
+		order by t.name`, ids)
 	if err != nil {
 		return nil, err
 	}
+	return pgx.CollectRows(rows, scanTemplateRow)
+}
+
+// expand resolves each block's exercise as the template's owner sees it, so
+// someone else's custom exercises show up in a shared or public template.
+func (s *Store) expand(ctx context.Context, rows []templateRow) ([]Template, error) {
+	byOwner := map[string][]string{}
+	for _, t := range rows {
+		for _, b := range t.blocks {
+			byOwner[t.owner] = append(byOwner[t.owner], b.ExerciseID)
+		}
+	}
+	ex := map[string]map[string]Exercise{}
+	for owner, ids := range byOwner {
+		m, err := exercisesByID(ctx, s.Pool, owner, ids)
+		if err != nil {
+			return nil, err
+		}
+		ex[owner] = m
+	}
 	out := make([]Template, 0, len(rows))
 	for _, t := range rows {
-		tpl := Template{ID: t.id, Name: t.name, Version: t.version, CurrentVersion: t.current, VersionID: t.versionID, UpdatedAt: t.updated, Blocks: []TemplateBlock{}}
+		tpl := Template{ID: t.id, Name: t.name, Version: t.version, CurrentVersion: t.current, VersionID: t.versionID,
+			UpdatedAt: t.updated, Blocks: []TemplateBlock{}, Community: t.community, ownerID: t.owner}
 		for i, b := range t.blocks {
 			tpl.Blocks = append(tpl.Blocks, TemplateBlock{
-				ID: b.ID, Position: i, Exercise: ex[b.ExerciseID], Sets: b.Sets, Cardio: b.Cardio,
+				ID: b.ID, Position: i, Exercise: ex[t.owner][b.ExerciseID], Sets: b.Sets, Cardio: b.Cardio,
 				RestSeconds: b.RestSeconds, Notes: b.Notes,
 			})
 		}
@@ -319,7 +373,7 @@ func (s *Store) ListTemplates(ctx context.Context, userID string) ([]Template, e
 	if err != nil {
 		return nil, err
 	}
-	return s.expand(ctx, userID, rows)
+	return s.expand(ctx, rows)
 }
 
 // GetTemplate returns one template at its current version.
@@ -336,7 +390,7 @@ func (s *Store) GetTemplateVersion(ctx context.Context, userID, id string, versi
 	if len(rows) == 0 {
 		return Template{}, ErrNotFound
 	}
-	list, err := s.expand(ctx, userID, rows)
+	list, err := s.expand(ctx, rows)
 	if err != nil {
 		return Template{}, err
 	}
@@ -383,7 +437,10 @@ func (s *Store) ArchiveTemplate(ctx context.Context, userID, id string) error {
 		if ct.RowsAffected() == 0 {
 			return ErrNotFound
 		}
-		_, err = tx.Exec(ctx, `delete from weekly_plan where template_id = $1::uuid`, id)
+		if _, err = tx.Exec(ctx, `delete from weekly_plan where template_id = $1::uuid`, id); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `delete from routine_days where template_id = $1::uuid`, id)
 		return err
 	})
 }
