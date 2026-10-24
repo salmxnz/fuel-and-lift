@@ -2,6 +2,7 @@
 
 // The install walkthrough: three drawn frames per platform showing exactly
 // what to tap. Defaults to the visitor's own phone; the toggle switches.
+// Styled for the landing page's pink install band.
 
 import Image from "next/image"
 import { useState, type ReactNode } from "react"
@@ -59,7 +60,7 @@ export function InstallGuide() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex w-fit gap-1 rounded-full bg-night-2 p-1" role="group" aria-label="Phone">
+      <div className="flex w-fit gap-1 rounded-full bg-white/45 p-1" role="group" aria-label="Phone">
         {(["ios", "android"] as const).map((o) => (
           <button
             key={o}
@@ -68,7 +69,7 @@ export function InstallGuide() {
             onClick={() => setChoice(o)}
             className={cn(
               "min-h-[44px] rounded-full px-5 text-[15px] font-bold transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97]",
-              os === o ? "bg-white text-ink" : "text-night-muted hover:text-white"
+              os === o ? "bg-ink text-white" : "text-ink-soft hover:text-ink"
             )}
           >
             {o === "ios" ? "iPhone" : "Android"}
@@ -78,12 +79,12 @@ export function InstallGuide() {
 
       <ol className="m-0 grid list-none gap-4 p-0 md:grid-cols-3">
         {STEPS[os].map((step, i) => (
-          <li key={`${os}-${i}`} className="flex flex-col gap-4">
-            <div aria-hidden="true" className="flex aspect-[5/4] items-center justify-center rounded-[22px] bg-night-2 p-6">
+          <li key={`${os}-${i}`} className="install-step flex flex-col gap-4" style={{ "--i": i } as React.CSSProperties}>
+            <div aria-hidden="true" className="flex aspect-[5/4] items-center justify-center rounded-[22px] bg-white/45 p-6 ring-1 ring-white/70">
               {step.art}
             </div>
-            <p className="m-0 flex gap-3 text-[16px] leading-[1.45] text-night-soft">
-              <span className="text-[16px] font-extrabold text-pink">{i + 1}</span>
+            <p className="m-0 flex gap-3 text-[16px] leading-[1.45] text-ink-soft">
+              <span className="text-[16px] font-extrabold text-protein">{i + 1}</span>
               <span>{step.text}</span>
             </p>
           </li>
@@ -96,7 +97,7 @@ export function InstallGuide() {
 /* ------------------------------------------------------------ Drawn UI */
 
 function Highlight({ children, className }: { children: ReactNode; className?: string }) {
-  return <span className={cn("flex items-center justify-center rounded-full bg-pink text-ink shadow-[0_0_0_5px_rgba(246,184,202,0.35)]", className)}>{children}</span>
+  return <span className={cn("flex items-center justify-center rounded-full bg-pink text-ink shadow-[0_0_0_5px_rgba(168,47,97,0.18)] install-ping", className)}>{children}</span>
 }
 
 function SafariBar() {
@@ -133,7 +134,7 @@ function Menu({ rows, pick, plus }: { rows: string[]; pick: number; plus?: boole
           className={cn(
             "flex items-center justify-between px-4 py-2.5",
             i > 0 && "border-t border-line-soft",
-            i === pick ? "bg-pink font-bold" : "text-muted"
+            i === pick ? "bg-pink font-bold install-ping-row" : "text-muted"
           )}
         >
           {r}
@@ -154,13 +155,13 @@ function HomeScreen() {
       {Array.from({ length: 8 }, (_, i) =>
         i === 5 ? (
           <span key={i} className="flex flex-col items-center gap-1">
-            <Image src="/icons/icon-192.png" alt="" width={192} height={192} className="aspect-square w-full rounded-[22%] shadow-[0_0_0_4px_rgba(246,184,202,0.45)]" />
-            <span className="text-[10px] font-semibold leading-none text-white">adebite</span>
+            <Image src="/icons/icon-192.png" alt="" width={192} height={192} className="install-icon aspect-square w-full rounded-[22%] shadow-[0_0_0_4px_rgba(255,255,255,0.7)]" />
+            <span className="text-[10px] font-semibold leading-none text-ink">adebite</span>
           </span>
         ) : (
           <span key={i} className="flex flex-col items-center gap-1">
-            <span className="aspect-square w-full rounded-[22%] bg-white/12" />
-            <span className="h-[6px] w-3/4 rounded-full bg-white/10" />
+            <span className="aspect-square w-full rounded-[22%] bg-white/60" />
+            <span className="h-[6px] w-3/4 rounded-full bg-white/50" />
           </span>
         )
       )}

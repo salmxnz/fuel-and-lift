@@ -1,7 +1,7 @@
 // The adebite logo, drawn from docs/brand/logo (bitten "a" + geometric
 // wordmark). Regenerate the paths from there if the mark ever changes.
 
-const SYMBOL =
+export const SYMBOL =
   "M123.85 38.1A28 28 0 0 1 86.13 63.93A28 28 0 0 1 48.07 89.23A88 88 0 0 0 168 204.38L168 212L216 212L216 40L168 40L168 47.62A88 88 0 0 0 123.85 38.1ZM167.95 127.96A40 40 0 1 1 88.05 124.04A40 40 0 1 1 167.95 127.96Z"
 
 const WORDMARK =
