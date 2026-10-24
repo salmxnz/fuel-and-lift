@@ -8,7 +8,7 @@ import { Button, Field, PageHeader, Spinner, TextInput } from "@/components/ui/p
 import { BarcodeIcon } from "@/components/ui/icons"
 import { ApiError, api, errorMessage, seg } from "@/lib/api/client"
 import type { EntryDayResponse, Food, FoodResponse } from "@/lib/api/types"
-import { kcal, num1, parseDecimal } from "@/lib/format"
+import { clip, kcal, num1, parseDecimal } from "@/lib/format"
 import { targetBody, targetFromParams } from "@/lib/meal-target"
 
 // Minimal typing for the Shape Detection API (not in TS's DOM lib yet).
@@ -114,11 +114,11 @@ export function BarcodeScreen() {
     try {
       await api.post<EntryDayResponse>(`days/${seg(target.date)}/entries`, {
         ...targetBody(target),
-        name: food.brand ? `${food.name} (${food.brand})` : food.name,
+        name: clip(food.brand ? `${food.name} (${food.brand})` : food.name, 80),
         origin: "barcode",
         items: [
           {
-            name: food.name,
+            name: clip(food.name, 80),
             grams: Math.round(g),
             kcal: Math.round(food.per_100g.kcal * f),
             protein_g: Math.round(food.per_100g.protein_g * f * 10) / 10,

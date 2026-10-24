@@ -102,14 +102,23 @@ self.addEventListener("push", (event) => {
   }
   const title = typeof payload.title === "string" && payload.title ? payload.title : "adebite"
   const url = typeof payload.url === "string" && payload.url.startsWith("/") ? payload.url : "/today"
+  const tag = typeof payload.tag === "string" ? payload.tag : undefined
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body: typeof payload.body === "string" ? payload.body : "",
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
-      tag: typeof payload.tag === "string" ? payload.tag : undefined,
-      data: { url },
-    })
+    Promise.all([
+      self.registration.showNotification(title, {
+        body: typeof payload.body === "string" ? payload.body : "",
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag,
+        data: { url },
+      }),
+      // An open app shows a friend's share as a popup right away (components/share/share-popup.tsx).
+      tag && tag.startsWith("share-")
+        ? self.clients
+            .matchAll({ type: "window", includeUncontrolled: true })
+            .then((windows) => windows.forEach((w) => w.postMessage({ type: "share" })))
+        : null,
+    ])
   )
 })
 

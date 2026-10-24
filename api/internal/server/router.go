@@ -137,6 +137,7 @@ func NewRouter(h *handlers.Handler) http.Handler {
 
 		// meals and templates shared by friends
 		"GET /v1/shares":              h.ListShares,
+		"GET /v1/shares/history":      h.ListShareHistory,
 		"POST /v1/shares/{id}/accept": h.AcceptShare,
 		"DELETE /v1/shares/{id}":      h.DeclineShare,
 
@@ -155,6 +156,22 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"POST /v1/admin/shop/{kind}/{id}/hide":    h.HideShopItem,
 		"DELETE /v1/admin/shop/{kind}/{id}/hide":  h.HideShopItem,
 		"POST /v1/admin/shop/{kind}/{id}/dismiss": h.DismissReports,
+
+		// users (the admin app)
+		"GET /v1/admin/users":                            h.ListAdminUsers,
+		"GET /v1/admin/users/{id}":                       h.GetAdminUser,
+		"PUT /v1/admin/users/{id}/pro":                   h.GrantPro,
+		"DELETE /v1/admin/users/{id}/pro":                h.RevokePro,
+		"PUT /v1/admin/users/{id}/role":                  h.SetUserRole,
+		"POST /v1/admin/users/{id}/suspend":              h.SuspendUser,
+		"DELETE /v1/admin/users/{id}/suspend":            h.SuspendUser,
+		"GET /v1/admin/users/{id}/saved-meals":           h.AdminUserSavedMeals,
+		"GET /v1/admin/users/{id}/entries":               h.AdminUserEntries,
+		"GET /v1/admin/users/{id}/templates":             h.AdminUserTemplates,
+		"GET /v1/admin/users/{id}/routines":              h.AdminUserRoutines,
+		"GET /v1/admin/users/{id}/sessions":              h.AdminUserSessions,
+		"GET /v1/admin/users/{id}/sessions/{session_id}": h.AdminUserSession,
+		"GET /v1/admin/users/{id}/friends":               h.AdminUserFriends,
 	}
 	for p, f := range admin {
 		mux.HandleFunc(p, secure(auth.RequireAdmin(f)))

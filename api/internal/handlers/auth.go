@@ -96,6 +96,10 @@ func (h *Handler) GoogleSignIn(w http.ResponseWriter, r *http.Request) {
 		Subject: id.Subject, Email: id.Email, Name: id.Name, AvatarURL: id.Picture,
 		MakeAdmin: h.Cfg.IsAdminEmail(id.Email), InviteTokenHash: inviteHash,
 	})
+	if errors.Is(err, store.ErrSuspended) {
+		httpx.ErrorCode(w, http.StatusForbidden, "suspended", "this account is suspended")
+		return
+	}
 	if err != nil {
 		h.storeError(w, r, err)
 		return
@@ -145,6 +149,10 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	u, err := h.Store.GetUser(r.Context(), userID)
 	if err != nil {
 		httpx.Error(w, http.StatusUnauthorized, "session expired, please sign in again")
+		return
+	}
+	if u.SuspendedAt != nil {
+		httpx.ErrorCode(w, http.StatusUnauthorized, "suspended", "this account is suspended")
 		return
 	}
 	access, csrf, err := h.issueTokens(w, r, u)

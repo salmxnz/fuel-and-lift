@@ -21,6 +21,9 @@ function useMounted() {
 }
 
 /** Lock page scroll, trap Tab, close on Escape and restore focus on close. */
+/** Open sheets, oldest first: only the top one answers Escape and Tab. */
+const openStack: object[] = []
+
 function useDialogBehaviour(open: boolean, panel: React.RefObject<HTMLElement | null>, onClose: () => void) {
   const onCloseRef = useRef(onClose)
   useEffect(() => {
@@ -40,7 +43,10 @@ function useDialogBehaviour(open: boolean, panel: React.RefObject<HTMLElement | 
       ;(auto ?? el).focus({ preventScroll: true })
     })
 
+    const me = {}
+    openStack.push(me)
     const onKey = (e: KeyboardEvent) => {
+      if (openStack[openStack.length - 1] !== me) return
       if (e.key === "Escape") {
         e.stopPropagation()
         onCloseRef.current()
@@ -63,6 +69,7 @@ function useDialogBehaviour(open: boolean, panel: React.RefObject<HTMLElement | 
     }
     document.addEventListener("keydown", onKey)
     return () => {
+      openStack.splice(openStack.indexOf(me), 1)
       cancelAnimationFrame(focusFirst)
       document.removeEventListener("keydown", onKey)
       document.body.style.overflow = overflow

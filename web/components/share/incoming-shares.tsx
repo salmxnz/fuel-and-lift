@@ -28,13 +28,13 @@ import { firstName } from "./friend-picker"
 const PART: Record<number, string> = { 2: "half", 3: "third", 4: "quarter" }
 
 /** "Your half", "Your third", "Your 1/5", or "Same meal" when shared whole. */
-function partLabel(ways: number | null): string {
+export function partLabel(ways: number | null): string {
   if (!ways) return "Same meal"
   return `Your ${PART[ways] ?? `1/${ways}`}`
 }
 
 /** "today", "yesterday" or "23 Oct". */
-function dayLabel(date: string): string {
+export function dayLabel(date: string): string {
   const today = todayISO()
   if (date === today) return "today"
   if (date === addDays(today, -1)) return "yesterday"
@@ -193,7 +193,7 @@ export function IncomingMeals({
   )
 }
 
-function AcceptMealSheet({
+export function AcceptMealSheet({
   share,
   slots,
   onClose,

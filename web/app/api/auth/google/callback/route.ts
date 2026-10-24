@@ -70,9 +70,11 @@ export async function GET(request: NextRequest) {
     const reason =
       err?.error?.code === "email_unverified"
         ? "unverified"
-        : res.status === 400 || res.status === 401 || res.status === 403
-          ? "google"
-          : "server"
+        : err?.error?.code === "suspended"
+          ? "suspended"
+          : res.status === 400 || res.status === 401 || res.status === 403
+            ? "google"
+            : "server"
     return fail(request, reason, oauth.invite)
   }
 

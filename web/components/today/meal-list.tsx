@@ -7,8 +7,11 @@ import { api, errorMessage, seg } from "@/lib/api/client"
 import { timeHM } from "@/lib/dates"
 import { kcal } from "@/lib/format"
 import { cn } from "@/lib/cn"
-import { BarcodeIcon, BowlIcon, StoreIcon } from "@/components/ui/icons"
+import { FoodIconTile } from "@/components/food/food-icon"
+import { iconFor } from "@/lib/food-icons"
 import type { FoodSheetTarget } from "@/components/food/add-food-sheet"
+import { Avatar } from "@/components/ui/primitives"
+import { shareSummary } from "@/components/share/friend-picker"
 
 const ORIGIN_NOTE: Partial<Record<Entry["origin"], string>> = {
   ai: "From a photo or description, checked by you",
@@ -146,36 +149,28 @@ function MealCard({
 
 function EntryRow({ entry, onEdit }: { entry: Entry; onEdit: () => void }) {
   const note = ORIGIN_NOTE[entry.origin]
+  const icon = iconFor(entry)
+  // Logged from a photo, menu or barcode, or with a picture: shown on a tile,
+  // with kcal on the right.
   const visual = entry.origin === "ai" || entry.origin === "restaurant" || entry.origin === "barcode"
+  const tile = visual || icon != null
   const description = entry.items
     .map((it) => it.name)
     .filter(Boolean)
     .join(", ")
+  const shared = shareSummary(entry)
   return (
     <button
       type="button"
       onClick={onEdit}
-      aria-label={`${entry.name}, ${kcal(entry.kcal)} kcal. Edit`}
+      aria-label={`${entry.name}, ${kcal(entry.kcal)} kcal${shared ? `. ${shared}` : ""}. Edit`}
       className="flex w-full items-center gap-3 text-left transition-transform duration-[160ms] ease-out active:scale-[0.98]"
     >
-      {visual ? (
-        <span
-          aria-hidden="true"
-          className="flex h-14 w-14 flex-none items-center justify-center rounded-[12px] bg-sand text-sand-ink"
-        >
-          {entry.origin === "restaurant" ? (
-            <StoreIcon size={26} strokeWidth={1.6} />
-          ) : entry.origin === "barcode" ? (
-            <BarcodeIcon size={26} strokeWidth={1.6} />
-          ) : (
-            <BowlIcon size={26} strokeWidth={1.6} />
-          )}
-        </span>
-      ) : null}
+      {tile ? <FoodIconTile icon={icon} origin={entry.origin} /> : null}
       <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
         <span className="flex items-baseline justify-between gap-3">
           <span className="text-[17px] font-bold">{entry.name}</span>
-          {!visual ? (
+          {!tile ? (
             <span className="flex-none text-[17px] font-bold">
               {kcal(entry.kcal)} <span className="text-[13px] font-normal text-muted">kcal</span>
             </span>
@@ -186,13 +181,29 @@ function EntryRow({ entry, onEdit }: { entry: Entry; onEdit: () => void }) {
         ) : description && description !== entry.name ? (
           <span className="line-clamp-2 text-[13px] leading-[1.4] text-muted">{description}</span>
         ) : null}
+        {shared ? <SharedLine entry={entry} text={shared} /> : null}
       </span>
-      {visual ? (
+      {tile ? (
         <span className="flex-none text-[17px] font-bold">
           {kcal(entry.kcal)} <span className="text-[13px] font-normal text-muted">kcal</span>
         </span>
       ) : null}
     </button>
+  )
+}
+
+/** Small overlapping faces of who a meal went to, then the summary line. */
+function SharedLine({ entry, text }: { entry: Entry; text: string }) {
+  const faces = entry.shared_with.slice(0, 3)
+  return (
+    <span aria-hidden="true" className="mt-0.5 flex min-w-0 items-start gap-1.5">
+      <span className="flex flex-none pt-px">
+        {faces.map((f, i) => (
+          <Avatar key={f.id} name={f.name} url={f.avatar_url} size={18} tone="pink" className={cn("ring-2 ring-white", i > 0 && "-ml-1.5")} />
+        ))}
+      </span>
+      <span className="line-clamp-2 text-[13px] leading-[1.4] text-muted">{text}</span>
+    </span>
   )
 }
 

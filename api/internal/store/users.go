@@ -19,13 +19,15 @@ type User struct {
 	ProSource *string    `json:"-"`
 	ProUntil  *time.Time `json:"-"`
 	InvitedBy *string    `json:"-"`
+	// SuspendedAt is set while an admin has suspended the account.
+	SuspendedAt *time.Time `json:"-"`
 }
 
-const userCols = `id::text, email::text, name, avatar_url, role, plan, pro_source, pro_until, invited_by::text`
+const userCols = `id::text, email::text, name, avatar_url, role, plan, pro_source, pro_until, invited_by::text, suspended_at`
 
 func scanUser(row pgx.Row) (User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.AvatarURL, &u.Role, &u.Plan, &u.ProSource, &u.ProUntil, &u.InvitedBy)
+	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.AvatarURL, &u.Role, &u.Plan, &u.ProSource, &u.ProUntil, &u.InvitedBy, &u.SuspendedAt)
 	return u, notFound(err)
 }
 
@@ -51,12 +53,15 @@ type GoogleSignIn struct {
 	InviteTokenHash string
 }
 
+// ErrSuspended is returned when a suspended account tries to sign in.
+var ErrSuspended = errors.New("this account is suspended")
+
 // ErrInviteInvalid is returned for a friend link that is used, revoked or expired.
 var ErrInviteInvalid = errors.New("this invite link has expired or was already used")
 
 // SignInWithGoogle finds or creates the user for a verified Google identity.
 // Anyone can sign up. An existing user is matched by Google subject, else by
-// email. ADMIN_EMAILS get the admin role and Pro (with no end date). A valid
+// email (a suspended account gets ErrSuspended). ADMIN_EMAILS get the admin role and Pro (with no end date). A valid
 // friend link records who invited a new user (referrals) and makes the two
 // people friends; a stale link is ignored rather than blocking sign-in.
 func (s *Store) SignInWithGoogle(ctx context.Context, in GoogleSignIn) (User, bool, error) {
@@ -68,6 +73,9 @@ func (s *Store) SignInWithGoogle(ctx context.Context, in GoogleSignIn) (User, bo
 			in.Subject, in.Email))
 		switch {
 		case err == nil:
+			if u.SuspendedAt != nil {
+				return ErrSuspended
+			}
 			// Existing account: refresh profile fields from Google.
 			role := u.Role
 			if in.MakeAdmin {

@@ -16,6 +16,8 @@ import { ItemsEditor, TotalsRow } from "./items-editor"
 import { CorrectionCard, LogFooter, QuestionsCard, TitleInput } from "./estimate-parts"
 import { PhotoCarousel } from "./photo-carousel"
 import { useEstimate, useLogActions } from "./use-estimate"
+import { IconChooser, useIconChoice } from "./icon-picker"
+import { guessIcon } from "@/lib/food-icons"
 
 const MAX_PHOTOS = 3
 
@@ -25,6 +27,7 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
   const target = useMemo(() => targetFromParams(new URLSearchParams(params.toString())), [params])
   const est = useEstimate(mode)
   const actions = useLogActions({ target, origin: "ai", estimateId: est.estimate?.estimate_id })
+  const pic = useIconChoice(est.estimate?.icon ?? guessIcon(est.title))
   // Up to 3 photos of the meal, then "Estimate" sends them together.
   const [photos, setPhotos] = useState<(PreparedImage & { key: string })[]>([])
   const [focus, setFocus] = useState<string | null>(null)
@@ -288,7 +291,12 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
 
       {hasResult ? (
         <>
-          <TitleInput value={est.title} onChange={est.setTitle} />
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <TitleInput value={est.title} onChange={est.setTitle} />
+            </div>
+            <IconChooser icon={pic.icon} onClick={pic.openPicker} size={48} />
+          </div>
           <QuestionsCard
             questions={est.questions}
             answers={est.answers}
@@ -319,9 +327,10 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
             logging={actions.logging}
             saved={!!actions.savedId}
             disabled={est.status === "refining" || entryItems.length === 0}
-            onSave={() => actions.save(est.title, entryItems)}
-            onLog={() => actions.log(est.title, entryItems)}
+            onSave={() => actions.save(est.title, entryItems, pic.icon)}
+            onLog={() => actions.log(est.title, entryItems, pic.icon)}
           />
+          {pic.sheet}
         </>
       ) : (
         <div className="pb-safe" />

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { Avatar, DashedNote, Skeleton } from "@/components/ui/primitives"
 import { CheckIcon } from "@/components/ui/icons"
-import type { Friend } from "@/lib/api/types"
+import type { Entry, Friend, ShareStatus } from "@/lib/api/types"
 import { cn } from "@/lib/cn"
 
 export function firstName(name: string): string {
@@ -94,4 +94,40 @@ export function joinNames(names: string[]): string {
   if (names.length > 3) return `${names.length} friends`
   if (names.length === 1) return names[0]
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
+}
+
+/** "waiting", "added" or "said no thanks". */
+export const STATUS_LABEL: Record<ShareStatus, string> = {
+  pending: "waiting",
+  accepted: "added",
+  declined: "said no thanks",
+}
+
+/**
+ * Who a meal of yours went to, as one line: "Split with Addy · waiting",
+ * "Split 3 ways with Addy and Sam", "Shared with Addy and Sam". The status shows when everyone gave the same answer.
+ */
+export function shareSummary(entry: Pick<Entry, "shared_with" | "split_ways">): string | null {
+  const list = entry.shared_with ?? []
+  if (list.length === 0) return null
+  const names = joinNames(list.map((f) => firstName(f.name)))
+  // "2 ways" says nothing new when it went to one friend.
+  const ways = entry.split_ways && entry.split_ways > 2 ? `${entry.split_ways} ways ` : ""
+  const head = entry.split_ways ? `Split ${ways}with ${names}` : `Shared with ${names}`
+  const one = list.every((f) => f.status === list[0].status)
+  return one ? `${head} · ${STATUS_LABEL[list[0].status]}` : head
+}
+
+/** A friend's answer as a small pill: waiting, added or said no thanks. */
+export function StatusPill({ status }: { status: ShareStatus }) {
+  return (
+    <span
+      className={cn(
+        "flex-none rounded-full px-2.5 py-[3px] text-[12px] font-semibold",
+        status === "accepted" ? "bg-pink-soft text-ink" : status === "pending" ? "bg-chip text-ink-soft" : "bg-line-soft text-muted"
+      )}
+    >
+      {STATUS_LABEL[status]}
+    </span>
+  )
 }

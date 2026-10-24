@@ -148,7 +148,16 @@ export type Entry = Macros & {
   logged_at: string
   /** Kept meal photos, in order. */
   photos: MealPhoto[]
+  /** A food picture key (lib/food-icons.ts), or null. */
+  icon: string | null
+  /** Friends you sent this meal to, oldest first, with their latest answer. */
+  shared_with: EntryShare[]
+  /** Set once split: how many people it was divided between (you included). */
+  split_ways: number | null
 }
+
+export type ShareStatus = "pending" | "accepted" | "declined"
+export type EntryShare = Person & { status: ShareStatus }
 
 /** `url` is a signed link that works for about an hour. */
 export type MealPhoto = { id: string; url: string; position: number; bytes: number; created_at: string }
@@ -195,6 +204,8 @@ export type SavedMeal = {
   items: SavedMealItem[]
   base: Macros
   last_used_at: string | null
+  /** A food picture key (lib/food-icons.ts), or null. */
+  icon: string | null
 } & Community
 
 /** Items sent when creating/updating a saved meal: ids are server-assigned. */
@@ -206,6 +217,8 @@ export type SavedMealRequest = {
   items: SavedMealItemInput[]
   /** Read when creating only; PUT saved-meals/{id}/visibility changes it. */
   visibility?: Visibility
+  /** A food picture key; "none" removes it, left out keeps it. */
+  icon?: string
 }
 
 export type SavedMealsResponse = { saved_meals: SavedMeal[] }
@@ -272,6 +285,8 @@ export type AiUsage = {
 export type MealEstimateResponse = {
   estimate_id: string
   title: string
+  /** The picture the AI chose (lib/food-icons.ts), or null when none fits. */
+  icon: string | null
   items: EstimateItem[]
   questions: EstimateQuestion[]
   totals: Macros
@@ -550,7 +565,7 @@ export type Share = {
   split_ways: number | null
   created_at: string
   /** The recipient's part (already divided when split). */
-  meal: (Macros & { date: string; name: string; meal_name: string; items: EntryItem[] }) | null
+  meal: (Macros & { date: string; name: string; meal_name: string; items: EntryItem[]; icon?: string | null }) | null
   template: { name: string; exercises: string[] } | null
   routine: {
     name: string
@@ -561,6 +576,21 @@ export type Share = {
   } | null
 }
 export type SharesResponse = { shares: Share[] }
+
+/** One line of share history: something a friend sent you, or one send of yours. */
+export type ShareHistoryItem = {
+  id: string
+  kind: Share["kind"]
+  name: string
+  /** Meals: the part each person got. */
+  kcal: number | null
+  split_ways: number | null
+  created_at: string
+  from: Person
+  /** Received: you first, then the others on a split meal. Sent: everyone you sent it to. */
+  recipients: (Person & { status: ShareStatus; responded_at: string | null })[]
+}
+export type ShareHistoryResponse = { items: ShareHistoryItem[] }
 export type ShareEntryResponse = { entry: Entry; day: Day; shared_with: number }
 
 export type FeedKind = "workout_finished" | "record" | "weight_milestone" | "streak"

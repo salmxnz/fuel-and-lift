@@ -7,7 +7,7 @@ import { ShareIcon } from "@/components/ui/icons"
 import { api, errorMessage } from "@/lib/api/client"
 import type { NotificationPrefs, NotificationPrefsResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
-import { currentSubscription, disablePush, enablePush, pushSupport } from "@/lib/push"
+import { currentSubscription, disablePush, enablePush, pushSupport, snoozePushPrompt } from "@/lib/push"
 
 const ROWS: { key: keyof NotificationPrefs; title: string; sub: string }[] = [
   { key: "friend_workouts", title: "When friends work out", sub: "Choose which friends in Friends" },
@@ -59,6 +59,8 @@ export function NotificationsScreen() {
     try {
       if (device === "on") {
         await disablePush()
+        // They chose this: the "Turn on notifications" popup stays away.
+        snoozePushPrompt(true)
         setDevice("off")
         toast.success("Notifications off on this device")
       } else {

@@ -1,6 +1,7 @@
 "use client"
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
+import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
 import { useMe } from "@/components/me-context"
@@ -40,18 +41,28 @@ export function ShareMealSheet({
 function ShareMealForm({ entry, onClose, onDayChange }: { entry: Entry; onClose: () => void; onDayChange: (day: Day) => void }) {
   const me = useMe()
   const friends = useApi<FriendsResponse>("friends")
-  const [mode, setMode] = useState<Mode>("split")
+  // A meal is split once: after that, anyone added gets the same as your part.
+  const split = entry.split_ways
+  const [mode, setMode] = useState<Mode>(split ? "share" : "split")
   const [picked, setPicked] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const reduce = useReducedMotion()
 
-  const list = friends.data?.friends ?? []
+  // Friends it's waiting for or who added it aren't offered again.
+  const already = (entry.shared_with ?? []).filter((f) => f.status !== "declined")
+  const allFriends = friends.data?.friends
+  const offered = allFriends?.filter((f) => !already.some((a) => a.id === f.id))
+  const list = offered ?? []
+  // Every friend already has it: nobody left to pick.
+  const everyone = already.length > 0 && !!allFriends && list.length === 0
   const chosen = picked.map((id) => list.find((f) => f.id === id)).filter((f) => f !== undefined)
   const names = chosen.map((f) => firstName(f.name))
   const ways = mode === "split" ? chosen.length + 1 : 1
   const part = entry.kcal / ways
-  const hint = MODES.find((m) => m.value === mode)!.hint
+  const hint = split
+    ? `Already split ${split} ways. Anyone you add gets the same as your part.`
+    : MODES.find((m) => m.value === mode)!.hint
 
   function toggle(id: string) {
     setError(null)
@@ -91,7 +102,16 @@ function ShareMealForm({ entry, onClose, onDayChange }: { entry: Entry; onClose:
         <h3 id="share-with" className="m-0 text-[13px] font-semibold text-muted">
           Who did you eat with?
         </h3>
-        <FriendPicker friends={friends.data?.friends} loading={friends.loading} selected={picked} onToggle={toggle} />
+        {already.length > 0 ? (
+          <p className="m-0 text-[14px] text-muted">Already with {joinNames(already.map((f) => firstName(f.name)))}</p>
+        ) : null}
+        {everyone ? (
+          <Link href="/friends/add" className="text-[14px] font-semibold text-protein">
+            Add a friend to share it with someone new
+          </Link>
+        ) : (
+          <FriendPicker friends={offered} loading={friends.loading} selected={picked} onToggle={toggle} />
+        )}
       </section>
 
       {list.length > 0 ? (
@@ -99,19 +119,22 @@ function ShareMealForm({ entry, onClose, onDayChange }: { entry: Entry; onClose:
           <div role="radiogroup" aria-label="How to share" className="grid grid-cols-2 rounded-full bg-chip p-[3px]">
             {MODES.map((m) => {
               const on = mode === m.value
+              const locked = !!split && m.value === "split"
               return (
                 <button
                   key={m.value}
                   type="button"
                   role="radio"
                   aria-checked={on}
+                  disabled={locked}
                   onClick={() => {
                     setMode(m.value)
                     setError(null)
                   }}
                   className={cn(
                     "relative min-h-[40px] rounded-full text-[14px] transition-[color,transform] duration-[160ms] ease-out active:scale-[0.97]",
-                    on ? "font-bold text-white" : "font-semibold text-ink-soft"
+                    on ? "font-bold text-white" : "font-semibold text-ink-soft",
+                    locked && "opacity-40"
                   )}
                 >
                   {on ? (
@@ -184,15 +207,17 @@ function ShareMealForm({ entry, onClose, onDayChange }: { entry: Entry; onClose:
         </p>
       ) : null}
 
-      <Button onClick={send} loading={busy} disabled={chosen.length === 0 || busy}>
-        {chosen.length === 0
-          ? "Pick who you ate with"
-          : mode === "split"
-            ? chosen.length === 1
-              ? `Split with ${names[0]}`
-              : `Split ${chosen.length + 1} ways`
-            : `Send to ${joinNames(names)}`}
-      </Button>
+      {everyone ? null : (
+        <Button onClick={send} loading={busy} disabled={chosen.length === 0 || busy}>
+          {chosen.length === 0
+            ? "Pick who you ate with"
+            : mode === "split"
+              ? chosen.length === 1
+                ? `Split with ${names[0]}`
+                : `Split ${chosen.length + 1} ways`
+              : `Send to ${joinNames(names)}`}
+        </Button>
+      )}
     </div>
   )
 }

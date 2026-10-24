@@ -104,14 +104,31 @@ func (h *Handler) signPhoto(p *store.MealPhoto) {
 	}
 }
 
-// withPhotos fills in the photos (with signed links) of a day's entries.
-func (h *Handler) withPhotos(ctx context.Context, userID string, entries ...*store.Entry) {
+// withExtras fills in what entries carry beyond their row: who each was
+// shared with (and how many ways it was split) and its photos, with signed links.
+func (h *Handler) withExtras(ctx context.Context, userID string, entries ...*store.Entry) {
 	ids := make([]string, 0, len(entries))
 	for _, e := range entries {
 		e.Photos = []store.MealPhoto{}
+		e.SharedWith = []store.EntryShare{}
 		ids = append(ids, e.ID)
 	}
-	if h.Photos == nil || len(ids) == 0 {
+	if len(ids) == 0 {
+		return
+	}
+	if shared, ways, err := h.Store.SharesForEntries(ctx, userID, ids); err != nil {
+		h.Log.Error("entry shares", "err", err)
+	} else {
+		for _, e := range entries {
+			if list := shared[e.ID]; list != nil {
+				e.SharedWith = list
+			}
+			if n, ok := ways[e.ID]; ok {
+				e.SplitWays = &n
+			}
+		}
+	}
+	if h.Photos == nil {
 		return
 	}
 	byEntry, err := h.Store.PhotosForEntries(ctx, userID, ids)

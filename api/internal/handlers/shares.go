@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/salmxnz/fuel-and-lift/api/internal/auth"
 	"github.com/salmxnz/fuel-and-lift/api/internal/httpx"
@@ -72,7 +73,7 @@ func (h *Handler) ShareEntry(w http.ResponseWriter, r *http.Request) {
 		h.shareError(w, r, err)
 		return
 	}
-	h.withPhotos(ctx, userID, &e)
+	h.withExtras(ctx, userID, &e)
 	day, err := h.day(ctx, userID, e.Date)
 	if err != nil {
 		h.storeError(w, r, err)
@@ -139,6 +140,36 @@ func (h *Handler) ListShares(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"shares": list})
+}
+
+// shareHistoryPage is how many items one page of share history holds.
+const shareHistoryPage = 30
+
+// ListShareHistory handles GET /v1/shares/history?direction=received|sent&before=<RFC 3339 time>.
+func (h *Handler) ListShareHistory(w http.ResponseWriter, r *http.Request) {
+	direction := r.URL.Query().Get("direction")
+	if direction == "" {
+		direction = "received"
+	}
+	if direction != "received" && direction != "sent" {
+		badRequest(w, "direction must be received or sent")
+		return
+	}
+	var before *time.Time
+	if v := r.URL.Query().Get("before"); v != "" {
+		t, err := time.Parse(time.RFC3339Nano, v)
+		if err != nil {
+			badRequest(w, "before must be an RFC 3339 time")
+			return
+		}
+		before = &t
+	}
+	items, err := h.Store.ShareHistory(r.Context(), auth.UserID(r), direction, before, shareHistoryPage)
+	if err != nil {
+		h.storeError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 // AcceptShare handles POST /v1/shares/{id}/accept. A meal takes
@@ -208,7 +239,7 @@ func (h *Handler) AcceptShare(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
-	h.withPhotos(ctx, userID, &e)
+	h.withExtras(ctx, userID, &e)
 	day, err := h.day(ctx, userID, d)
 	if err != nil {
 		h.storeError(w, r, err)

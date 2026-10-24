@@ -14,6 +14,7 @@ const ERRORS: Record<string, string> = {
   server: "Something went wrong signing you in. Please try again.",
   config: "Sign-in isn't set up on this server yet (missing GOOGLE_CLIENT_ID or JWT_SECRET).",
   session: "Your session ended. Sign in again.",
+  suspended: "Your account is suspended. Contact us if you think this is a mistake.",
 }
 
 export default async function LoginPage({

@@ -17,7 +17,8 @@ const SNOOZE_KEY = "fl:install-popup-snoozed"
 const SNOOZE_MS = 14 * 24 * 60 * 60 * 1000
 const EASE_OUT = [0.23, 1, 0.32, 1] as const
 
-function snoozed(): boolean {
+/** The visitor said "Not now" to installing in the last two weeks. */
+export function snoozed(): boolean {
   try {
     const at = Number(localStorage.getItem(SNOOZE_KEY))
     return at > 0 && Date.now() - at < SNOOZE_MS
@@ -31,6 +32,7 @@ export function InstallPopup({
   afterScrollPx,
   bottom = "calc(var(--safe-bottom) + 12px)",
   hidden = false,
+  onShowChange,
 }: {
   delayMs?: number
   /** Also open once the page has scrolled this far. */
@@ -39,6 +41,8 @@ export function InstallPopup({
   bottom?: string
   /** Hold it back while something else owns the screen (the walkthrough). */
   hidden?: boolean
+  /** Told whenever it appears or goes, so other popups can wait their turn. */
+  onShowChange?: (show: boolean) => void
 }) {
   const platform = useInstallPlatform()
   const { canPrompt, justInstalled } = useInstallPrompt()
@@ -75,6 +79,7 @@ export function InstallPopup({
   }
 
   const show = open && eligible && !hidden
+  useEffect(() => onShowChange?.(show), [show, onShowChange])
 
   return (
     <AnimatePresence>

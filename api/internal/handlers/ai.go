@@ -282,6 +282,7 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"estimate_id": id,
 		"title":       res.Estimate.Title,
+		"icon":        nilIfEmpty(res.Estimate.Icon),
 		"items":       res.Estimate.Items,
 		"questions":   res.Estimate.Questions,
 		"totals":      res.Estimate.Totals,
@@ -375,4 +376,12 @@ func (h *Handler) Billing(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Checkout(w http.ResponseWriter, r *http.Request) {
 	httpx.ErrorCode(w, http.StatusNotImplemented, "checkout_unavailable",
 		"paid Pro isn't open yet — invite 8 friends to get Pro free, forever")
+}
+
+// nilIfEmpty turns "" into JSON null.
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

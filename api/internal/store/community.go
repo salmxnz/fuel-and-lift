@@ -365,8 +365,8 @@ func (s *Store) AddToMine(ctx context.Context, viewer, kind, id string) (string,
 			newID, err = s.copyTemplate(ctx, tx, viewer, id, owner, ownerName)
 		case "meal":
 			err = tx.QueryRow(ctx, `
-				insert into saved_meals (user_id, name, items, copied_from_id, copied_from_user)
-				select $1::uuid, name, items, id, user_id from saved_meals where id = $2::uuid returning id::text`, viewer, id).Scan(&newID)
+				insert into saved_meals (user_id, name, items, icon, copied_from_id, copied_from_user)
+				select $1::uuid, name, items, icon, id, user_id from saved_meals where id = $2::uuid returning id::text`, viewer, id).Scan(&newID)
 		case "routine":
 			newID, err = s.copyRoutine(ctx, tx, viewer, id, owner, ownerName)
 		}

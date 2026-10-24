@@ -110,3 +110,28 @@ export async function disablePush(): Promise<void> {
     await sub.unsubscribe().catch(() => undefined)
   }
 }
+
+// The "Turn on notifications" popup (components/pwa/push-popup.tsx): "Not now"
+// hides it for two weeks; turning push off in Settings hides it for good.
+const PROMPT_SNOOZE_KEY = "fl:push-popup-snoozed"
+const PROMPT_SNOOZE_MS = 14 * 24 * 60 * 60 * 1000
+
+export function pushPromptSnoozed(): boolean {
+  try {
+    const raw = localStorage.getItem(PROMPT_SNOOZE_KEY)
+    if (raw === "never") return true
+    const at = Number(raw)
+    return at > 0 && Date.now() - at < PROMPT_SNOOZE_MS
+  } catch {
+    return false
+  }
+}
+
+/** Hide the popup for two weeks, or for good on this device. */
+export function snoozePushPrompt(forGood = false) {
+  try {
+    localStorage.setItem(PROMPT_SNOOZE_KEY, forGood ? "never" : String(Date.now()))
+  } catch {
+    /* private mode: it just comes back next visit */
+  }
+}

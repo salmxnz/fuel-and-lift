@@ -9,6 +9,7 @@ watch weight, calories and lifts trend the right way.
 |---|---|---|
 | API | Go 1.24, stdlib `net/http`, Postgres (pgx), Google sign-in | [`api/`](api) |
 | Web | Next.js PWA (App Router), talks to the API through a small BFF | [`web/`](web) |
+| Admin | Next.js back office: users, plans, what they share, suspensions | [`admin/`](admin) |
 | Docs | API contract, auth flow, designs | [`docs/`](docs) |
 | Emails | React Email templates, exported to Go templates the API embeds | [`emails/`](emails) |
 
@@ -28,13 +29,20 @@ make run                      # migrations run on start
 cd ../web
 cp .env.example .env.local
 npm install && npm run dev
+
+# 4. Admin, optional (http://localhost:3001)
+cd ../admin
+cp .env.example .env.local
+npm install && npm run dev
 ```
 
 New users get two starter templates, Upper-1 and Lower-1, so the Gym tab isn't
 empty. Weights start blank and fill in from the first session.
 
 Google sign-in needs an OAuth client (type *Web application*) with the redirect
-URI `http://localhost:3000/api/auth/google/callback`. See [docs/auth.md](docs/auth.md).
+URI `http://localhost:3000/api/auth/google/callback` (and
+`http://localhost:3001/api/auth/google/callback` for the admin app, whose origin
+also goes in the API's `ALLOWED_ORIGINS`). See [docs/auth.md](docs/auth.md).
 
 ## Who can get in
 

@@ -8,6 +8,9 @@
   errors with `h.storeError`. Error bodies are `{"error": {"message", "code"?}}`.
 - `docs/api.md` is the contract the web app codes against: update it in the same
   change as any endpoint.
+- `admin/` is the back office (Next.js + shadcn, port 3001). It codes against the
+  "Admin" sections of `docs/api.md`, its BFF only forwards `/v1/admin/*` and
+  `auth/me`, and its cookies are `fla_*` so they never clash with the PWA's `fl_*`.
 - DB tests reset the schema: run `go test -p 1 ./...` with `TEST_DATABASE_URL`.
 - Pro rules: free = 10 photo estimates per month; Pro = unlimited; Pro comes
   from admin, 8 referrals (for the inviter only) or a future subscription.

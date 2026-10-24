@@ -46,6 +46,7 @@ type SharedMeal struct {
 	MealName string      `json:"meal_name"`
 	Items    []EntryItem `json:"items"`
 	Macros
+	Icon *string `json:"icon,omitempty"`
 }
 
 // SharedTemplate describes a template; Blocks are kept for the copy.
@@ -95,6 +96,8 @@ func checkFriends(ctx context.Context, tx pgx.Tx, userID string, friendIDs []str
 // shareRef is what a share was made from: one of the three is set.
 type shareRef struct{ entryID, templateID, routineID *string }
 
+// insertShares offers payload to each friend. Sending again while it waits is
+// a no-op, and so is sending a meal to a friend who already added it.
 func insertShares(ctx context.Context, tx pgx.Tx, from, kind string, ref shareRef, split *int, payload any, to []string) error {
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -103,7 +106,9 @@ func insertShares(ctx context.Context, tx pgx.Tx, from, kind string, ref shareRe
 	for _, id := range to {
 		if _, err := tx.Exec(ctx, `
 			insert into shares (from_user, to_user, kind, entry_id, template_id, routine_id, split_ways, payload)
-			values ($1::uuid, $2::uuid, $3, $4::uuid, $5::uuid, $6::uuid, $7, $8) on conflict do nothing`,
+			select $1::uuid, $2::uuid, $3, $4::uuid, $5::uuid, $6::uuid, $7, $8
+			where not exists (select 1 from shares where entry_id = $4::uuid and to_user = $2::uuid and status = 'accepted')
+			on conflict do nothing`,
 			from, id, kind, ref.entryID, ref.templateID, ref.routineID, split, raw); err != nil {
 			return err
 		}
@@ -158,7 +163,7 @@ func (s *Store) ShareMeal(ctx context.Context, userID, entryID string, friendIDs
 			}
 		}
 		out = e
-		meal := SharedMeal{Date: e.Date, Name: e.Name, MealName: e.MealName, Items: e.Items, Macros: e.Macros}
+		meal := SharedMeal{Date: e.Date, Name: e.Name, MealName: e.MealName, Items: e.Items, Macros: e.Macros, Icon: e.Icon}
 		return insertShares(ctx, tx, userID, "meal", shareRef{entryID: &entryID}, ways, meal, friendIDs)
 	})
 	return out, err
@@ -239,6 +244,49 @@ func (s *Store) ShareRoutine(ctx context.Context, userID, routineID string, frie
 		return insertShares(ctx, tx, userID, "routine", shareRef{routineID: &routineID}, nil, payload, friendIDs)
 	})
 	return r, err
+}
+
+// EntryShare is a friend a meal was sent to, with their latest answer:
+// pending, accepted or declined.
+type EntryShare struct {
+	Person
+	Status string `json:"status"`
+}
+
+// SharesForEntries returns who each of the user's entries was sent to (oldest
+// first, the latest answer per friend) and, for split ones, how many ways.
+func (s *Store) SharesForEntries(ctx context.Context, userID string, entryIDs []string) (map[string][]EntryShare, map[string]int, error) {
+	shares, ways := map[string][]EntryShare{}, map[string]int{}
+	if len(entryIDs) == 0 {
+		return shares, ways, nil
+	}
+	rows, err := s.Pool.Query(ctx, `
+		select entry_id, id, name, avatar_url, status, split_ways from (
+			select distinct on (sh.entry_id, sh.to_user)
+				sh.entry_id::text as entry_id, u.id::text as id, coalesce(p.display_name, u.name) as name, u.avatar_url,
+				sh.status, sh.split_ways, sh.created_at
+			from shares sh join users u on u.id = sh.to_user
+			left join profiles p on p.user_id = u.id
+			where sh.from_user = $1::uuid and sh.entry_id = any($2::uuid[])
+			order by sh.entry_id, sh.to_user, sh.created_at desc
+		) latest order by created_at, name`, userID, entryIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var entryID string
+		var sh EntryShare
+		var split *int
+		if err := rows.Scan(&entryID, &sh.ID, &sh.Name, &sh.AvatarURL, &sh.Status, &split); err != nil {
+			return nil, nil, err
+		}
+		shares[entryID] = append(shares[entryID], sh)
+		if split != nil && *split > ways[entryID] {
+			ways[entryID] = *split
+		}
+	}
+	return shares, ways, rows.Err()
 }
 
 const shareCols = `sh.id::text, sh.kind, u.id::text, coalesce(p.display_name, u.name), u.avatar_url, sh.split_ways, sh.created_at, sh.payload`
@@ -352,7 +400,7 @@ func (s *Store) AcceptMealShare(ctx context.Context, userID, id string, d Date, 
 		}
 		out, err = addEntry(ctx, tx, userID, d, NewEntry{
 			MealSlotID: slotID, MealName: mealName, Name: sh.Meal.Name, Origin: "shared",
-			Items: sh.Meal.Items, Macros: sh.Meal.Macros,
+			Items: sh.Meal.Items, Macros: sh.Meal.Macros, Icon: sh.Meal.Icon,
 		})
 		if err != nil {
 			return err
@@ -474,4 +522,82 @@ func (s *Store) DeclineShare(ctx context.Context, userID, id string) error {
 		return ErrNotFound
 	}
 	return err
+}
+
+// ShareHistoryItem is one thing shared, as a line in the user's history:
+// something a friend sent them, or one send of theirs to some friends.
+type ShareHistoryItem struct {
+	ID        string    `json:"id"`
+	Kind      string    `json:"kind"`
+	Name      string    `json:"name"`
+	Kcal      *float64  `json:"kcal"` // meals only: the part each person got
+	SplitWays *int      `json:"split_ways"`
+	CreatedAt time.Time `json:"created_at"`
+	From      Person    `json:"from"`
+	// Recipients is everyone it was sent to. For something sent to the user,
+	// it's them (first) and, on a split meal, the others it was split with.
+	Recipients []ShareRecipient `json:"recipients"`
+}
+
+// ShareRecipient is someone a share went to and what they did with it.
+type ShareRecipient struct {
+	Person
+	Status      string     `json:"status"` // pending | accepted | declined
+	RespondedAt *time.Time `json:"responded_at"`
+}
+
+// recipientJSON builds one ShareRecipient from shares row o joined with users u
+// and profiles p.
+const recipientJSON = `json_build_object('id', u.id::text, 'name', coalesce(p.display_name, u.name), 'avatar_url', u.avatar_url,
+	'status', o.status, 'responded_at', o.responded_at)`
+
+// ShareHistory lists what was shared with the user ("received") or by them
+// ("sent"), newest first, before a time. One send to several friends is one
+// item: they're inserted in one transaction, so they share created_at.
+func (s *Store) ShareHistory(ctx context.Context, userID, direction string, before *time.Time, limit int) ([]ShareHistoryItem, error) {
+	var q string
+	if direction == "sent" {
+		q = `
+		select min(o.id::text), o.kind, coalesce(o.payload->>'name', ''), (o.payload->>'kcal')::float8, o.split_ways, o.created_at,
+			fu.id::text, coalesce(fp.display_name, fu.name), fu.avatar_url,
+			json_agg(` + recipientJSON + ` order by coalesce(p.display_name, u.name))
+		from shares o join users u on u.id = o.to_user left join profiles p on p.user_id = u.id
+		join users fu on fu.id = o.from_user left join profiles fp on fp.user_id = fu.id
+		where o.from_user = $1::uuid and ($2::timestamptz is null or o.created_at < $2)
+		group by o.kind, coalesce(o.entry_id, o.template_id, o.routine_id), o.created_at, o.split_ways,
+			o.payload->>'name', o.payload->>'kcal', fu.id, fp.display_name, fu.name, fu.avatar_url
+		order by o.created_at desc limit $3`
+	} else {
+		q = `
+		select sh.id::text, sh.kind, coalesce(sh.payload->>'name', ''), (sh.payload->>'kcal')::float8, sh.split_ways, sh.created_at,
+			fu.id::text, coalesce(fp.display_name, fu.name), fu.avatar_url,
+			(select json_agg(` + recipientJSON + ` order by o.id <> sh.id, coalesce(p.display_name, u.name))
+			 from shares o join users u on u.id = o.to_user left join profiles p on p.user_id = u.id
+			 where o.id = sh.id or (sh.split_ways is not null and o.from_user = sh.from_user
+			   and o.entry_id = sh.entry_id and o.created_at = sh.created_at))
+		from shares sh join users fu on fu.id = sh.from_user left join profiles fp on fp.user_id = fu.id
+		where sh.to_user = $1::uuid and ($2::timestamptz is null or sh.created_at < $2)
+		order by sh.created_at desc limit $3`
+	}
+	rows, err := s.Pool.Query(ctx, q, userID, before, limit)
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (ShareHistoryItem, error) {
+		var it ShareHistoryItem
+		var raw []byte
+		err := r.Scan(&it.ID, &it.Kind, &it.Name, &it.Kcal, &it.SplitWays, &it.CreatedAt,
+			&it.From.ID, &it.From.Name, &it.From.AvatarURL, &raw)
+		if err != nil {
+			return it, err
+		}
+		if it.Kind != "meal" {
+			it.Kcal = nil
+		}
+		return it, json.Unmarshal(raw, &it.Recipients)
+	})
+	if out == nil {
+		out = []ShareHistoryItem{}
+	}
+	return out, err
 }

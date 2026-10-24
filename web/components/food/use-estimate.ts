@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { useCallback, useRef, useState } from "react"
 import { toast } from "sonner"
 import { ApiError, api, errorMessage, seg } from "@/lib/api/client"
+import { clip } from "@/lib/format"
 import type {
   EntryDayResponse,
   EntryItem,
@@ -239,7 +240,8 @@ export function useLogActions({
   const [savedId, setSavedId] = useState<string | null>(null)
 
   const log = useCallback(
-    async (name: string, items: EntryItem[]) => {
+    /** icon: a food picture key, or null for none. */
+    async (name: string, items: EntryItem[], icon?: string | null) => {
       if (items.length === 0) {
         toast.error("Add at least one item first.")
         return
@@ -248,10 +250,11 @@ export function useLogActions({
       try {
         const res = await api.post<EntryDayResponse>(`days/${seg(target.date)}/entries`, {
           ...targetBody(target),
-          name: name.trim() || items[0].name,
+          name: clip(name.trim() || items[0].name, 80),
           origin,
           ...(estimateId ? { ai_estimate_id: estimateId } : {}),
-          items,
+          items: fitItems(items),
+          ...(icon !== undefined ? { icon: icon ?? "none" } : {}),
         })
         const skipped = res.photos_skipped ?? 0
         if (skipped > 0) {
@@ -272,7 +275,7 @@ export function useLogActions({
   )
 
   const save = useCallback(
-    async (name: string, items: EntryItem[]) => {
+    async (name: string, items: EntryItem[], icon?: string | null) => {
       if (items.length === 0) {
         toast.error("Add at least one item first.")
         return
@@ -280,9 +283,10 @@ export function useLogActions({
       setSaving(true)
       try {
         const res = await api.post<SavedMealResponse>("saved-meals", {
-          name: name.trim() || items[0].name,
+          name: clip(name.trim() || items[0].name, 60),
           default_meal_slot_id: target.mealSlotId,
-          items: items.map((it) => ({ ...it, is_addon: false })),
+          items: fitItems(items).map((it) => ({ ...it, is_addon: false })),
+          ...(icon ? { icon } : {}),
         })
         setSavedId(res.saved_meal.id)
         toast.success(`Saved “${res.saved_meal.name}” to My meals`)
@@ -299,3 +303,8 @@ export function useLogActions({
 }
 
 export { toEntryItems }
+
+/** Items as the API accepts them: every one named, no name over 80 characters. */
+function fitItems(items: EntryItem[]): EntryItem[] {
+  return items.map((it, i) => ({ ...it, name: clip(it.name, 80) || `Item ${i + 1}` }))
+}

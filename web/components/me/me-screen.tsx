@@ -116,6 +116,7 @@ export function MeScreen() {
         <Row href="/friends" icon={<FriendsIcon size={20} />} title="Friends" sub="Their workouts and streaks" tour="friends-row" />
         <Row href="/friends/add" icon={<PlusIcon size={20} />} title="Add a friend" sub="Send them a link" tour="add-friend" />
         <Row href="/sharing" icon={<ShareIcon size={20} />} title="Sharing" sub={sharingSummary(sharing.data?.sharing)} />
+        <Row href="/shared" icon={<ShareIcon size={20} />} title="Shared" sub="What friends sent you and what you sent" />
         <Row href={`/people/${me.user.id}`} icon={<GlobeIcon size={20} />} title="Your profile" sub="What friends and the Shop see" />
         <Row href="/shop" icon={<ShopIcon size={20} />} title="Shop" sub="Routines, workouts and meals people share" />
         <Row href="/meals" icon={<ListIcon size={20} />} title="My meals" sub="Breakfast, lunch and the rest" />

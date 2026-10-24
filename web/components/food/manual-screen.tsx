@@ -9,6 +9,8 @@ import { api, errorMessage, seg } from "@/lib/api/client"
 import type { EntryDayResponse } from "@/lib/api/types"
 import { parseDecimal } from "@/lib/format"
 import { targetBody, targetFromParams } from "@/lib/meal-target"
+import { guessIcon } from "@/lib/food-icons"
+import { IconChooser, useIconChoice } from "./icon-picker"
 
 /** Enter it manually: name + kcal + protein / carbs / fat. */
 export function ManualScreen() {
@@ -18,6 +20,7 @@ export function ManualScreen() {
   const [form, setForm] = useState({ name: "", kcal: "", protein: "", carbs: "", fat: "" })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const { icon, openPicker, sheet } = useIconChoice(guessIcon(form.name))
 
   function set<K extends keyof typeof form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }))
@@ -46,6 +49,7 @@ export function ManualScreen() {
         protein_g: parseDecimal(form.protein) ?? 0,
         carbs_g: parseDecimal(form.carbs) ?? 0,
         fat_g: parseDecimal(form.fat) ?? 0,
+        icon: icon ?? "none",
       })
       toast.success(`Logged to ${target.label}`)
       router.push(`/today?date=${target.date}`)
@@ -59,17 +63,24 @@ export function ManualScreen() {
     <main className="app-column pb-safe flex min-h-dvh flex-col gap-4">
       <PageHeader back="history" eyebrow={target.label} title="Enter it manually" titleClassName="text-[20px]" />
       <form onSubmit={submit} noValidate className="flex flex-col gap-3.5">
-        <Field label="What was it?" htmlFor="m-name" hint={errors.name ? <Err>{errors.name}</Err> : undefined}>
-          <TextInput
-            id="m-name"
-            autoFocus
-            value={form.name}
-            maxLength={80}
-            placeholder="Protein bar"
-            aria-invalid={!!errors.name}
-            onChange={(e) => set("name", e.target.value)}
-          />
-        </Field>
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <Field label="What was it?" htmlFor="m-name" hint={errors.name ? <Err>{errors.name}</Err> : undefined}>
+              <TextInput
+                id="m-name"
+                autoFocus
+                value={form.name}
+                maxLength={80}
+                placeholder="Protein bar"
+                aria-invalid={!!errors.name}
+                onChange={(e) => set("name", e.target.value)}
+              />
+            </Field>
+          </div>
+          <div className="pt-[22px]">
+            <IconChooser icon={icon} onClick={openPicker} size={48} />
+          </div>
+        </div>
         <Field label="Calories (kcal)" htmlFor="m-kcal" hint={errors.kcal ? <Err>{errors.kcal}</Err> : undefined}>
           <TextInput
             id="m-kcal"
@@ -105,6 +116,7 @@ export function ManualScreen() {
           Log {target.label.toLowerCase()}
         </Button>
       </form>
+      {sheet}
     </main>
   )
 }

@@ -11,6 +11,8 @@ import (
 	"math"
 	"strings"
 	"time"
+
+	"github.com/salmxnz/fuel-and-lift/api/internal/foodicon"
 )
 
 // Image is a base64 encoded photo.
@@ -72,6 +74,7 @@ type Totals struct {
 // Estimate is the model's answer, normalised.
 type Estimate struct {
 	Title     string     `json:"title"`
+	Icon      string     `json:"icon"` // a foodicon key, or "" when none fits
 	Items     []Item     `json:"items"`
 	Questions []Question `json:"questions"`
 	Totals    Totals     `json:"totals"`
@@ -157,7 +160,8 @@ func Normalise(e *Estimate) error {
 	r1 := func(v float64) float64 { return math.Round(v*10) / 10 }
 	var items []Item
 	for _, it := range e.Items {
-		it.Name = strings.TrimSpace(it.Name)
+		// Item names are limited to 80 characters when logged or saved.
+		it.Name = Clip(it.Name, 80)
 		if it.Name == "" {
 			continue
 		}
@@ -210,20 +214,43 @@ func Normalise(e *Estimate) error {
 		qs = []Question{}
 	}
 	e.Questions = qs
-	e.Title = strings.TrimSpace(e.Title)
+	// The title becomes the entry or saved meal name (saved meals allow 60).
+	e.Title = Clip(e.Title, 60)
 	if e.Title == "" {
-		e.Title = items[0].Name
+		e.Title = Clip(items[0].Name, 60)
+	}
+	if e.Icon = strings.TrimSpace(e.Icon); !foodicon.Valid(e.Icon) {
+		e.Icon = ""
 	}
 	return nil
+}
+
+// Clip trims s and shortens it to at most max characters, at a word
+// boundary when there's one in the last third.
+func Clip(s string, max int) string {
+	s = strings.TrimSpace(s)
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	cut := string(r[:max])
+	if i := strings.LastIndexAny(cut, " ,;(/-"); i >= len(cut)*2/3 {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(strings.TrimSpace(cut), ",;(/-")
 }
 
 // Schema is the JSON schema every provider is asked to fill.
 var Schema = map[string]any{
 	"type":                 "object",
 	"additionalProperties": false,
-	"required":             []string{"title", "items", "questions"},
+	"required":             []string{"title", "icon", "items", "questions"},
 	"properties": map[string]any{
 		"title": map[string]any{"type": "string", "description": "Short name for the whole meal, e.g. \"Fish curry with rice\""},
+		"icon": map[string]any{
+			"type": "string", "enum": foodicon.Choices(),
+			"description": "The one picture that best shows the whole meal, or \"none\" when nothing is close",
+		},
 		"items": map[string]any{
 			"type": "array",
 			"items": map[string]any{
@@ -288,6 +315,7 @@ Rules:
 - Local dishes (for example Mauritian rice and curry, dholl puri, farata) are common; estimate them like any home-cooked dish.
 - When given a previous estimate and the user's answers, return the full revised estimate and only ask questions that are still open.
 - When the user corrects the estimate, renames the dish or edits items, treat that as fact: keep their name as the title, keep items they edited unless their correction says otherwise, and recompute anything the correction changes (for example "cooked in oil only, no butter" removes the butter item and sizes the oil).
+- "icon" is the one picture that best shows the whole meal, judged by its main food: a curry with rice is "rice_bowl", fried chicken is "chicken", a cola is "soda". Use "none" when no picture is close.
 - Respond only with JSON matching the schema.
 ` + tone
 }

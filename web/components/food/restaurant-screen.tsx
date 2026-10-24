@@ -13,6 +13,8 @@ import { targetFromParams } from "@/lib/meal-target"
 import { ItemsEditor } from "./items-editor"
 import { LogFooter, QuestionsCard } from "./estimate-parts"
 import { useEstimate, useLogActions } from "./use-estimate"
+import { IconChooser, useIconChoice } from "./icon-picker"
+import { guessIcon } from "@/lib/food-icons"
 
 const CHAINS = ["McDonald's", "KFC"] as const
 type ChainChoice = (typeof CHAINS)[number] | "mine" | null
@@ -26,6 +28,7 @@ export function RestaurantScreen() {
   const [chain, setChain] = useState<ChainChoice>(null)
   const [query, setQuery] = useState("")
   const actions = useLogActions({ target, origin: "restaurant", estimateId: est.estimate?.estimate_id })
+  const pic = useIconChoice(est.estimate?.icon ?? guessIcon(est.title))
 
   // "Your places": your own foods and the shared chain items.
   const foods = useApi<FoodsResponse>(chain === "mine" ? `foods?q=${encodeURIComponent(query)}` : null)
@@ -161,18 +164,21 @@ export function RestaurantScreen() {
       {ready && est.status !== "loading" ? (
         <>
           <article aria-label={est.title || "Your meal"} className="flex flex-col overflow-hidden rounded-[20px] bg-white">
-            <div className="flex flex-col gap-0.5 bg-ink px-4 py-3.5 text-white">
-              <span className="text-[12px] text-night-muted">{chain && chain !== "mine" ? chain : "Restaurant"}</span>
-              <label>
-                <span className="sr-only">Meal name</span>
-                <input
-                  value={est.title}
-                  onChange={(e) => est.setTitle(e.target.value)}
-                  placeholder="Name this meal"
-                  maxLength={80}
-                  className="w-full bg-transparent text-[20px] font-extrabold tracking-[-0.01em] text-white outline-none placeholder:text-night-muted"
-                />
-              </label>
+            <div className="flex items-center gap-3 bg-ink px-4 py-3.5 text-white">
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-[12px] text-night-muted">{chain && chain !== "mine" ? chain : "Restaurant"}</span>
+                <label>
+                  <span className="sr-only">Meal name</span>
+                  <input
+                    value={est.title}
+                    onChange={(e) => est.setTitle(e.target.value)}
+                    placeholder="Name this meal"
+                    maxLength={80}
+                    className="w-full bg-transparent text-[20px] font-extrabold tracking-[-0.01em] text-white outline-none placeholder:text-night-muted"
+                  />
+                </label>
+              </div>
+              <IconChooser icon={pic.icon} onClick={pic.openPicker} size={44} />
             </div>
             {est.questions.length > 0 ? (
               <div className="border-b border-line-soft">
@@ -210,9 +216,10 @@ export function RestaurantScreen() {
             logging={actions.logging}
             saved={!!actions.savedId}
             disabled={est.status === "refining" || entryItems.length === 0}
-            onSave={() => actions.save(est.title, entryItems)}
-            onLog={() => actions.log(est.title, entryItems)}
+            onSave={() => actions.save(est.title, entryItems, pic.icon)}
+            onLog={() => actions.log(est.title, entryItems, pic.icon)}
           />
+          {pic.sheet}
         </>
       ) : (
         <div className="pb-safe" />

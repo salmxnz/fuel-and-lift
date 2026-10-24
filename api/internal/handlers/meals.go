@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/salmxnz/fuel-and-lift/api/internal/auth"
+	"github.com/salmxnz/fuel-and-lift/api/internal/foodicon"
 	"github.com/salmxnz/fuel-and-lift/api/internal/httpx"
 	"github.com/salmxnz/fuel-and-lift/api/internal/store"
 )
@@ -145,7 +146,7 @@ func (h *Handler) target(ctx context.Context, userID string) store.Macros {
 func (h *Handler) day(ctx context.Context, userID string, d store.Date) (store.Day, error) {
 	day, err := h.Store.GetDay(ctx, userID, d, h.target(ctx, userID))
 	if err == nil {
-		h.withPhotos(ctx, userID, dayEntries(&day)...)
+		h.withExtras(ctx, userID, dayEntries(&day)...)
 	}
 	return day, err
 }
@@ -197,7 +198,33 @@ func checkItems(items []store.EntryItem) ([]store.EntryItem, string) {
 	return out, ""
 }
 
+// checkIcon reads an optional food icon: nil stays nil (unchanged), "none"
+// or "" becomes "" (no icon), a known key stays. Anything else writes a 400.
+func checkIcon(w http.ResponseWriter, icon *string) (*string, bool) {
+	if icon == nil {
+		return nil, true
+	}
+	k := strings.TrimSpace(*icon)
+	if k == "" || k == foodicon.None {
+		k = ""
+	} else if !foodicon.Valid(k) {
+		badRequest(w, "icon is not one we know")
+		return nil, false
+	}
+	return &k, true
+}
+
+// newIcon is checkIcon for something new: no icon is nil.
+func newIcon(w http.ResponseWriter, icon *string) (*string, bool) {
+	k, ok := checkIcon(w, icon)
+	if k != nil && *k == "" {
+		k = nil
+	}
+	return k, ok
+}
+
 type entryBody struct {
+	Icon         *string           `json:"icon"`
 	MealSlotID   *string           `json:"meal_slot_id"`
 	MealName     *string           `json:"meal_name"`
 	Name         string            `json:"name"`
@@ -257,10 +284,14 @@ func (h *Handler) AddEntry(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "kcal and macros must be positive")
 		return
 	}
+	icon, ok := newIcon(w, in.Icon)
+	if !ok {
+		return
+	}
 	userID := auth.UserID(r)
 	e, err := h.Store.AddEntry(r.Context(), userID, d, store.NewEntry{
 		MealSlotID: in.MealSlotID, MealName: in.MealName, Name: name, Origin: in.Origin,
-		AIEstimateID: in.AIEstimateID, Items: items, Macros: m,
+		AIEstimateID: in.AIEstimateID, Items: items, Macros: m, Icon: icon,
 	})
 	if err != nil {
 		h.storeError(w, r, err)
@@ -270,7 +301,7 @@ func (h *Handler) AddEntry(w http.ResponseWriter, r *http.Request) {
 	if in.AIEstimateID != nil {
 		skipped = h.attachPhotos(context.WithoutCancel(r.Context()), userID, *in.AIEstimateID, e.ID)
 	}
-	h.withPhotos(r.Context(), userID, &e)
+	h.withExtras(r.Context(), userID, &e)
 	day, err := h.day(r.Context(), userID, d)
 	if err != nil {
 		h.storeError(w, r, err)
@@ -293,8 +324,13 @@ func (h *Handler) UpdateEntry(w http.ResponseWriter, r *http.Request) {
 		MealSlotID *string            `json:"meal_slot_id"`
 		MealName   *string            `json:"meal_name"`
 		Items      *[]store.EntryItem `json:"items"`
+		Icon       *string            `json:"icon"` // "none" removes it
 	}
 	if !decode(w, r, &in) {
+		return
+	}
+	icon, ok := checkIcon(w, in.Icon)
+	if !ok {
 		return
 	}
 	if in.Name != nil {
@@ -318,12 +354,12 @@ func (h *Handler) UpdateEntry(w http.ResponseWriter, r *http.Request) {
 		in.Items = &items
 	}
 	userID := auth.UserID(r)
-	e, err := h.Store.UpdateEntry(r.Context(), userID, id, store.EntryPatch{Name: in.Name, MealSlotID: in.MealSlotID, MealName: in.MealName, Items: in.Items})
+	e, err := h.Store.UpdateEntry(r.Context(), userID, id, store.EntryPatch{Name: in.Name, MealSlotID: in.MealSlotID, MealName: in.MealName, Items: in.Items, Icon: icon})
 	if err != nil {
 		h.storeError(w, r, err)
 		return
 	}
-	h.withPhotos(r.Context(), userID, &e)
+	h.withExtras(r.Context(), userID, &e)
 	day, err := h.day(r.Context(), userID, e.Date)
 	if err != nil {
 		h.storeError(w, r, err)
@@ -385,8 +421,13 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 			IsAddon bool `json:"is_addon"`
 		} `json:"items"`
 		Visibility *string `json:"visibility"` // creating only; see PUT …/visibility
+		Icon       *string `json:"icon"`       // left out keeps it; "none" removes it
 	}
 	if !decode(w, r, &in) {
+		return
+	}
+	icon, ok := checkIcon(w, in.Icon)
+	if !ok {
 		return
 	}
 	if !validVisibility(w, in.Visibility) {
@@ -422,7 +463,7 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 		}
 		items[i] = store.SavedItem{ID: itemID, EntryItem: it, IsAddon: in.Items[i].IsAddon}
 	}
-	m, err := h.Store.SaveMeal(r.Context(), auth.UserID(r), id, name, in.DefaultMealSlotID, items, in.Visibility)
+	m, err := h.Store.SaveMeal(r.Context(), auth.UserID(r), id, name, in.DefaultMealSlotID, items, in.Visibility, icon)
 	if err != nil {
 		h.storeError(w, r, err)
 		return
@@ -475,7 +516,7 @@ func (h *Handler) LogSavedMeal(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
-	h.withPhotos(r.Context(), userID, &e)
+	h.withExtras(r.Context(), userID, &e)
 	day, err := h.day(r.Context(), userID, d)
 	if err != nil {
 		h.storeError(w, r, err)

@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/salmxnz/fuel-and-lift/api/internal/foodicon"
 )
 
 const lunchJSON = `{"title":"Fish curry with rice","items":[
@@ -126,5 +128,42 @@ func TestGatewayFallsBack(t *testing.T) {
 	}
 	if _, _, err := (&Gateway{}).Estimate(context.Background(), Request{}); !errors.Is(err, ErrNoProviders) {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestNormaliseClipsLongNames(t *testing.T) {
+	long := "Salad (onion, cucumber, tomato, lettuce, carrot, red cabbage, coriander and a squeeze of lemon)"
+	e := Estimate{Title: long + " with chicken tikka and basmati rice", Items: []Item{{Name: long, Kcal: 15}}}
+	if err := Normalise(&e); err != nil {
+		t.Fatal(err)
+	}
+	if n := len([]rune(e.Items[0].Name)); n > 80 || n < 50 {
+		t.Errorf("item name %q is %d characters", e.Items[0].Name, n)
+	}
+	if n := len([]rune(e.Title)); n > 60 {
+		t.Errorf("title %q is %d characters", e.Title, n)
+	}
+	if got := Clip("  Basmati rice  ", 80); got != "Basmati rice" {
+		t.Errorf("short names stay as they are: %q", got)
+	}
+	if got := Clip("ééééééééééé", 5); got != "ééééé" {
+		t.Errorf("clips by character, not byte: %q", got)
+	}
+}
+
+func TestNormaliseIcon(t *testing.T) {
+	for in, want := range map[string]string{"rice_bowl": "rice_bowl", " pizza ": "pizza", "none": "", "spaceship": "", "": ""} {
+		e := Estimate{Icon: in, Items: []Item{{Name: "Rice", Kcal: 300}}}
+		if err := Normalise(&e); err != nil {
+			t.Fatal(err)
+		}
+		if e.Icon != want {
+			t.Errorf("icon %q → %q, want %q", in, e.Icon, want)
+		}
+	}
+	icon := Schema["properties"].(map[string]any)["icon"].(map[string]any)
+	enum := icon["enum"].([]string)
+	if len(enum) != len(foodicon.Keys)+1 || enum[len(enum)-1] != foodicon.None {
+		t.Fatalf("icon enum = %v", enum)
 	}
 }

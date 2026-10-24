@@ -56,3 +56,9 @@ export function parseDecimal(raw: string): number | null {
 export function round1(n: number): number {
   return Math.round(n * 10) / 10
 }
+
+/** Trim and cut to max characters, as the API counts them (80 for food items and entries, 60 for saved meals). */
+export function clip(s: string, max: number): string {
+  const chars = Array.from(s.trim())
+  return chars.length <= max ? chars.join("") : chars.slice(0, max).join("").trim()
+}

@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import { Sheet } from "@/components/ui/sheet"
-import { Button, Field, TextInput } from "@/components/ui/primitives"
+import { Avatar, Button, Field, TextInput } from "@/components/ui/primitives"
+import { StatusPill, firstName } from "@/components/share/friend-picker"
 import { ItemsEditor, TotalsRow } from "@/components/food/items-editor"
 import { PhotoCarousel } from "@/components/food/photo-carousel"
 import { api, errorMessage, seg } from "@/lib/api/client"
@@ -11,6 +12,8 @@ import type { Day, DayResponse, Entry, EntryDayResponse, MealSlot } from "@/lib/
 import { fromEntryItem, toEntryItems, type EditableItem } from "@/lib/items"
 import { parseDecimal } from "@/lib/format"
 import { ShareIcon } from "@/components/ui/icons"
+import { IconChooser, useIconChoice } from "@/components/food/icon-picker"
+import { iconFor } from "@/lib/food-icons"
 
 export function EntrySheet({
   entry,
@@ -66,6 +69,8 @@ function EntryForm({
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [photos, setPhotos] = useState(entry.photos ?? [])
+  // Shows the stored picture or the guess from the name; saved once changed.
+  const pic = useIconChoice(iconFor({ icon: entry.icon, name }))
   const [removingPhoto, setRemovingPhoto] = useState<string | null>(null)
 
   async function removePhoto(id: string) {
@@ -87,6 +92,7 @@ function EntryForm({
     e.preventDefault()
     setError(null)
     const body: Record<string, unknown> = { name: name.trim() || entry.name }
+    if (pic.icon !== entry.icon) body.icon = pic.icon ?? "none"
     if (meal === ONE_OFF) {
       body.meal_slot_id = null
       body.meal_name = oneOffName.trim() || entry.meal_name
@@ -156,9 +162,17 @@ function EntryForm({
         removeLabel="Delete photo"
         busyKey={removingPhoto}
       />
-      <Field label="Name" htmlFor="entry-name">
-        <TextInput id="entry-name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
-      </Field>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <Field label="Name" htmlFor="entry-name">
+            <TextInput id="entry-name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+          </Field>
+        </div>
+        <div className="pt-[22px]">
+          <IconChooser icon={pic.icon} onClick={pic.openPicker} size={48} />
+        </div>
+      </div>
+      {pic.sheet}
       <Field label="Meal" htmlFor="entry-meal">
         <select
           id="entry-meal"
@@ -218,8 +232,24 @@ function EntryForm({
           {error}
         </p>
       ) : null}
+      {entry.shared_with.length > 0 ? (
+        <section aria-labelledby="entry-shared" className="flex flex-col gap-2 rounded-card bg-white p-3.5">
+          <h3 id="entry-shared" className="m-0 text-[13px] font-semibold text-muted">
+            {entry.split_ways ? `Split ${entry.split_ways} ways with` : "Shared with"}
+          </h3>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {entry.shared_with.map((f) => (
+              <li key={f.id} className="flex items-center gap-2.5">
+                <Avatar name={f.name} url={f.avatar_url} size={28} tone="pink" />
+                <span className="min-w-0 flex-1 truncate text-[15px]">{firstName(f.name)}</span>
+                <StatusPill status={f.status} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <Button variant="outline" size="md" onClick={() => onShare(entry)} disabled={saving || deleting}>
-        <ShareIcon size={18} /> Share or split with a friend
+        <ShareIcon size={18} /> {entry.shared_with.length > 0 ? "Share with more friends" : "Share or split with a friend"}
       </Button>
       <div className="grid grid-cols-2 gap-2">
         <Button variant="danger" onClick={remove} loading={deleting} disabled={saving}>

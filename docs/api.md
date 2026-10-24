@@ -29,6 +29,7 @@ Anyone with a verified Google email can sign up; an unverified email gets
 `ADMIN_EMAILS` become `admin` with Pro (no end date). A valid `invite_token`
 makes the inviter and the new user friends and counts toward the inviter's
 referrals; a used or expired token is ignored and sign-in still succeeds.
+A suspended account gets `403 {"error":{"message":"…","code":"suspended"}}`.
 
 `200`:
 ```json
@@ -43,6 +44,8 @@ Also sets `refresh_token` (httpOnly) and `csrf_token` cookies.
 
 ### `POST /v1/auth/refresh` (cookie route)
 Rotates the refresh token. `200 {"access_token","csrf_token"}` + new cookies.
+`401` when the token is used, revoked or expired; `401` with `code: "suspended"`
+when the account is suspended.
 
 ### `POST /v1/auth/logout` (cookie route)
 `204`. Revokes the refresh token and clears cookies.
@@ -170,7 +173,22 @@ type Entry = Macros & {
   items: EntryItem[]
   logged_at: string
   photos: MealPhoto[]             // kept meal photos, in order ([] when none)
+  icon: FoodIcon | null           // its picture; null = none (the app may guess one from the name)
+  // Friends you sent this meal to, oldest first, with each one's latest
+  // answer ([] when never shared, and always [] on a meal a friend sent you).
+  shared_with: (Person & { status: "pending" | "accepted" | "declined" })[]
+  split_ways: number | null       // set once split: people it was divided between, you included
 }
+
+// A food picture: one of a fixed set of keys (api/internal/foodicon), never
+// renamed. The web app draws public/food/<key>.png.
+type FoodIcon =
+  | "pizza" | "burger" | "fries" | "hot_dog" | "taco" | "sandwich" | "rice_bowl"
+  | "chicken" | "meat" | "canned_fish" | "fried_egg"
+  | "bread" | "toast" | "cheese" | "milk" | "honey"
+  | "apple" | "banana" | "watermelon" | "bell_pepper" | "chili" | "cabbage" | "mushroom"
+  | "chips" | "popcorn" | "donut" | "cupcake" | "pie" | "sweet" | "lollipop" | "candy_cane"
+  | "coffee" | "soda" | "beer" | "salt"
 
 // url is a signed link to the private bucket, valid for PHOTO_URL_TTL (1h).
 type MealPhoto = { id: string, url: string, position: number, bytes: number, created_at: string }
@@ -195,12 +213,14 @@ type Day = {
 ```
 Give `meal_slot_id`, or `meal_name` for a one-off meal. Totals are computed from
 `items`; an entry without items may send `kcal`, `protein_g`, `carbs_g`, `fat_g`
-directly. `201 {"entry": Entry, "day": Day, "photos_skipped": number}`.
+directly. Optional `icon`: a `FoodIcon` (`"none"` or left out = no picture; an
+unknown key is `400`). `201 {"entry": Entry, "day": Day, "photos_skipped": number}`.
 With `ai_estimate_id`, the estimate's photos are kept on the entry while the
 user has room (free: `FREE_PHOTOS_STORED`, 20; Pro unlimited); photos that don't
 fit are deleted and counted in `photos_skipped`.
 
-### `PATCH /v1/entries/{id}` `{name?, meal_slot_id?, meal_name?, items?}` → `200 {"entry": Entry, "day": Day}`
+### `PATCH /v1/entries/{id}` `{name?, meal_slot_id?, meal_name?, items?, icon?}` → `200 {"entry": Entry, "day": Day}`
+`icon`: a `FoodIcon`, or `"none"` to remove it; left out keeps it.
 ### `DELETE /v1/entries/{id}` → `200 {"day": Day}` (its photos are deleted too)
 
 ## Meal photos
@@ -218,12 +238,13 @@ type SavedMeal = {
   id: string, name: string, default_meal_slot_id: string | null,
   items: (EntryItem & { id: string, is_addon: boolean })[],
   base: Macros,                  // non-add-on items only
-  last_used_at: string | null
+  last_used_at: string | null,
+  icon: FoodIcon | null          // copied to entries logged from it, and to Shop copies
 } & Community                    // see "The Shop"
 ```
 ### `GET /v1/saved-meals` → `200 {"saved_meals": SavedMeal[]}` (most recently used first)
-### `POST /v1/saved-meals` `{name, default_meal_slot_id?, items, visibility?}` → `201 {"saved_meal": SavedMeal}`
-### `PUT /v1/saved-meals/{id}` (same body; `visibility` is ignored) → `200 {"saved_meal": SavedMeal}`
+### `POST /v1/saved-meals` `{name, default_meal_slot_id?, items, visibility?, icon?}` → `201 {"saved_meal": SavedMeal}`
+### `PUT /v1/saved-meals/{id}` (same body; `visibility` is ignored; `icon` left out keeps it, `"none"` removes it) → `200 {"saved_meal": SavedMeal}`
 ### `PUT /v1/saved-meals/{id}/visibility` `{visibility}` → `200 {visibility, published_at, hidden}`
 ### `DELETE /v1/saved-meals/{id}` → `204`
 ### `POST /v1/days/{date}/saved-meals/{id}` `{meal_slot_id?, meal_name?, addon_ids: []}`
@@ -270,6 +291,7 @@ dish name) and `"items": [{name, grams?, kcal, protein_g, carbs_g, fat_g}]`
 {
   "estimate_id": "uuid",
   "title": "Fish curry with rice",
+  "icon": "rice_bowl",
   "items": [ { "name": "White rice", "grams": 250, "kcal": 325, "protein_g": 6, "carbs_g": 71,
                "fat_g": 1, "assumption": "normal plate", "confidence": 0.7, "source": "ai" } ],
   "questions": [ { "id": "rice_portion", "text": "How much rice?",
@@ -279,6 +301,8 @@ dish name) and `"items": [{name, grams?, kcal, protein_g, carbs_g, fat_g}]`
   "usage": { "used_today": 3, "limit_today": 60, "per_minute": 6, "photos_this_month": 4, "photo_limit": 10, "resets_on": "2026-11-01" }
 }
 ```
+`icon` is the `FoodIcon` the AI picked for the whole meal, or `null` when none
+fits; send it (or the user's choice) as `icon` when logging.
 `429` when over the per-minute or per-day limit, `503` when AI is not configured,
 `502` when every provider failed.
 
@@ -515,7 +539,7 @@ type Share = {
   from: { id: string, name: string, avatar_url: string | null },
   split_ways: number | null,     // meal split between this many people (you included); null = shared whole
   created_at: string,
-  meal: (Macros & { date: string, name: string, meal_name: string, items: EntryItem[] }) | null,  // the friend's part
+  meal: (Macros & { date: string, name: string, meal_name: string, items: EntryItem[], icon?: FoodIcon }) | null,  // the friend's part (keeps its icon when added)
   template: { name: string, exercises: string[] } | null,
   routine: { name: string, description: string | null,
              days: Record<Weekday, number | null>,                // index into workouts
@@ -528,8 +552,10 @@ type Share = {
     (items, grams and macros scaled) and each friend is offered the same part.
     A meal can only be split once: `409` code `already_split`.
   - `split: false` — you each had the same: every friend is offered the whole meal.
+    On a meal that was split, that's your part as it is now.
   - 1 to 10 friends; anyone who isn't a friend is `403` code `not_friends`.
-    Sending the same meal to someone it's still waiting for does nothing.
+    Sending the same meal to someone it's still waiting for, or who already
+    added it, does nothing for them. The entry's `shared_with` shows who has it.
 - `POST /v1/templates/{id}/share` `{friend_ids: [...]}` → `201 {"shared_with": number}`
   (the current version, with your sets and target weights)
 - `POST /v1/routines/{id}/share` `{friend_ids: [...]}` → `201 {"shared_with": number}`
@@ -546,9 +572,29 @@ type Share = {
   - routine: `{}` → `201 {"routine": Routine}`. Copies of its workouts (as for a
     template) and a routine using them. Your week isn't changed until you apply it.
 - `DELETE /v1/shares/{id}` → `204` (no thanks)
+- `GET /v1/shares/history?direction=received|sent&before=<RFC 3339 time>` →
+  `200 {"items": ShareHistoryItem[]}`: everything shared with you (`received`,
+  the default) or by you (`sent`), whatever the answer, newest first, 30 a
+  page. Pass the last item's `created_at` as `before` for the next page. One
+  send to several friends is one `sent` item. Shares from people who are no
+  longer friends stay listed.
+  ```ts
+  type ShareHistoryItem = {
+    id: string                       // received: the share (accept/decline it while pending)
+    kind: "meal" | "template" | "routine"
+    name: string
+    kcal: number | null              // meals: the part each person got
+    split_ways: number | null
+    created_at: string
+    from: Person                     // sent: you
+    // received: you first, then the others a meal was split with; sent: everyone you sent it to
+    recipients: (Person & { status: "pending" | "accepted" | "declined", responded_at: string | null })[]
+  }
+  ```
 
 The friend gets a push ("Bhavish split Pizza with you", "Bhavish shared a
 workout with you") that opens Today or Gym, where waiting shares are shown.
+Push tags start with `share-`; the web app also pops up each new share once.
 
 ## The Shop (community)
 Workouts (templates), saved meals and routines each have a visibility:
@@ -624,6 +670,56 @@ type ReportGroup = {
   for everyone but the owner (who gets a push). Closes its open reports.
 - `DELETE /v1/admin/shop/{kind}/{id}/hide` → `200 {"hidden": false}`
 - `POST /v1/admin/shop/{kind}/{id}/dismiss` → `204` (closes the reports, nothing hidden)
+
+### Admin: users (admins only; others get `403`)
+What the admin app (`admin/`) shows and changes about a person. Reads reuse the
+app's own shapes (`SavedMeal`, `Entry`, `Template`, `Routine`, `Session`,
+`Friend`, `Billing`, `Profile`, `Goal`) for the user in the path.
+
+```ts
+type AdminUser = {
+  id: string, email: string, name: string,        // name = Google name
+  display_name: string | null,                    // null before onboarding
+  avatar_url: string | null,
+  role: "admin" | "member",
+  plan: "free" | "pro",                           // as stored; use is_pro
+  pro_source: "admin" | "referrals" | "subscription" | null,
+  pro_until: string | null,                       // null = forever
+  is_pro: boolean,                                // plan = pro and pro_until not passed
+  admin_email: boolean,                           // in ADMIN_EMAILS: always admin + Pro
+  onboarded: boolean,
+  invited_by: Person | null,
+  created_at: string, last_login_at: string | null,
+  suspended_at: string | null, suspended_reason: string | null,
+  counts: { saved_meals: number, templates: number, routines: number,
+            sessions_finished: number, friends: number, referrals: number }
+}
+```
+- `GET /v1/admin/users?q=&plan=free|pro&role=admin|member&status=active|suspended&limit=50&offset=0`
+  → `200 {"users": AdminUser[], "total": number}`. Newest first; `q` matches email, name
+  or display name; `limit` ≤ 100.
+- `GET /v1/admin/users/{id}` → `200 {"user": AdminUser, "billing": Billing, "profile": Profile|null, "goal": Goal|null}`
+- `PUT /v1/admin/users/{id}/pro` `{until: string|null}` → `200 {"user"}`. Pro from an admin
+  (`pro_source: "admin"`), forever or until a future time. `400` when `until` has passed, or
+  when it would cut short Pro forever from referrals.
+- `DELETE /v1/admin/users/{id}/pro` → `200 {"user"}` (back to free; `400` for `admin_email`)
+- `PUT /v1/admin/users/{id}/role` `{role}` → `200 {"user"}`. `400` when demoting yourself or
+  an `admin_email`. The new role shows up in their next access token.
+- `POST /v1/admin/users/{id}/suspend` `{reason?}` (≤ 300 chars) → `200 {"user"}`. Revokes every
+  refresh token and blocks sign-in; an access token already issued keeps working until it
+  expires (`ACCESS_TTL`, 15 min). `400` on yourself.
+- `DELETE /v1/admin/users/{id}/suspend` → `200 {"user"}`
+- `GET /v1/admin/users/{id}/saved-meals` → `200 {"saved_meals": SavedMeal[]}`
+- `GET /v1/admin/users/{id}/entries?from=&to=` → `200 {"entries": Entry[], from, to}`: the
+  food log, newest day first (default the last 14 days, at most 92). Photos aren't included.
+- `GET /v1/admin/users/{id}/templates` → `200 {"templates": Template[]}`
+- `GET /v1/admin/users/{id}/routines` → `200 {"routines": Routine[]}`
+- `GET /v1/admin/users/{id}/sessions?from=&to=` → `200 {"sessions": Session[], from, to}`
+  (default the last 90 days) and `GET /v1/admin/users/{id}/sessions/{session_id}` → `200 {"session": Session}`
+- `GET /v1/admin/users/{id}/friends` → `200 {"friends": Friend[]}`
+
+Hiding any of their meals, templates or routines (whatever the visibility) uses
+`POST/DELETE /v1/admin/shop/{kind}/{id}/hide` above.
 
 ## Notifications (Web Push)
 

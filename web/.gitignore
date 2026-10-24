@@ -11,3 +11,5 @@ npm-debug.log*
 # Pixel icon pack (licence: no redistribution). Remove these lines and commit
 # public/pixel once the GitHub repository is private.
 /public/pixel/
+# Food icon pack (licence silent on redistribution): same as public/pixel.
+/public/food/
