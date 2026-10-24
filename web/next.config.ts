@@ -1,7 +1,19 @@
 import type { NextConfig } from "next"
 
+// Food icons (public/food, from a pack that stays out of this public repo):
+// served from the assets bucket when they aren't installed locally.
+const FOOD_ICONS_URL = (process.env.FOOD_ICONS_URL || "https://assets.adebite.com/food").replace(/\/+$/, "")
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  async rewrites() {
+    return {
+      beforeFiles: [],
+      afterFiles: [],
+      // Only when no file in public/ matched.
+      fallback: [{ source: "/food/:file", destination: `${FOOD_ICONS_URL}/:file` }],
+    }
+  },
   experimental: {
     // Keep visited (and prefetched) app screens in the router cache, so
     // switching tabs doesn't wait for the server each time. Data freshness is

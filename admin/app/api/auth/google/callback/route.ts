@@ -55,15 +55,18 @@ export async function GET(request: NextRequest) {
   }
 
   if (!res.ok) {
-    const err = (await res.json().catch(() => null)) as { error?: { code?: string } } | null
+    const err = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null
+    console.error(`Go /v1/auth/google ${res.status}: ${err?.error?.message ?? "no message"}`)
     const reason =
       err?.error?.code === "email_unverified"
         ? "unverified"
         : err?.error?.code === "suspended"
           ? "suspended"
-          : res.status === 400 || res.status === 401 || res.status === 403
-            ? "google"
-            : "server"
+          : err?.error?.message?.includes("redirect_uri")
+            ? "origin"
+            : res.status === 400 || res.status === 401 || res.status === 403
+              ? "google"
+              : "server"
     return fail(request, reason)
   }
 

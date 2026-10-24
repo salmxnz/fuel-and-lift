@@ -6,7 +6,9 @@
 //
 // The pack is free for commercial projects; it says nothing about
 // redistributing it, so public/food stays out of git while the repository is
-// public (see .gitignore).
+// public (see .gitignore). Production loads the same files from the assets
+// bucket (food/<key>.png on assets.adebite.com, see next.config.ts): upload
+// public/food/*.png there after changing them.
 import { execFileSync } from "node:child_process"
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"

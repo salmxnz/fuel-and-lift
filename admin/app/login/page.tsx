@@ -14,6 +14,8 @@ const ERRORS: Record<string, string> = {
   google: "Google couldn't sign you in. Please try again.",
   unreachable: "Can't reach the API right now. Is it running?",
   server: "Something went wrong signing you in. Please try again.",
+  origin:
+    "The API doesn't accept this app's address yet. Add it to ALLOWED_ORIGINS in api/.env (e.g. http://localhost:3001) and restart the API.",
   config: "Sign-in isn't set up yet (missing GOOGLE_CLIENT_ID or JWT_SECRET in admin/.env.local).",
 }
 

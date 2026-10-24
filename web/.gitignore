@@ -12,4 +12,5 @@ npm-debug.log*
 # public/pixel once the GitHub repository is private.
 /public/pixel/
 # Food icon pack (licence silent on redistribution): same as public/pixel.
+# Production loads them from assets.adebite.com/food (next.config.ts).
 /public/food/
