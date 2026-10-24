@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { GoogleButton, NightShell, Tick } from "@/components/auth/night-shell"
 import { AcceptInvite } from "@/components/auth/accept-invite"
+import { OpenInAppHint } from "@/components/auth/open-in-app-hint"
 import type { InvitePreviewResponse } from "@/lib/api/types"
 import { GoApiError, goFetch } from "@/lib/auth/go-client"
 import { getSession } from "@/lib/auth/session"
@@ -105,6 +106,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
         </li>
       </ul>
       <div className="flex-1" />
+      {session ? null : <OpenInAppHint />}
       <div className="flex flex-col gap-2.5">
         {session ? (
           <AcceptInvite token={token} inviter={first} />

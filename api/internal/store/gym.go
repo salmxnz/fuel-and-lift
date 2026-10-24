@@ -206,20 +206,27 @@ func checkExercises(ctx context.Context, tx pgx.Tx, userID string, blocks []Bloc
 func (s *Store) CreateTemplate(ctx context.Context, userID, name string, blocks []BlockInput) (Template, error) {
 	var id string
 	err := s.tx(ctx, func(tx pgx.Tx) error {
-		if err := checkExercises(ctx, tx, userID, blocks); err != nil {
-			return err
-		}
-		if err := tx.QueryRow(ctx, `insert into templates (user_id, name) values ($1::uuid, $2) returning id::text`, userID, name).Scan(&id); err != nil {
-			return err
-		}
-		raw, _ := json.Marshal(toStored(blocks))
-		_, err := tx.Exec(ctx, `insert into template_versions (template_id, version, blocks) values ($1::uuid, 1, $2)`, id, raw)
+		var err error
+		id, err = createTemplate(ctx, tx, userID, name, blocks)
 		return err
 	})
 	if err != nil {
 		return Template{}, err
 	}
 	return s.GetTemplate(ctx, userID, id)
+}
+
+func createTemplate(ctx context.Context, tx pgx.Tx, userID, name string, blocks []BlockInput) (string, error) {
+	if err := checkExercises(ctx, tx, userID, blocks); err != nil {
+		return "", err
+	}
+	var id string
+	if err := tx.QueryRow(ctx, `insert into templates (user_id, name) values ($1::uuid, $2) returning id::text`, userID, name).Scan(&id); err != nil {
+		return "", err
+	}
+	raw, _ := json.Marshal(toStored(blocks))
+	_, err := tx.Exec(ctx, `insert into template_versions (template_id, version, blocks) values ($1::uuid, 1, $2)`, id, raw)
+	return id, err
 }
 
 // SaveTemplateVersion writes a new version (and the name) of a template.

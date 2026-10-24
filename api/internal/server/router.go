@@ -51,6 +51,7 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"POST /v1/days/{date}/saved-meals/{id}": h.LogSavedMeal,
 		"PATCH /v1/entries/{id}":                h.UpdateEntry,
 		"DELETE /v1/entries/{id}":               h.DeleteEntry,
+		"POST /v1/entries/{id}/share":           h.ShareEntry,
 		"GET /v1/saved-meals":                   h.ListSavedMeals,
 		"POST /v1/saved-meals":                  h.SaveMeal,
 		"PUT /v1/saved-meals/{id}":              h.SaveMeal,
@@ -75,6 +76,7 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"DELETE /v1/templates/{id}":                     h.DeleteTemplate,
 		"GET /v1/templates/{id}/versions/{version}":     h.GetTemplateVersion,
 		"POST /v1/templates/{id}/current":               h.SetCurrentTemplateVersion,
+		"POST /v1/templates/{id}/share":                 h.ShareTemplate,
 		"GET /v1/weekly-plan":                           h.GetWeeklyPlan,
 		"PUT /v1/weekly-plan":                           h.PutWeeklyPlan,
 		"POST /v1/sessions":                             h.StartSession,
@@ -111,6 +113,11 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/feed":                 h.Feed,
 		"POST /v1/feed/{id}/cheer":     h.Cheer,
 		"DELETE /v1/feed/{id}/cheer":   h.Cheer,
+
+		// meals and templates shared by friends
+		"GET /v1/shares":              h.ListShares,
+		"POST /v1/shares/{id}/accept": h.AcceptShare,
+		"DELETE /v1/shares/{id}":      h.DeclineShare,
 
 		// notifications
 		"POST /v1/push/subscriptions":   h.Subscribe,

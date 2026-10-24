@@ -12,6 +12,7 @@ import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
 import { formatDayMonth, relativeDay } from "@/lib/dates"
 import { RewardIcon } from "@/components/progress/rewards-card"
+import { PasteInvite } from "./paste-invite"
 
 const KIND_VERB: Record<FeedItem["kind"], string> = {
   workout_finished: "worked out",
@@ -259,6 +260,8 @@ export function FriendsScreen() {
       >
         Send a friend link <ChevronRightIcon size={16} />
       </Link>
+
+      <PasteInvite />
     </div>
   )
 }

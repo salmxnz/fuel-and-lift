@@ -197,42 +197,47 @@ var ErrNoMeal = errors.New("give meal_slot_id or meal_name")
 func (s *Store) AddEntry(ctx context.Context, userID string, d Date, in NewEntry) (Entry, error) {
 	var out Entry
 	err := s.tx(ctx, func(tx pgx.Tx) error {
-		slotID, meal, err := resolveMeal(ctx, tx, userID, in.MealSlotID, in.MealName)
-		if errors.Is(err, ErrConflict) {
-			return ErrNoMeal
-		}
-		if err != nil {
-			return err
-		}
-		if in.AIEstimateID != nil {
-			var ok bool
-			if err := tx.QueryRow(ctx, `select exists(select 1 from ai_estimates where id = $1::uuid and user_id = $2::uuid)`, *in.AIEstimateID, userID).Scan(&ok); err != nil {
-				return err
-			}
-			if !ok {
-				in.AIEstimateID = nil
-			}
-		}
-		if in.Items == nil {
-			in.Items = []EntryItem{}
-		}
-		m := in.Macros.Rounded()
-		if len(in.Items) > 0 {
-			m = SumItems(in.Items)
-		}
-		items, _ := json.Marshal(in.Items)
-		rows, err := tx.Query(ctx, `
-			insert into log_entries (user_id, date, meal_slot_id, meal_name, name, origin, saved_meal_id, ai_estimate_id, items, kcal, protein_g, carbs_g, fat_g)
-			values ($1::uuid, $2, $3::uuid, $4, $5, $6, $7::uuid, $8::uuid, $9, $10, $11, $12, $13)
-			returning `+entryCols,
-			userID, d.Time, slotID, meal, in.Name, in.Origin, in.SavedMealID, in.AIEstimateID, items, m.Kcal, m.ProteinG, m.CarbsG, m.FatG)
-		if err != nil {
-			return err
-		}
-		out, err = pgx.CollectExactlyOneRow(rows, scanEntry)
+		var err error
+		out, err = addEntry(ctx, tx, userID, d, in)
 		return err
 	})
 	return out, err
+}
+
+func addEntry(ctx context.Context, tx pgx.Tx, userID string, d Date, in NewEntry) (Entry, error) {
+	slotID, meal, err := resolveMeal(ctx, tx, userID, in.MealSlotID, in.MealName)
+	if errors.Is(err, ErrConflict) {
+		return Entry{}, ErrNoMeal
+	}
+	if err != nil {
+		return Entry{}, err
+	}
+	if in.AIEstimateID != nil {
+		var ok bool
+		if err := tx.QueryRow(ctx, `select exists(select 1 from ai_estimates where id = $1::uuid and user_id = $2::uuid)`, *in.AIEstimateID, userID).Scan(&ok); err != nil {
+			return Entry{}, err
+		}
+		if !ok {
+			in.AIEstimateID = nil
+		}
+	}
+	if in.Items == nil {
+		in.Items = []EntryItem{}
+	}
+	m := in.Macros.Rounded()
+	if len(in.Items) > 0 {
+		m = SumItems(in.Items)
+	}
+	items, _ := json.Marshal(in.Items)
+	rows, err := tx.Query(ctx, `
+		insert into log_entries (user_id, date, meal_slot_id, meal_name, name, origin, saved_meal_id, ai_estimate_id, items, kcal, protein_g, carbs_g, fat_g)
+		values ($1::uuid, $2, $3::uuid, $4, $5, $6, $7::uuid, $8::uuid, $9, $10, $11, $12, $13)
+		returning `+entryCols,
+		userID, d.Time, slotID, meal, in.Name, in.Origin, in.SavedMealID, in.AIEstimateID, items, m.Kcal, m.ProteinG, m.CarbsG, m.FatG)
+	if err != nil {
+		return Entry{}, err
+	}
+	return pgx.CollectExactlyOneRow(rows, scanEntry)
 }
 
 // EntryPatch changes parts of an entry.
