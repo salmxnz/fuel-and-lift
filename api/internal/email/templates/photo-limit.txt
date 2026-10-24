@@ -1,0 +1,25 @@
+Photo estimates
+
+That's {{.Limit}} photos this month.
+
+Nice going, {{.FirstName}}. You've used all {{.Limit}} free photo estimates for {{.Month}}. They come back on {{.ResetsOn}}.
+
+Until then you can still describe a meal, pick from a restaurant menu, scan a barcode or log a saved meal. None of those count.
+
+Want unlimited photos?
+
+{{.Referrals}} of {{.Needed}}
+
+Invite {{.Needed}} friends and Pro is yours forever. It only counts once they've set up.
+
+Invite a friend {{.AppURL}}/friends/add
+
+or describe your next meal {{.AppURL}}/log/describe
+
+Eat, lift, and see it add up.
+
+Open adebite {{.AppURL}} · Notifications {{.AppURL}}/settings/notifications
+
+You're getting this because you used your last free photo estimate this month.
+
+© adebite

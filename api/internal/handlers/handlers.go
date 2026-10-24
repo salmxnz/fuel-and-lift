@@ -16,6 +16,7 @@ import (
 
 	"github.com/salmxnz/fuel-and-lift/api/internal/ai"
 	"github.com/salmxnz/fuel-and-lift/api/internal/config"
+	"github.com/salmxnz/fuel-and-lift/api/internal/email"
 	"github.com/salmxnz/fuel-and-lift/api/internal/google"
 	"github.com/salmxnz/fuel-and-lift/api/internal/httpx"
 	"github.com/salmxnz/fuel-and-lift/api/internal/push"
@@ -35,6 +36,8 @@ type Handler struct {
 	FoodLookup func(ctx context.Context, code string) (store.Food, error)
 	// Photos stores meal photos (Cloudflare R2); nil turns photo storage off.
 	Photos PhotoStorage
+	// Mail sends transactional emails; nil sends none.
+	Mail *email.Mailer
 }
 
 // PhotoStorage is where meal photos live (storage.R2, or a fake in tests).

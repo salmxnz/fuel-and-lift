@@ -18,6 +18,7 @@ import (
 
 	"github.com/salmxnz/fuel-and-lift/api/internal/ai"
 	"github.com/salmxnz/fuel-and-lift/api/internal/config"
+	"github.com/salmxnz/fuel-and-lift/api/internal/email"
 	"github.com/salmxnz/fuel-and-lift/api/internal/google"
 	"github.com/salmxnz/fuel-and-lift/api/internal/handlers"
 	"github.com/salmxnz/fuel-and-lift/api/internal/migrate"
@@ -102,6 +103,13 @@ func run(log *slog.Logger, args []string) error {
 		AI:       gateway(cfg, log),
 		Notifier: notifier,
 		Log:      log,
+	}
+	h.Mail = email.New(email.Config{
+		Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername, Password: cfg.SMTPPassword,
+		From: cfg.SMTPFrom, FromName: cfg.SMTPFromName, AppURL: cfg.AppURL, AssetsURL: cfg.EmailAssetsURL,
+	}, log)
+	if !h.Mail.Enabled() {
+		log.Warn("SMTP not configured: emails are logged, not sent (set SMTP_HOST and SMTP_FROM)")
 	}
 	if r2 := storage.NewR2(cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2Bucket); r2 != nil {
 		h.Photos = r2

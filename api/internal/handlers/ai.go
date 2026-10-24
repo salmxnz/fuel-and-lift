@@ -275,6 +275,9 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 	a.usage.CallsToday++
 	if len(images) > 0 {
 		a.usage.PhotosThisMonth++
+		if a.photoLimit != nil && a.usage.PhotosThisMonth == *a.photoLimit {
+			h.emailPhotoLimit(ctx, userID, a)
+		}
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"estimate_id": id,

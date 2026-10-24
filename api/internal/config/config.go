@@ -56,6 +56,15 @@ type Config struct {
 	VAPIDPublicKey  string
 	VAPIDPrivateKey string
 	VAPIDSubject    string // mailto: or https: contact for push services
+
+	// Transactional email over SMTP. Off (log only) unless host and from are set.
+	SMTPHost       string
+	SMTPPort       int // 465 = implicit TLS, else STARTTLS
+	SMTPUsername   string
+	SMTPPassword   string
+	SMTPFrom       string
+	SMTPFromName   string
+	EmailAssetsURL string // serves web/public for email images; defaults to AppURL
 }
 
 // SecureCookies reports whether cookies carry the Secure flag.
@@ -126,6 +135,17 @@ func Load() (Config, error) {
 		VAPIDPublicKey:  os.Getenv("VAPID_PUBLIC_KEY"),
 		VAPIDPrivateKey: os.Getenv("VAPID_PRIVATE_KEY"),
 		VAPIDSubject:    env("VAPID_SUBJECT", "mailto:admin@example.com"),
+
+		SMTPHost:     os.Getenv("SMTP_HOST"),
+		SMTPPort:     envInt("SMTP_PORT", 587),
+		SMTPUsername: os.Getenv("SMTP_USERNAME"),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:     os.Getenv("SMTP_FROM"),
+		SMTPFromName: os.Getenv("SMTP_FROM_NAME"),
+	}
+	cfg.EmailAssetsURL = strings.TrimRight(env("EMAIL_ASSETS_URL", cfg.AppURL), "/")
+	if cfg.SMTPFromName == "" {
+		cfg.SMTPFromName = cfg.AppName
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

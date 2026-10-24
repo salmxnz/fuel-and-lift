@@ -176,6 +176,7 @@ func (h *Handler) Onboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.seedGym(r.Context(), userID, split, gymDays)
+	h.emailAfterOnboarding(r.Context(), userID, name, goal.Plan, upgraded)
 	if upgraded != "" {
 		h.Notifier.Notify([]string{upgraded}, push.Message{
 			Title: "You've got Pro, for good",

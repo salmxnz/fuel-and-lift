@@ -1,0 +1,47 @@
+Welcome to adebite
+
+Hi {{.FirstName}}, your plan is ready.
+
+Every bite and every set you log adds up here. This is the daily target we worked out from what you told us. You can change it any time from Me.
+
+Your daily target
+
+{{.Calories}} kcal
+
+Protein
+
+{{.Protein}} g
+
+Carbs
+
+{{.Carbs}} g
+
+Fat
+
+{{.Fat}} g
+
+Three things to try this week
+
+Snap your next meal
+
+Take a photo and get an estimate in seconds. Fix anything that looks off before you save it.
+
+Start your first workout
+
+Your plan is waiting in Gym. Weights fill in from your first session.
+
+Bring a friend
+
+Send a friend link and cheer each other on. Invite {{.ReferralsForPro}} and you get Pro forever.
+
+Open adebite {{.AppURL}}/today
+
+Tip: add adebite to your home screen. It opens like an app and works offline.
+
+Eat, lift, and see it add up.
+
+Open adebite {{.AppURL}} · Notifications {{.AppURL}}/settings/notifications
+
+You're getting this because you just set up adebite.
+
+© adebite

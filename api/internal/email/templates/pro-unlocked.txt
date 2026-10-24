@@ -1,0 +1,27 @@
+Pro, for good
+
+You did it, {{.FirstName}}. Pro is yours.
+
+{{.Needed}} friends joined adebite through your links. That unlocks Pro forever: no subscription and no end date. Thanks for bringing them along.
+
+Unlimited photo estimates
+
+Snap every meal. There's no monthly count any more.
+
+Every meal photo, kept
+
+No cap on how many photos you store.
+
+Yours for good
+
+Nothing to renew, nothing to cancel.
+
+Snap a meal {{.AppURL}}/log/photo
+
+Eat, lift, and see it add up.
+
+Open adebite {{.AppURL}} · Notifications {{.AppURL}}/settings/notifications
+
+You're getting this because your friends unlocked Pro for you.
+
+© adebite

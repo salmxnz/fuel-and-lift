@@ -10,6 +10,7 @@ watch weight, calories and lifts trend the right way.
 | API | Go 1.24, stdlib `net/http`, Postgres (pgx), Google sign-in | [`api/`](api) |
 | Web | Next.js PWA (App Router), talks to the API through a small BFF | [`web/`](web) |
 | Docs | API contract, auth flow, designs | [`docs/`](docs) |
+| Emails | React Email templates, exported to Go templates the API embeds | [`emails/`](emails) |
 
 ## Run it locally
 
@@ -48,6 +49,31 @@ and restaurant estimates aren't counted). **Invite 8 friends** who join through
 your links and finish onboarding, and you get Pro forever. Pro can't be gifted.
 Every user also has a fair-use rate limit, and there's a global monthly AI budget
 cap (`AI_MONTHLY_BUDGET_USD`).
+
+## Emails
+
+The API sends a few transactional emails over SMTP (`SMTP_*` in `api/.env`;
+without `SMTP_HOST` they're only logged):
+
+| Email | When |
+|---|---|
+| `welcome` | Someone finishes onboarding: their daily target and three first steps |
+| `friend-joined` | A friend who joined through your link finishes onboarding (progress to Pro) |
+| `pro-unlocked` | That friend was your 8th: Pro forever |
+| `photo-limit` | A free user uses their last photo estimate of the month |
+| `weekly-recap` | Template only, not sent yet (needs a scheduler and an opt-out) |
+
+Templates live in `emails/emails/*.tsx`. Illustrations are drawn in code by
+`emails/scripts/make-assets.mjs` into `web/public/email`, which the web app
+serves, so emails load them from `APP_URL` (or `EMAIL_ASSETS_URL`).
+
+```sh
+cd emails && npm install
+npm run dev        # live preview at http://localhost:3002
+npm run assets     # redraw web/public/email/*.png
+npm run build      # export to api/internal/email/templates (commit the output)
+npm run preview    # out/*.html with local images, to open in a browser
+```
 
 ## Tests
 

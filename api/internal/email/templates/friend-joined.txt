@@ -1,0 +1,23 @@
+A friend joined
+
+{{.FriendName}} is on adebite now.
+
+Good news, {{.FirstName}}. {{.FriendName}} signed up through your link and finished setting up, so you're friends and it counts towards Pro.
+
+Invite friends, get Pro forever
+
+{{.Referrals}} of {{.Needed}}
+
+{{.Remaining}} more and Pro is yours for good: unlimited photo estimates, nothing to renew.
+
+Send another link {{.AppURL}}/friends/add
+
+Links work once and last 14 days.
+
+Eat, lift, and see it add up.
+
+Open adebite {{.AppURL}} · Notifications {{.AppURL}}/settings/notifications
+
+You're getting this because someone joined adebite through your friend link.
+
+© adebite

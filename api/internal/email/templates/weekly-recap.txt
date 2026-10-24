@@ -1,0 +1,39 @@
+Your week · {{.WeekRange}}
+
+Here's how it added up, {{.FirstName}}.
+
+A quick look back before the new week starts.
+
+Days logged
+
+{{.DaysLogged}} / 7
+
+Every day counts
+
+Average a day
+
+{{.AvgCalories}}
+
+Target {{.TargetCalories}} kcal
+
+Workouts
+
+{{.Workouts}}
+
+Sessions finished
+
+Weight
+
+{{.WeightChange}}
+
+Since last week
+
+See your progress {{.AppURL}}/progress
+
+Eat, lift, and see it add up.
+
+Open adebite {{.AppURL}} · Notifications {{.AppURL}}/settings/notifications
+
+You get this every Monday. Turn it off in Notifications.
+
+© adebite
