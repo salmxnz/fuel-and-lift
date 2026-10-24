@@ -59,6 +59,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           position="top-center"
           offset={{ top: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
           toastOptions={{
+            duration: 3000,
             style: {
               fontFamily: "var(--font-sans)",
               borderRadius: 14,

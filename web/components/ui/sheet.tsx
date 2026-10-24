@@ -1,11 +1,11 @@
 "use client"
 
-import { AnimatePresence, motion, useReducedMotion } from "motion/react"
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react"
 import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { cn } from "@/lib/cn"
 import { CloseButton } from "./primitives"
-import { EASE_OUT } from "@/lib/motion"
+import { EASE_OUT, SPRING_SHEET } from "@/lib/motion"
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -71,6 +71,15 @@ function useDialogBehaviour(open: boolean, panel: React.RefObject<HTMLElement | 
   }, [open, panel])
 }
 
+/**
+ * The full-screen layer of a sheet. While it animates out it lets taps
+ * through, so the page answers right away instead of after the exit.
+ */
+function Layer({ children }: { children: ReactNode }) {
+  const present = useIsPresent()
+  return <div className={cn("fixed inset-0 z-50", !present && "pointer-events-none")}>{children}</div>
+}
+
 export type SheetProps = {
   open: boolean
   onClose: () => void
@@ -108,7 +117,7 @@ export function Sheet({
   return createPortal(
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-50" key="sheet">
+        <Layer key="sheet">
           <motion.button
             type="button"
             aria-label="Close"
@@ -133,10 +142,11 @@ export function Sheet({
               className
             )}
             style={{ paddingBottom: "calc(var(--safe-bottom) + 28px)" }}
-            initial={reduce ? { opacity: 0 } : { y: "100%" }}
-            animate={reduce ? { opacity: 1 } : { y: 0 }}
-            exit={reduce ? { opacity: 0 } : { y: "100%" }}
-            transition={reduce ? { duration: 0 } : { type: "spring", damping: 32, stiffness: 360 }}
+            // Full transform strings (not the y shorthand) so the slide runs off the main thread.
+            initial={reduce ? { opacity: 0 } : { transform: "translateY(100%)" }}
+            animate={reduce ? { opacity: 1 } : { transform: "translateY(0%)" }}
+            exit={reduce ? { opacity: 0 } : { transform: "translateY(100%)" }}
+            transition={reduce ? { duration: 0 } : SPRING_SHEET}
           >
             <span aria-hidden="true" className="h-[5px] w-10 flex-none self-center rounded-[3px] bg-line" />
             <div className={cn("flex items-center justify-between gap-3", hideTitle && "sr-only")}>
@@ -152,7 +162,7 @@ export function Sheet({
             ) : null}
             {children}
           </motion.div>
-        </div>
+        </Layer>
       ) : null}
     </AnimatePresence>,
     document.body
@@ -179,30 +189,51 @@ export function Overlay({
   return createPortal(
     <AnimatePresence>
       {open ? (
-        <motion.div
-          key="overlay"
-          ref={panel}
-          role="dialog"
-          aria-modal="true"
-          aria-label={label}
-          tabIndex={-1}
-          className="fixed inset-0 z-50 outline-none"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: reduce ? 0 : 0.18 }}
-        >
-          <button
-            type="button"
-            aria-label="Close menu"
-            tabIndex={-1}
-            className="scrim absolute inset-0 h-full w-full cursor-default"
-            onClick={onClose}
-          />
+        <OverlayPanel key="overlay" panelRef={panel} label={label} reduce={!!reduce} onClose={onClose}>
           {children}
-        </motion.div>
+        </OverlayPanel>
       ) : null}
     </AnimatePresence>,
     document.body
+  )
+}
+
+function OverlayPanel({
+  panelRef,
+  label,
+  reduce,
+  onClose,
+  children,
+}: {
+  panelRef: React.RefObject<HTMLDivElement | null>
+  label: string
+  reduce: boolean
+  onClose: () => void
+  children: ReactNode
+}) {
+  // Closing: stop catching taps at once, so the next tap lands on the page.
+  const present = useIsPresent()
+  return (
+    <motion.div
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      tabIndex={-1}
+      className={cn("fixed inset-0 z-50 outline-none", !present && "pointer-events-none")}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: reduce ? 0 : 0.18, ease: EASE_OUT }}
+    >
+      <button
+        type="button"
+        aria-label="Close menu"
+        tabIndex={-1}
+        className="scrim absolute inset-0 h-full w-full cursor-default"
+        onClick={onClose}
+      />
+      {children}
+    </motion.div>
   )
 }

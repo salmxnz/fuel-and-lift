@@ -2,6 +2,12 @@ import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    // Keep visited (and prefetched) app screens in the router cache, so
+    // switching tabs doesn't wait for the server each time. Data freshness is
+    // the client data cache's job (lib/api/query-client.ts).
+    staleTimes: { dynamic: 30, static: 180 },
+  },
   async headers() {
     return [
       {

@@ -6,7 +6,7 @@
 // bar; that's fine). "Not now" hides it for two weeks, and it never shows once
 // adebite is installed.
 
-import { AnimatePresence, motion } from "motion/react"
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import Image from "next/image"
 import { useEffect, useState } from "react"
 import { InstallCta } from "@/components/landing/install-cta"
@@ -43,6 +43,7 @@ export function InstallPopup({
   const platform = useInstallPlatform()
   const { canPrompt, justInstalled } = useInstallPrompt()
   const [open, setOpen] = useState(false)
+  const reduce = useReducedMotion()
 
   // Desktop without an install prompt has nothing useful to offer.
   const eligible =
@@ -84,9 +85,9 @@ export function InstallPopup({
           aria-labelledby="install-popup-title"
           className="fixed inset-x-0 z-40 mx-auto w-full max-w-[440px] px-3"
           style={{ bottom }}
-          initial={{ opacity: 0, transform: "translateY(24px)" }}
-          animate={{ opacity: 1, transform: "translateY(0px)", transition: { duration: 0.28, ease: EASE_OUT } }}
-          exit={{ opacity: 0, transform: "translateY(16px)", transition: { duration: 0.18, ease: EASE_OUT } }}
+          initial={{ opacity: 0, transform: reduce ? "none" : "translateY(24px)" }}
+          animate={{ opacity: 1, transform: reduce ? "none" : "translateY(0px)", transition: { duration: 0.28, ease: EASE_OUT } }}
+          exit={{ opacity: 0, transform: reduce ? "none" : "translateY(16px)", transition: { duration: 0.18, ease: EASE_OUT } }}
         >
           <div className="flex flex-col gap-4 rounded-[24px] bg-white p-4 shadow-[0_12px_40px_-8px_rgba(46,26,36,0.28),0_0_0_1px_rgba(46,26,36,0.06)]">
             <div className="flex items-start gap-3.5">

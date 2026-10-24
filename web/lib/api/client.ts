@@ -90,16 +90,32 @@ function onUnauthorized() {
 export const ENTRY_LOGGED_EVENT = "adebite:entry-logged"
 const LOGS_ENTRY = /^days\/[^/]+\/(entries|saved-meals\/[^/]+)$/
 
+// Writes report their path so the data cache can refresh what they changed
+// (lib/api/query-client.ts registers the listener).
+let writeListener: ((path: string) => void) | null = null
+export function onApiWrite(fn: (path: string) => void) {
+  writeListener = fn
+}
+
+async function write<T>(method: string, path: string, body: unknown): Promise<T> {
+  try {
+    return await request<T>(method, path, { body })
+  } finally {
+    // Also after a failure: the server may have changed something anyway.
+    writeListener?.(path)
+  }
+}
+
 export const api = {
   get: <T>(path: string, query?: Query, signal?: AbortSignal) => request<T>("GET", path, { query, signal }),
   post: async <T>(path: string, body?: unknown) => {
-    const res = await request<T>("POST", path, { body: body ?? {} })
+    const res = await write<T>("POST", path, body ?? {})
     if (typeof window !== "undefined" && LOGS_ENTRY.test(path)) window.dispatchEvent(new Event(ENTRY_LOGGED_EVENT))
     return res
   },
-  put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body: body ?? {} }),
-  patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body: body ?? {} }),
-  del: <T = void>(path: string, body?: unknown) => request<T>("DELETE", path, { body }),
+  put: <T>(path: string, body?: unknown) => write<T>("PUT", path, body ?? {}),
+  patch: <T>(path: string, body?: unknown) => write<T>("PATCH", path, body ?? {}),
+  del: <T = void>(path: string, body?: unknown) => write<T>("DELETE", path, body),
 }
 
 export function errorMessage(err: unknown): string {

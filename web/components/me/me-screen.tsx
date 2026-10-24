@@ -1,5 +1,6 @@
 "use client"
 
+import { clearCache } from "@/lib/api/query-client"
 import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
@@ -45,6 +46,8 @@ export function MeScreen() {
 
   async function signOut() {
     setSigningOut(true)
+    // Nothing of this account stays on the device.
+    clearCache()
     try {
       await fetch("/api/auth/logout", { method: "POST", headers: { Accept: "application/json" } })
     } catch {

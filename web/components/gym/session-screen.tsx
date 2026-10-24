@@ -287,7 +287,8 @@ export function SessionScreen({ id }: { id: string }) {
                   dragElastic={{ left: 0.6, right: 0.05 }}
                   dragSnapToOrigin
                   onDragEnd={(_e: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
-                    if (info.offset.x < -SWIPE_SKIP_PX) void setSkipped(b, true)
+                    // A long drag or a quick flick to the left skips it.
+                    if (info.offset.x < -SWIPE_SKIP_PX || (info.offset.x < -24 && info.velocity.x < -500)) void setSkipped(b, true)
                   }}
                 >
                   {isCurrent ? (
@@ -306,7 +307,7 @@ export function SessionScreen({ id }: { id: string }) {
                     <button
                       type="button"
                       onClick={() => !finished && setExpanded(b.id)}
-                      className="flex w-full items-center justify-between gap-2 rounded-btn bg-white px-3.5 py-3 text-left"
+                      className="flex w-full items-center justify-between gap-2 rounded-btn bg-white px-3.5 py-3 text-left transition-transform duration-[160ms] ease-out active:scale-[0.98]"
                       aria-label={`${b.exercise.name}${done ? ", done" : ""}. ${finished ? "" : "Open"}`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
@@ -368,7 +369,7 @@ export function SessionScreen({ id }: { id: string }) {
         style={{ bottom: "max(26px, calc(var(--safe-bottom) + 8px))" }}
       >
         {timer.running ? (
-          <RestTimerPill remaining={timer.remaining} total={timer.total} onAdd={() => timer.add(15)} onStop={timer.stop} />
+          <RestTimerPill endAt={timer.endAt!} total={timer.total} onAdd={() => timer.add(15)} onStop={timer.stop} onDone={timer.finish} />
         ) : null}
         <Link
           href={`/gym/session/${s.id}/review`}

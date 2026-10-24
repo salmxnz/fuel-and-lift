@@ -6,6 +6,8 @@ import { motion } from "motion/react"
 import { useAddFlow } from "@/components/food/add-flow"
 import { ChartIcon, DumbbellIcon, HomeIcon, PersonIcon, PlusIcon } from "@/components/ui/icons"
 import { cn } from "@/lib/cn"
+import { SPRING_SNAPPY } from "@/lib/motion"
+import { useState } from "react"
 
 const TABS = [
   { href: "/today", label: "Today", Icon: HomeIcon, match: ["/today"] },
@@ -36,9 +38,15 @@ function isActive(pathname: string, match: readonly string[]) {
 export function GlassNav() {
   const pathname = usePathname()
   const { openMenu, menuOpen } = useAddFlow()
+  // The lens moves on tap, not when the new route arrives; once the path
+  // changes, the path decides again.
+  const [tapped, setTapped] = useState<{ href: string; from: string } | null>(null)
+  const pendingHref = tapped && tapped.from === pathname ? tapped.href : null
 
   return (
-    <nav
+    // layoutRoot: the lens is measured inside this fixed bar, not with the page scroll.
+    <motion.nav
+      layoutRoot
       aria-label="Main"
       className="pointer-events-none fixed inset-x-0 z-40"
       style={{ bottom: "max(26px, calc(var(--safe-bottom) + 8px))" }}
@@ -46,15 +54,16 @@ export function GlassNav() {
       <div className="pointer-events-auto mx-auto flex max-w-[var(--app-max)] items-center gap-2.5 px-4">
         <div className="glass grid flex-1 grid-cols-4 rounded-full p-[5px]">
           {TABS.map(({ href, label, Icon, match }) => {
-            const active = isActive(pathname, match)
+            const active = pendingHref ? pendingHref === href : isActive(pathname, match)
             return (
               <Link
                 key={href}
                 href={href}
+                onClick={() => setTapped({ href, from: pathname })}
                 data-tour={`tab-${label.toLowerCase()}`}
-                aria-current={active ? "page" : undefined}
+                aria-current={isActive(pathname, match) ? "page" : undefined}
                 className={cn(
-                  "relative flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-full py-[7px] text-[11px] no-underline",
+                  "relative flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-full py-[7px] text-[11px] no-underline transition-transform duration-[160ms] ease-out active:scale-[0.97]",
                   active ? "font-bold text-ink" : "font-semibold text-ink-soft"
                 )}
               >
@@ -63,7 +72,7 @@ export function GlassNav() {
                     layoutId="nav-lens"
                     aria-hidden="true"
                     className="absolute inset-0 rounded-full bg-white/90 shadow-lens"
-                    transition={{ type: "spring", stiffness: 520, damping: 38, mass: 0.8 }}
+                    transition={SPRING_SNAPPY}
                   />
                 ) : null}
                 <Icon size={22} className="relative" />
@@ -79,11 +88,11 @@ export function GlassNav() {
           aria-haspopup="dialog"
           aria-expanded={menuOpen}
           onClick={openMenu}
-          className="flex h-[62px] w-[62px] flex-none items-center justify-center rounded-full border border-[rgba(46,26,36,0.15)] bg-pink text-ink shadow-fab"
+          className="flex h-[62px] w-[62px] flex-none items-center justify-center rounded-full border border-[rgba(46,26,36,0.15)] bg-pink text-ink shadow-fab transition-transform duration-[160ms] ease-out active:scale-[0.95]"
         >
           <PlusIcon size={26} strokeWidth={2.2} />
         </button>
       </div>
-    </nav>
+    </motion.nav>
   )
 }

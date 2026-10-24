@@ -321,13 +321,21 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 }
 
+/* Toasts: in and out within the UI budget, on the app's ease-out. */
+body [data-sonner-toast] {
+  transition-duration: 250ms;
+  transition-timing-function: var(--ease-out);
+}
+
+/* Reduced motion means less movement, not no feedback: keyframe animations
+   (pulses, spinners, slides) stop, but small press and colour transitions
+   stay. Motion-driven movement is handled by <MotionConfig reducedMotion>. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 }

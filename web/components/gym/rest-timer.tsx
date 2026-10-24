@@ -4,60 +4,68 @@ import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { ClockIcon } from "@/components/ui/icons"
 
-/** Countdown that starts when a set is ticked; vibrates when rest is over. */
+/**
+ * Countdown that starts when a set is ticked; vibrates when rest is over.
+ * The hook only holds when rest ends: the ticking lives in RestTimerPill, so
+ * the workout screen doesn't re-render four times a second.
+ */
 export function useRestTimer() {
   const [endAt, setEndAt] = useState<number | null>(null)
   const [total, setTotal] = useState(0)
-  const [now, setNow] = useState(0)
-
-  useEffect(() => {
-    if (endAt == null) return
-    const tick = () => {
-      const t = Date.now()
-      if (t >= endAt) {
-        setEndAt(null)
-        try {
-          navigator.vibrate?.([220, 100, 220])
-        } catch {
-          /* not supported (iOS) */
-        }
-        toast("Rest over. Next set!", { duration: 2500 })
-        return
-      }
-      setNow(t)
-    }
-    const id = window.setInterval(tick, 250)
-    return () => window.clearInterval(id)
-  }, [endAt])
 
   const start = useCallback((seconds: number) => {
     const s = Math.max(5, Math.min(600, Math.round(seconds)))
-    const t = Date.now()
     setTotal(s)
-    setNow(t)
-    setEndAt(t + s * 1000)
+    setEndAt(Date.now() + s * 1000)
   }, [])
   const add = useCallback((seconds: number) => {
     setEndAt((e) => (e == null ? e : e + seconds * 1000))
     setTotal((t) => t + seconds)
   }, [])
   const stop = useCallback(() => setEndAt(null), [])
+  const finish = useCallback(() => {
+    setEndAt(null)
+    try {
+      navigator.vibrate?.([220, 100, 220])
+    } catch {
+      /* not supported (iOS) */
+    }
+    toast("Rest over. Next set!", { duration: 2500 })
+  }, [])
 
-  const remaining = endAt == null ? 0 : Math.max(0, Math.ceil((endAt - now) / 1000))
-  return { running: endAt != null, remaining, total, start, add, stop }
+  return { running: endAt != null, endAt, total, start, add, stop, finish }
 }
 
 export function RestTimerPill({
-  remaining,
+  endAt,
   total,
   onAdd,
   onStop,
+  onDone,
 }: {
-  remaining: number
+  endAt: number
   total: number
   onAdd: () => void
   onStop: () => void
+  /** Rest is over. */
+  onDone: () => void
 }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const tick = () => {
+      const t = Date.now()
+      if (t >= endAt) {
+        onDone()
+        return
+      }
+      setNow(t)
+    }
+    tick()
+    const id = window.setInterval(tick, 250)
+    return () => window.clearInterval(id)
+  }, [endAt, onDone])
+
+  const remaining = Math.max(0, Math.ceil((endAt - now) / 1000))
   const m = Math.floor(remaining / 60)
   const s = String(remaining % 60).padStart(2, "0")
   const p = total > 0 ? Math.min(100, ((total - remaining) / total) * 100) : 0

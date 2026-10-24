@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { ApiDownScreen } from "@/components/api-down"
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow"
+import { QueryProvider } from "@/components/query-provider"
 import { getMe, getSession } from "@/lib/auth/session"
 
 export const metadata: Metadata = { title: "Set up" }
@@ -18,5 +19,9 @@ export default async function OnboardingPage() {
   if (!me) redirect("/api/auth/logout?reason=session")
   if (me.onboarded) redirect("/today")
   const first = (me.user.name ?? "").trim().split(/\s+/)[0] ?? ""
-  return <OnboardingFlow defaultName={first} />
+  return (
+    <QueryProvider key={me.user.id} userId={me.user.id}>
+      <OnboardingFlow defaultName={first} />
+    </QueryProvider>
+  )
 }

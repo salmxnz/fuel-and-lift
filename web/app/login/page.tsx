@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { GoogleButton, NightShell, Tick } from "@/components/auth/night-shell"
 import { safeCallbackUrl } from "@/lib/auth/callback-url"
+import { ClearCache } from "@/components/auth/clear-cache"
 
 export const metadata: Metadata = { title: "Sign in" }
 
@@ -34,6 +35,8 @@ export default async function LoginPage({
 
   return (
     <NightShell>
+      {/* Signed out (maybe by the server): forget the last account's cached data. */}
+      <ClearCache />
       <div className="flex flex-col gap-2.5">
         <h1 className="m-0 text-[38px] font-extrabold leading-[1.02] tracking-[-0.03em]">Eat, lift, and see it add up.</h1>
         <p className="m-0 text-[16px] leading-[1.45] text-night-soft">

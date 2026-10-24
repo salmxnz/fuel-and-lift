@@ -31,6 +31,8 @@ import { num1, parseDecimal, signed } from "@/lib/format"
 import { cardioText, doneText, plannedText } from "./session-helpers"
 
 const THRESHOLD = 100
+/** px/s: a flick this fast counts even when it's short. */
+const FLICK = 500
 type Dir = "right" | "left" | "up"
 
 function useNightBody() {
@@ -368,9 +370,14 @@ function SwipeCard({
   function onDragEnd(_: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) {
     if (disabled) return
     const { x: ox, y: oy } = info.offset
-    if (oy < -THRESHOLD && Math.abs(oy) > Math.abs(ox)) onSwipe("up")
-    else if (ox > THRESHOLD) onSwipe("right")
-    else if (ox < -THRESHOLD) onSwipe("left")
+    const { x: vx, y: vy } = info.velocity
+    // Far enough, or a quick flick in that direction.
+    const up = oy < -THRESHOLD || (oy < -24 && vy < -FLICK)
+    const right = ox > THRESHOLD || (ox > 24 && vx > FLICK)
+    const left = ox < -THRESHOLD || (ox < -24 && vx < -FLICK)
+    if (up && Math.abs(oy) > Math.abs(ox)) onSwipe("up")
+    else if (right) onSwipe("right")
+    else if (left) onSwipe("left")
   }
 
   const exit = reduce

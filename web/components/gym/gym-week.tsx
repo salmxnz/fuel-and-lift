@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { CalendarIcon, CheckIcon, ListIcon } from "@/components/ui/icons"
 import { Button, Skeleton } from "@/components/ui/primitives"
 import { Sheet } from "@/components/ui/sheet"
@@ -49,7 +49,12 @@ export function GymWeek({
   const [view, setView] = useStoredChoice("adebite:gym-week-view", ["rows", "list"] as const, "rows")
   const [visibleWeek, setVisibleWeek] = useState(() => startOfWeek(today))
   const [openDay, setOpenDay] = useState<string | null>(null)
-  const sessions = useApi<SessionsResponse>(view === "rows" ? `sessions?from=${visibleWeek}&to=${addDays(visibleWeek, 6)}` : null)
+  // The pill stays on the last day opened after its sheet closes.
+  const [picked, setPicked] = useState<string | null>(null)
+  const selectedDay = openDay ?? picked ?? today
+  const sessions = useApi<SessionsResponse>(view === "rows" ? `sessions?from=${visibleWeek}&to=${addDays(visibleWeek, 6)}` : null, {
+    keepPrevious: true,
+  })
   const byId = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates])
   const byDate = useMemo(() => {
     const m = new Map<string, Session>()
@@ -61,6 +66,31 @@ export function GymWeek({
   }, [sessions.data])
 
   const todayKey = weekdayKey(today)
+
+  const days = plan?.days
+  const renderDay = useCallback(
+    (d: string) => {
+      const tplId = days?.[weekdayKey(d)]
+      const t = tplId ? byId.get(tplId) : undefined
+      const session = byDate.get(d)
+      const done = session?.status === "finished"
+      const selected = d === selectedDay
+      // A day you trained shows what you did, even off-plan.
+      const label = done && session?.template_name ? session.template_name : t ? t.name : "Rest"
+      return (
+        <span
+          className={cn(
+            "flex max-w-full items-center gap-0.5 truncate px-0.5 text-[10px] font-semibold leading-tight",
+            selected ? "text-pink" : t || done ? "text-ink-soft" : "text-muted"
+          )}
+        >
+          {done ? <CheckIcon size={10} className={selected ? "text-pink" : "text-protein"} /> : null}
+          {label === "Rest" ? label : shortName(label)}
+        </span>
+      )
+    },
+    [days, byId, byDate, selectedDay]
+  )
 
   return (
     <section aria-labelledby="week-title" className="flex flex-col gap-1 rounded-card bg-white px-3.5 pb-2 pt-1">
@@ -82,32 +112,16 @@ export function GymWeek({
         <Skeleton className="my-1 h-[70px]" />
       ) : view === "rows" ? (
         <WeekPager
-          selected={openDay ?? today}
-          onSelect={setOpenDay}
+          selected={selectedDay}
+          onSelect={(d) => {
+            setPicked(d)
+            setOpenDay(d)
+          }}
           dimAfter={today}
           label="Your gym week"
           pillId="gym-day"
           onWeekChange={setVisibleWeek}
-          renderDay={(d) => {
-            const tplId = plan.days[weekdayKey(d)]
-            const t = tplId ? byId.get(tplId) : undefined
-            const session = byDate.get(d)
-            const done = session?.status === "finished"
-            const selected = d === (openDay ?? today)
-            // A day you trained shows what you did, even off-plan.
-            const label = done && session?.template_name ? session.template_name : t ? t.name : "Rest"
-            return (
-              <span
-                className={cn(
-                  "flex max-w-full items-center gap-0.5 truncate px-0.5 text-[10px] font-semibold leading-tight",
-                  selected ? "text-pink" : t || done ? "text-ink-soft" : "text-muted"
-                )}
-              >
-                {done ? <CheckIcon size={10} className={selected ? "text-pink" : "text-protein"} /> : null}
-                {label === "Rest" ? label : shortName(label)}
-              </span>
-            )
-          }}
+          renderDay={renderDay}
         />
       ) : (
         WEEKDAY_KEYS.map((d) => {

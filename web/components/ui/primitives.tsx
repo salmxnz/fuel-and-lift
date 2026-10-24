@@ -124,7 +124,7 @@ export function CloseButton({ onClick, label = "Close", dark }: { onClick: () =>
       aria-label={label}
       onClick={onClick}
       className={cn(
-        "flex h-11 w-11 flex-none items-center justify-center rounded-full",
+        "flex h-11 w-11 flex-none items-center justify-center rounded-full transition-transform duration-[160ms] ease-out active:scale-[0.95]",
         dark ? "bg-night-2 text-white" : "bg-chip text-ink"
       )}
     >

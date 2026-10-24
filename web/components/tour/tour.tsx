@@ -130,7 +130,12 @@ function useTargetRect(target: string | null): Rect | null {
       if (!el || !el.isConnected) el = document.querySelector(`[data-tour="${target}"]`)
       if (!el) return setRect(null)
       const r = el.getBoundingClientRect()
-      setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
+      // Scroll and DOM changes fire often: only re-render when the target moved.
+      setRect((prev) =>
+        prev && prev.top === r.top && prev.left === r.left && prev.width === r.width && prev.height === r.height
+          ? prev
+          : { top: r.top, left: r.left, width: r.width, height: r.height }
+      )
     }
     // The target may not be rendered yet (route still loading): watch for it.
     const mo = new MutationObserver(() => {

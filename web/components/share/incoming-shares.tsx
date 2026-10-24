@@ -41,9 +41,26 @@ function dayLabel(date: string): string {
   return formatDayMonth(date)
 }
 
-/** Shares fold open when they arrive and fold shut when answered, so what's below glides instead of jumping. */
-function ShareList({ shares, label, children }: { shares: Share[]; label: string; children: (s: Share) => ReactNode }) {
+/**
+ * Shares fold open when they arrive and fold shut when answered, so what's
+ * below glides instead of jumping. The ones already waiting when the list
+ * loads just appear: they shouldn't push the screen down on every visit.
+ */
+function ShareList({
+  shares,
+  loaded,
+  label,
+  children,
+}: {
+  shares: Share[]
+  /** The list has loaded (from the cache or the network). */
+  loaded: boolean
+  label: string
+  children: (s: Share) => ReactNode
+}) {
   const reduce = useReducedMotion()
+  const [initialIds, setInitialIds] = useState<Set<string> | null>(null)
+  if (loaded && initialIds === null) setInitialIds(new Set(shares.map((s) => s.id)))
   return (
     <section aria-label={label} className="-mb-3.5 flex flex-col">
       <AnimatePresence initial={false}>
@@ -51,7 +68,7 @@ function ShareList({ shares, label, children }: { shares: Share[]; label: string
           <motion.div
             key={s.id}
             className="overflow-hidden"
-            initial={reduce ? { opacity: 0 } : { opacity: 0, height: 0 }}
+            initial={initialIds?.has(s.id) ? false : reduce ? { opacity: 0 } : { opacity: 0, height: 0 }}
             animate={reduce ? { opacity: 1 } : { opacity: 1, height: "auto" }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0, transition: { duration: 0.18, ease: EASE_OUT } }}
             transition={{ duration: 0.24, ease: EASE_OUT, delay: Math.min(i, 4) * 0.04 }}
@@ -119,7 +136,7 @@ function useShares(kind: Share["kind"]) {
       toast.error(errorMessage(err))
     }
   }
-  return { shares, remove, decline }
+  return { shares, loaded: res.data !== undefined, remove, decline }
 }
 
 // ------------------------------------------------------------ Meals (Today)
@@ -136,12 +153,12 @@ export function IncomingMeals({
   onDayChange: (day: Day) => void
   onGoTo: (date: string) => void
 }) {
-  const { shares, remove, decline } = useShares("meal")
+  const { shares, loaded, remove, decline } = useShares("meal")
   const [adding, setAdding] = useState<Share | null>(null)
 
   return (
     <>
-      <ShareList shares={shares} label="Meals friends shared with you">
+      <ShareList shares={shares} loaded={loaded} label="Meals friends shared with you">
         {(s) => (
           <ShareCard
             share={s}
@@ -286,7 +303,7 @@ function AcceptMealForm({
 
 export function IncomingTemplates({ onAdded }: { onAdded: (t: Template) => void }) {
   const router = useRouter()
-  const { shares, remove, decline } = useShares("template")
+  const { shares, loaded, remove, decline } = useShares("template")
   const [busy, setBusy] = useState<string | null>(null)
 
   async function accept(s: Share) {
@@ -306,7 +323,7 @@ export function IncomingTemplates({ onAdded }: { onAdded: (t: Template) => void 
   }
 
   return (
-    <ShareList shares={shares} label="Workouts friends shared with you">
+    <ShareList shares={shares} loaded={loaded} label="Workouts friends shared with you">
       {(s) => {
         const ex = s.template!.exercises
         const summary =
@@ -340,7 +357,7 @@ export function IncomingTemplates({ onAdded }: { onAdded: (t: Template) => void 
 
 export function IncomingRoutines({ onAdded }: { onAdded: (r: Routine) => void }) {
   const router = useRouter()
-  const { shares, remove, decline } = useShares("routine")
+  const { shares, loaded, remove, decline } = useShares("routine")
   const [busy, setBusy] = useState<string | null>(null)
 
   async function accept(s: Share) {
@@ -360,7 +377,7 @@ export function IncomingRoutines({ onAdded }: { onAdded: (r: Routine) => void })
   }
 
   return (
-    <ShareList shares={shares} label="Routines friends shared with you">
+    <ShareList shares={shares} loaded={loaded} label="Routines friends shared with you">
       {(s) => {
         const r = s.routine!
         const trained = Object.values(r.days).filter((d) => d != null).length

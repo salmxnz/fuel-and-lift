@@ -3,7 +3,8 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useAddFlow } from "@/components/food/add-flow"
 import { CalendarIcon, PlusIcon } from "@/components/ui/icons"
 import { Button, ErrorCard, Skeleton, TextInput } from "@/components/ui/primitives"
@@ -25,7 +26,16 @@ export function TodayScreen() {
   const params = useSearchParams()
   const today = todayISO()
   const raw = params.get("date")
-  const date = isISODate(raw) ? raw : today
+  const paramDate = isISODate(raw) ? raw : today
+  // The day on screen. Changing it is local (plus a history.replaceState for
+  // the URL), so day taps and swipes never wait for a server round trip. A
+  // real navigation to /today?date=… still wins.
+  const [date, setShownDate] = useState(paramDate)
+  const [seenParam, setSeenParam] = useState(paramDate)
+  if (paramDate !== seenParam) {
+    setSeenParam(paramDate)
+    setShownDate(paramDate)
+  }
   const isToday = date === today
   const isPast = date < today
 
@@ -47,13 +57,32 @@ export function TodayScreen() {
   function goTo(d: string) {
     if (d === date || d > today) return
     setDir(d > date ? 1 : -1)
-    router.replace(d === today ? "/today" : `/today?date=${d}`, { scroll: false })
+    setShownDate(d)
+    window.history.replaceState(null, "", d === today ? "/today" : `/today?date=${d}`)
   }
 
-  // Dots under days with something logged, for the week in view.
+  // Dots under days with something logged, for the week in view. The old
+  // week's dots stay while the next week loads.
   const [visibleWeek, setVisibleWeek] = useState(() => startOfWeek(date))
-  const calories = useApi<ProgressCaloriesResponse>(`progress/calories?from=${visibleWeek}&to=${addDays(visibleWeek, 6)}`)
+  const calories = useApi<ProgressCaloriesResponse>(`progress/calories?from=${visibleWeek}&to=${addDays(visibleWeek, 6)}`, {
+    keepPrevious: true,
+  })
   const logged = useMemo(() => new Set((calories.data?.days ?? []).filter((d) => d.logged).map((d) => d.date)), [calories.data])
+  const shownHasFood = !!day.data?.day.meals.some((m) => m.entries.length > 0)
+  const renderDay = useCallback(
+    (d: string) => <DayDot on={logged.has(d) || (d === date && shownHasFood)} />,
+    [logged, date, shownHasFood]
+  )
+
+  // The days either side are fetched ahead, so swiping lands on data.
+  const queryClient = useQueryClient()
+  const dayLoaded = !!day.data
+  useEffect(() => {
+    if (!dayLoaded) return
+    for (const d of [addDays(date, -1), addDays(date, 1)]) {
+      if (d <= today) void queryClient.prefetchQuery({ queryKey: [`days/${d}`] })
+    }
+  }, [dayLoaded, date, today, queryClient])
 
   // New food from the + menu goes to the day on screen.
   useEffect(() => {
@@ -126,7 +155,7 @@ export function TodayScreen() {
         label="Pick a day"
         pillId="today-day"
         onWeekChange={setVisibleWeek}
-        renderDay={(d) => <DayDot on={logged.has(d) || (d === date && !!day.data?.day.meals.some((m) => m.entries.length > 0))} />}
+        renderDay={renderDay}
       />
 
       <IncomingMeals

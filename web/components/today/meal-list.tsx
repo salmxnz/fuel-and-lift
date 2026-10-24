@@ -60,7 +60,7 @@ export function MealList({
                 <button
                   type="button"
                   onClick={() => onAdd(target)}
-                  className="flex min-h-[44px] flex-none items-center rounded-[12px] bg-ink px-3.5 text-[14px] font-semibold text-white"
+                  className="flex min-h-[44px] flex-none items-center rounded-[12px] bg-ink px-3.5 text-[14px] font-semibold text-white transition-transform duration-[160ms] ease-out active:scale-[0.97]"
                 >
                   Log {meal.name.toLowerCase()}
                 </button>
@@ -72,7 +72,7 @@ export function MealList({
               <button
                 type="button"
                 onClick={() => onAdd(target)}
-                className="flex w-full flex-col gap-1.5 rounded-card px-4 py-3.5 text-left"
+                className="flex w-full flex-col gap-1.5 rounded-card px-4 py-3.5 text-left transition-transform duration-[160ms] ease-out active:scale-[0.98]"
               >
                 <h2 className="m-0 text-[13px] font-semibold text-muted">{meal.name}</h2>
                 <span className="text-[15px]">
@@ -136,7 +136,7 @@ function MealCard({
       <button
         type="button"
         onClick={onAdd}
-        className="-mb-1.5 flex min-h-[40px] items-center self-start text-[13px] font-semibold text-protein"
+        className="-mb-1.5 flex min-h-[40px] items-center self-start text-[13px] font-semibold text-protein transition-transform duration-[160ms] ease-out active:scale-[0.97]"
       >
         + Add to {meal.name.toLowerCase()}
       </button>
@@ -156,7 +156,7 @@ function EntryRow({ entry, onEdit }: { entry: Entry; onEdit: () => void }) {
       type="button"
       onClick={onEdit}
       aria-label={`${entry.name}, ${kcal(entry.kcal)} kcal. Edit`}
-      className="flex w-full items-center gap-3 text-left"
+      className="flex w-full items-center gap-3 text-left transition-transform duration-[160ms] ease-out active:scale-[0.98]"
     >
       {visual ? (
         <span

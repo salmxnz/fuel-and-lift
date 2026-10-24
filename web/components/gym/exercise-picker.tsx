@@ -39,7 +39,8 @@ function useDebounced<T>(value: T, ms: number): T {
 function PickerBody({ onPick }: { onPick: (exercise: Exercise) => void }) {
   const [q, setQ] = useState("")
   const query = useDebounced(q.trim(), 250)
-  const results = useApi<ExercisesResponse>(`exercises?q=${encodeURIComponent(query)}`)
+  // Old results stay while a new search loads, so the sheet doesn't jump.
+  const results = useApi<ExercisesResponse>(`exercises?q=${encodeURIComponent(query)}`, { keepPrevious: true })
   const [creating, setCreating] = useState(false)
   const [kind, setKind] = useState<ExerciseKind>("strength")
   const [muscle, setMuscle] = useState("")

@@ -40,9 +40,20 @@ export function PhotoCarousel({
   useEffect(() => {
     const el = track.current
     if (!el) return
-    const onScroll = () => setActive(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)))
+    // Once per frame at most: the dots re-measure on every change.
+    let frame = 0
+    const onScroll = () => {
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        setActive(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)))
+      })
+    }
     el.addEventListener("scroll", onScroll, { passive: true })
-    return () => el.removeEventListener("scroll", onScroll)
+    return () => {
+      cancelAnimationFrame(frame)
+      el.removeEventListener("scroll", onScroll)
+    }
   }, [])
 
   useEffect(() => {

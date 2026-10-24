@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { getMe, getSession } from "@/lib/auth/session"
 import { MeProvider } from "@/components/me-context"
 import { ApiDownScreen } from "@/components/api-down"
+import { QueryProvider } from "@/components/query-provider"
 
 export const dynamic = "force-dynamic"
 
@@ -22,5 +23,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!me) redirect("/api/auth/logout?reason=session")
   if (!me.onboarded) redirect("/onboarding")
 
-  return <MeProvider value={{ user: me.user, profile: me.profile }}>{children}</MeProvider>
+  return (
+    <MeProvider value={{ user: me.user, profile: me.profile }}>
+      {/* Keyed by user: another account never sees this one's cache. */}
+      <QueryProvider key={me.user.id} userId={me.user.id}>
+        {children}
+      </QueryProvider>
+    </MeProvider>
+  )
 }
