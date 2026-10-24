@@ -125,13 +125,6 @@ func (h *Handler) ShareTemplate(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, map[string]any{"shared_with": len(ids)})
 }
 
-func plural(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
-}
-
 // ListShares handles GET /v1/shares?kind=meal|template: what friends sent
 // that's still waiting for an answer.
 func (h *Handler) ListShares(w http.ResponseWriter, r *http.Request) {
