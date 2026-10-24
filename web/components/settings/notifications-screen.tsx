@@ -10,12 +10,14 @@ import { useApi } from "@/lib/api/use-api"
 import { currentSubscription, disablePush, enablePush, pushSupport, snoozePushPrompt } from "@/lib/push"
 
 const ROWS: { key: keyof NotificationPrefs; title: string; sub: string }[] = [
-  { key: "friend_workouts", title: "When friends work out", sub: "Choose which friends in Friends" },
+  { key: "friend_workouts", title: "When friends work out", sub: "Choose which friends on their profile" },
+  { key: "friend_goals", title: "Friends hit their goal", sub: "Sunday evening, when a friend's week hits the goal" },
   { key: "cheers", title: "Cheers", sub: "When a friend cheers your workout" },
-  { key: "meal_nudges", title: "Meal reminders", sub: "If a usual meal isn't logged by its usual time" },
-  { key: "workout_day", title: "Workout days", sub: "A nudge on days your plan has a workout" },
-  { key: "weigh_in", title: "Weigh-in reminders", sub: "Matches how often you weigh in" },
-  { key: "weekly_checkin", title: "Weekly check-in", sub: "How the week went against your plan" },
+  { key: "meal_nudges", title: "Meal reminders", sub: "At the times set in My meals, if that meal isn't logged yet" },
+  { key: "streak_risk", title: "Streak at risk", sub: "At 8 pm, if nothing is logged yet and you have a streak going" },
+  { key: "workout_day", title: "Workout days", sub: "At 9 am on days your plan has a workout" },
+  { key: "weigh_in", title: "Weigh-in reminders", sub: "At 8 am, as often as you chose to weigh in" },
+  { key: "weekly_checkin", title: "Weekly recap", sub: "Sunday evening: days on target, protein and streak" },
 ]
 
 type DeviceState = "checking" | "on" | "off" | "ios-install" | "unsupported" | "denied"

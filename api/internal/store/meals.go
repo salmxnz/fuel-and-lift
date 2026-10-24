@@ -17,17 +17,21 @@ type MealSlot struct {
 	Name     string `json:"name"`
 	Position int    `json:"position"`
 	Schedule string `json:"schedule"` // daily | gym_days
+	// RemindAt is a local time ("12:30") to be reminded to log it, or null.
+	RemindAt *string `json:"remind_at"`
 }
+
+const slotCols = `id::text, name, position, schedule, to_char(remind_at, 'HH24:MI')`
 
 func scanSlot(r pgx.CollectableRow) (MealSlot, error) {
 	var m MealSlot
-	return m, r.Scan(&m.ID, &m.Name, &m.Position, &m.Schedule)
+	return m, r.Scan(&m.ID, &m.Name, &m.Position, &m.Schedule, &m.RemindAt)
 }
 
 // ListMealSlots returns the active slots in order.
 func (s *Store) ListMealSlots(ctx context.Context, userID string) ([]MealSlot, error) {
 	rows, err := s.Pool.Query(ctx, `
-		select id::text, name, position, schedule from meal_slots
+		select `+slotCols+` from meal_slots
 		where user_id = $1::uuid and archived_at is null order by position, created_at`, userID)
 	if err != nil {
 		return nil, err
@@ -40,23 +44,25 @@ func (s *Store) ListMealSlots(ctx context.Context, userID string) ([]MealSlot, e
 }
 
 // CreateMealSlot appends a slot.
-func (s *Store) CreateMealSlot(ctx context.Context, userID, name, schedule string) (MealSlot, error) {
+func (s *Store) CreateMealSlot(ctx context.Context, userID, name, schedule string, remindAt *string) (MealSlot, error) {
 	rows, err := s.Pool.Query(ctx, `
-		insert into meal_slots (user_id, name, schedule, position)
-		values ($1::uuid, $2, $3, (select coalesce(max(position) + 1, 0) from meal_slots where user_id = $1::uuid and archived_at is null))
-		returning id::text, name, position, schedule`, userID, name, schedule)
+		insert into meal_slots (user_id, name, schedule, remind_at, position)
+		values ($1::uuid, $2, $3, $4::time, (select coalesce(max(position) + 1, 0) from meal_slots where user_id = $1::uuid and archived_at is null))
+		returning `+slotCols, userID, name, schedule, remindAt)
 	if err != nil {
 		return MealSlot{}, err
 	}
 	return pgx.CollectExactlyOneRow(rows, scanSlot)
 }
 
-// UpdateMealSlot renames or reschedules a slot.
-func (s *Store) UpdateMealSlot(ctx context.Context, userID, id string, name, schedule *string) (MealSlot, error) {
+// UpdateMealSlot renames or reschedules a slot. setRemind says whether
+// remindAt (which may be nil, to clear it) is being changed.
+func (s *Store) UpdateMealSlot(ctx context.Context, userID, id string, name, schedule *string, setRemind bool, remindAt *string) (MealSlot, error) {
 	rows, err := s.Pool.Query(ctx, `
-		update meal_slots set name = coalesce($3, name), schedule = coalesce($4, schedule)
+		update meal_slots set name = coalesce($3, name), schedule = coalesce($4, schedule),
+		       remind_at = case when $5 then $6::time else remind_at end
 		where id = $1::uuid and user_id = $2::uuid and archived_at is null
-		returning id::text, name, position, schedule`, id, userID, name, schedule)
+		returning `+slotCols, id, userID, name, schedule, setRemind, remindAt)
 	if err != nil {
 		return MealSlot{}, err
 	}

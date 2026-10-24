@@ -3,14 +3,15 @@
 import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
-import { useMe } from "@/components/me-context"
-import { Avatar, Button, ErrorCard, PageHeader, Skeleton, Switch } from "@/components/ui/primitives"
+import { displayName, useMe } from "@/components/me-context"
+import { WeekCard } from "@/components/friends/week-card"
+import { Avatar, Button, ErrorCard, PageHeader, Skeleton } from "@/components/ui/primitives"
 import { CheerIcon, ChevronRightIcon, DumbbellIcon, PlusIcon, TrendIcon } from "@/components/ui/icons"
 import { api, errorMessage, seg } from "@/lib/api/client"
-import type { FeedItem, FeedItemResponse, FeedResponse, FriendResponse, FriendsResponse } from "@/lib/api/types"
+import type { FeedItem, FeedItemResponse, FeedResponse, FriendsWeekResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
-import { formatDayMonth, relativeDay } from "@/lib/dates"
+import { relativeDay } from "@/lib/dates"
 import { RewardIcon } from "@/components/progress/rewards-card"
 import { PasteInvite } from "./paste-invite"
 
@@ -21,14 +22,14 @@ const KIND_VERB: Record<FeedItem["kind"], string> = {
   streak: "is on a streak",
 }
 
+/** The Friends tab: everyone's week so far, then the activity feed. */
 export function FriendsScreen() {
   const me = useMe()
   const feed = useApi<FeedResponse>("feed")
-  const friends = useApi<FriendsResponse>("friends")
+  const week = useApi<FriendsWeekResponse>("friends/week")
   const [more, setMore] = useState<FeedItem[]>([])
   const [loadingMore, setLoadingMore] = useState(false)
   const [exhausted, setExhausted] = useState(false)
-  const [openFriend, setOpenFriend] = useState<string | null>(null)
 
   const items = [...(feed.data?.items ?? []), ...more]
 
@@ -67,28 +68,6 @@ export function FriendsScreen() {
     }
   }
 
-  async function setNotify(id: string, notify: boolean) {
-    friends.setData((prev) => ({ friends: (prev?.friends ?? []).map((f) => (f.id === id ? { ...f, notify_workouts: notify } : f)) }))
-    try {
-      const res = await api.patch<FriendResponse>(`friends/${seg(id)}`, { notify_workouts: notify })
-      friends.setData((prev) => ({ friends: (prev?.friends ?? []).map((f) => (f.id === id ? res.friend : f)) }))
-    } catch (err) {
-      friends.setData((prev) => ({ friends: (prev?.friends ?? []).map((f) => (f.id === id ? { ...f, notify_workouts: !notify } : f)) }))
-      toast.error(errorMessage(err))
-    }
-  }
-
-  async function removeFriend(id: string, name: string) {
-    try {
-      await api.del(`friends/${seg(id)}`)
-      friends.setData((prev) => ({ friends: (prev?.friends ?? []).filter((f) => f.id !== id) }))
-      toast.success(`You and ${name} are no longer friends`)
-      setOpenFriend(null)
-    } catch (err) {
-      toast.error(errorMessage(err))
-    }
-  }
-
   // Group the feed by day.
   const groups: { day: string; items: FeedItem[] }[] = []
   for (const it of items) {
@@ -101,13 +80,12 @@ export function FriendsScreen() {
   return (
     <div className="flex flex-col gap-3">
       <PageHeader
-        back="/me"
-        backLabel="Back to Me"
         title="Friends"
-        titleClassName="text-[26px]"
+        titleClassName="text-[30px]"
         right={
           <Link
             href="/friends/add"
+            data-tour="add-friend"
             className="flex min-h-11 items-center gap-1.5 rounded-[12px] bg-ink px-3.5 text-[14px] font-bold text-white no-underline"
           >
             <PlusIcon size={16} strokeWidth={2.2} /> Add friend
@@ -115,7 +93,42 @@ export function FriendsScreen() {
         }
       />
 
-      <section aria-label="Activity" className="flex flex-col gap-2">
+      <section aria-labelledby="this-week" className="flex flex-col gap-2">
+        <h2 id="this-week" className="m-0 text-[17px] font-extrabold">
+          This week
+        </h2>
+        {week.error && !week.data ? (
+          <ErrorCard message={week.error.message} onRetry={() => void week.reload()} />
+        ) : !week.data ? (
+          <>
+            <Skeleton className="h-[118px] rounded-card" />
+            <Skeleton className="h-[118px] rounded-card" />
+          </>
+        ) : (
+          <>
+            <WeekCard
+              person={{ id: me.user.id, name: displayName(me), avatar_url: me.user.avatar_url }}
+              summary={week.data.me}
+              isMe
+              href={`/people/${seg(me.user.id)}`}
+            />
+            {week.data.friends.length === 0 ? (
+              <div className="rounded-card border-[1.5px] border-dashed border-dash p-4 text-[15px] text-muted">
+                No friends yet. Send a link and you&apos;ll see how their week is going here.
+              </div>
+            ) : (
+              week.data.friends.map((f) => (
+                <WeekCard key={f.person.id} person={f.person} summary={f.summary} href={`/people/${seg(f.person.id)}`} />
+              ))
+            )}
+          </>
+        )}
+      </section>
+
+      <section aria-labelledby="activity" className="flex flex-col gap-2">
+        <h2 id="activity" className="m-0 mt-2 text-[17px] font-extrabold">
+          Activity
+        </h2>
         {feed.error && !feed.data ? (
           <ErrorCard message={feed.error.message} onRetry={() => void feed.reload()} />
         ) : feed.loading ? (
@@ -130,7 +143,7 @@ export function FriendsScreen() {
         ) : (
           groups.map((g) => (
             <div key={g.day} className="flex flex-col gap-2">
-              <h2 className="m-0 mt-1 text-[13px] font-semibold text-muted">{g.day}</h2>
+              <h3 className="m-0 mt-1 text-[13px] font-semibold text-muted">{g.day}</h3>
               {g.items.map((it) => {
                 const mine = it.actor.id === me.user.id
                 return (
@@ -204,62 +217,6 @@ export function FriendsScreen() {
             Older activity
           </Button>
         ) : null}
-      </section>
-
-      <section aria-label="Your friends" className="flex flex-col rounded-card bg-white px-3.5 py-0.5">
-        {friends.error && !friends.data ? (
-          <p className="m-0 py-3 text-[14px] text-danger">{friends.error.message}</p>
-        ) : friends.loading ? (
-          <Skeleton className="my-3 h-10" />
-        ) : (friends.data?.friends.length ?? 0) === 0 ? (
-          <p className="m-0 py-3.5 text-[14px] text-muted">No friends yet. Send a link and they&apos;re added when they join.</p>
-        ) : (
-          friends.data!.friends.map((f) => {
-            const labelId = `friend-${f.id}`
-            const open = openFriend === f.id
-            return (
-              <div key={f.id} className="flex flex-col border-b border-line-soft last:border-b-0">
-                <div className="flex min-h-[60px] items-center gap-2.5">
-                  <Avatar name={f.name} url={f.avatar_url} size={36} />
-                  <button
-                    type="button"
-                    aria-expanded={open}
-                    onClick={() => setOpenFriend(open ? null : f.id)}
-                    className="flex min-h-11 flex-1 flex-col justify-center text-left"
-                  >
-                    <span id={labelId} className="text-[15px] font-bold">
-                      {f.name}
-                    </span>
-                    <span className="text-[12px] text-muted">
-                      {f.last_workout_on ? `Last workout ${formatDayMonth(f.last_workout_on)}` : "Notify me when they work out"}
-                    </span>
-                  </button>
-                  <Switch
-                    checked={f.notify_workouts}
-                    onChange={(v) => setNotify(f.id, v)}
-                    label={`Notify me when ${f.name} works out`}
-                  />
-                </div>
-                {open ? (
-                  <div className="flex flex-col gap-2 pb-3">
-                    <Link
-                      href={`/people/${f.id}`}
-                      className="flex min-h-[44px] items-center justify-between rounded-tile bg-ground px-3 text-[14px] font-semibold no-underline"
-                    >
-                      See their routines and meals <ChevronRightIcon size={16} className="text-muted" />
-                    </Link>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[12px] text-muted">Friends since {formatDayMonth(f.since)}</span>
-                      <Button variant="danger" size="sm" onClick={() => removeFriend(f.id, f.name)}>
-                        Remove friend
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            )
-          })
-        )}
       </section>
 
       <Link

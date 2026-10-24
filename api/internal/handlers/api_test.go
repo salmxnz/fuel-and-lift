@@ -56,6 +56,7 @@ func (f *fakeAI) Estimate(ctx context.Context, req ai.Request) (ai.Estimate, ai.
 
 type env struct {
 	t   *testing.T
+	h   *handlers.Handler
 	srv *httptest.Server
 	st  *store.Store
 	ai  *fakeAI
@@ -141,7 +142,7 @@ func setup(t *testing.T) *env {
 	}
 	srv := httptest.NewServer(server.NewRouter(h))
 	t.Cleanup(func() { srv.Close(); st.Close() })
-	return &env{t: t, srv: srv, st: st, ai: fake, ph: photos}
+	return &env{t: t, h: h, srv: srv, st: st, ai: fake, ph: photos}
 }
 
 type user struct {

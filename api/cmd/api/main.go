@@ -117,6 +117,7 @@ func run(log *slog.Logger, args []string) error {
 	} else {
 		log.Warn("R2 not configured: meal photos are not stored (set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)")
 	}
+	go h.RunReminders(ctx)
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           server.NewRouter(h),

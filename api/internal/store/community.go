@@ -442,6 +442,8 @@ type PersonView struct {
 	Routines     []ShopItem `json:"routines"`
 	Templates    []ShopItem `json:"templates"`
 	Meals        []ShopItem `json:"meals"`
+	// Summary is their week so far, for themselves and for friends they share it with.
+	Summary *WeekSummary `json:"summary"`
 }
 
 // GetPerson returns someone's profile and the items the viewer may see. It's

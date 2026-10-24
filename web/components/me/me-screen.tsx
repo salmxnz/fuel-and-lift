@@ -2,12 +2,16 @@
 
 import { clearCache } from "@/lib/api/query-client"
 import Link from "next/link"
-import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 import { displayName, useMe } from "@/components/me-context"
-import { Avatar, Button, ReferralBar, Skeleton } from "@/components/ui/primitives"
-import { BellIcon, CameraIcon, ChevronRightIcon, FriendsIcon, GearIcon, GlobeIcon, ListIcon, PlusIcon, ScaleIcon, ShareIcon, ShopIcon, StarIcon, TargetIcon } from "@/components/ui/icons"
-import type { BillingResponse, Goal, GoalResponse, SharingResponse } from "@/lib/api/types"
+import { Avatar, Button, PageHeader, ReferralBar, Skeleton } from "@/components/ui/primitives"
+import { BellIcon, CameraIcon, ChevronRightIcon, GearIcon, GlobeIcon, ListIcon, PencilIcon, ScaleIcon, ShareIcon, ShopIcon, StarIcon, TargetIcon, TrashIcon } from "@/components/ui/icons"
+import { Sheet } from "@/components/ui/sheet"
+import { api, errorMessage } from "@/lib/api/client"
+import type { BillingResponse, Goal, GoalResponse, SharingResponse, UserResponse } from "@/lib/api/types"
+import { prepareImage } from "@/lib/image"
 import { useApi } from "@/lib/api/use-api"
 import { num1 } from "@/lib/format"
 import { useTour } from "@/components/tour/tour"
@@ -27,6 +31,7 @@ function sharingSummary(s: SharingResponse["sharing"] | undefined): string {
     s.records && "records",
     s.weight_trend && "weight trend",
     s.food_streaks && "food streaks",
+    s.weekly_summary && "weekly summary",
   ].filter(Boolean) as string[]
   if (on.length === 0) return "Nothing shared"
   const text = on.length > 1 ? `${on.slice(0, -1).join(", ")} and ${on[on.length - 1]}` : on[0]
@@ -58,10 +63,10 @@ export function MeScreen() {
 
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="m-0 text-[30px] font-extrabold tracking-[-0.02em]">Me</h1>
+      <PageHeader back="/today" backLabel="Back to Today" title="Me" titleClassName="text-[30px]" />
 
       <section aria-label="Profile" className="flex items-center gap-3 rounded-card bg-white p-3.5">
-        <Avatar name={name} url={me.user.avatar_url} size={52} tone="ink" />
+        <ProfilePhoto name={name} url={me.user.avatar_url} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-[18px] font-extrabold">{name}</span>
           {goal.loading ? (
@@ -113,8 +118,6 @@ export function MeScreen() {
       ) : null}
 
       <nav aria-label="Settings" className="flex flex-col rounded-card bg-white px-3.5 py-0.5">
-        <Row href="/friends" icon={<FriendsIcon size={20} />} title="Friends" sub="Their workouts and streaks" tour="friends-row" />
-        <Row href="/friends/add" icon={<PlusIcon size={20} />} title="Add a friend" sub="Send them a link" tour="add-friend" />
         <Row href="/sharing" icon={<ShareIcon size={20} />} title="Sharing" sub={sharingSummary(sharing.data?.sharing)} />
         <Row href="/shared" icon={<ShareIcon size={20} />} title="Shared" sub="What friends sent you and what you sent" />
         <Row href={`/people/${me.user.id}`} icon={<GlobeIcon size={20} />} title="Your profile" sub="What friends and the Shop see" />
@@ -152,6 +155,101 @@ export function MeScreen() {
       </Button>
       <p className="m-0 text-center text-[12px] text-muted">Signed in as {me.user.email}</p>
     </div>
+  )
+}
+
+/** The avatar on Me: tap to take, choose or remove a profile photo. */
+function ProfilePhoto({ name, url }: { name: string; url: string | null }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  // Shown until the refreshed layout brings the new avatar_url.
+  const [preview, setPreview] = useState<string | null | undefined>(undefined)
+  const choose = useRef<HTMLInputElement>(null)
+  const take = useRef<HTMLInputElement>(null)
+  const shown = preview === undefined ? url : preview
+  const uploaded = !!url && url.includes("/avatars/")
+
+  async function upload(file: File | undefined) {
+    if (!file) return
+    setBusy(true)
+    try {
+      const img = await prepareImage(file, { maxSide: 512, square: true })
+      await api.post<UserResponse>("profile/avatar", { media_type: img.mediaType, data: img.data })
+      setPreview(img.previewUrl)
+      setOpen(false)
+      toast.success("Profile photo updated")
+      router.refresh()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove() {
+    setBusy(true)
+    try {
+      const res = await api.del<UserResponse>("profile/avatar")
+      setPreview(res?.user.avatar_url ?? null)
+      setOpen(false)
+      router.refresh()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const input = (ref: React.RefObject<HTMLInputElement | null>, capture?: "user") => (
+    <input
+      ref={ref}
+      type="file"
+      accept="image/*"
+      capture={capture}
+      className="hidden"
+      onChange={(e) => {
+        void upload(e.target.files?.[0])
+        e.target.value = ""
+      }}
+    />
+  )
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Change profile photo"
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        className="relative flex-none rounded-full transition-transform duration-[160ms] ease-out active:scale-[0.95]"
+      >
+        <Avatar name={name} url={shown} size={52} tone="ink" />
+        <span
+          aria-hidden="true"
+          className="absolute -right-0.5 -bottom-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 border-white bg-pink text-ink"
+        >
+          <PencilIcon size={11} strokeWidth={2.2} />
+        </span>
+      </button>
+      {input(choose)}
+      {input(take, "user")}
+      <Sheet open={open} onClose={() => !busy && setOpen(false)} title="Profile photo" description="Friends see it on their Friends tab.">
+        <div className="flex flex-col gap-2">
+          <Button variant="primary" size="md" loading={busy} onClick={() => choose.current?.click()}>
+            Choose a photo
+          </Button>
+          <Button variant="outline" size="md" disabled={busy} onClick={() => take.current?.click()}>
+            <CameraIcon size={18} /> Take a photo
+          </Button>
+          {uploaded ? (
+            <Button variant="outline" size="md" className="text-danger" disabled={busy} onClick={remove}>
+              <TrashIcon size={18} /> Remove photo
+            </Button>
+          ) : null}
+        </div>
+      </Sheet>
+    </>
   )
 }
 

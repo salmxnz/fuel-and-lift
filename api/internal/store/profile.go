@@ -95,6 +95,15 @@ func (s *Store) ActiveGoal(ctx context.Context, userID string) (Goal, error) {
 	return scanGoal(s.Pool.QueryRow(ctx, `select `+goalCols+` from goals where user_id = $1::uuid and ended_on is null`, userID))
 }
 
+// Target is the daily target from the user's active goal (zero without one).
+func (s *Store) Target(ctx context.Context, userID string) Macros {
+	g, err := s.ActiveGoal(ctx, userID)
+	if err != nil {
+		return Macros{}
+	}
+	return Macros{Kcal: g.Plan.TargetKcal, ProteinG: g.Plan.Macros.ProteinG, CarbsG: g.Plan.Macros.CarbsG, FatG: g.Plan.Macros.FatG}
+}
+
 func insertGoal(ctx context.Context, tx pgx.Tx, userID string, mode, pace string, startKg float64, goalKg *float64, on Date, plan nutrition.Plan) (Goal, error) {
 	if _, err := tx.Exec(ctx, `update goals set ended_on = $2 where user_id = $1::uuid and ended_on is null`, userID, on.Time); err != nil {
 		return Goal{}, err

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion } from "motion/react"
 import { useAddFlow } from "@/components/food/add-flow"
-import { ChartIcon, DumbbellIcon, HomeIcon, PersonIcon, PlusIcon } from "@/components/ui/icons"
+import { ChartIcon, DumbbellIcon, FriendsIcon, HomeIcon, PlusIcon } from "@/components/ui/icons"
 import { cn } from "@/lib/cn"
 import { SPRING_SNAPPY } from "@/lib/motion"
 import { useState } from "react"
@@ -13,13 +13,10 @@ const TABS = [
   { href: "/today", label: "Today", Icon: HomeIcon, match: ["/today"] },
   { href: "/gym", label: "Gym", Icon: DumbbellIcon, match: ["/gym"] },
   { href: "/progress", label: "Progress", Icon: ChartIcon, match: ["/progress"] },
-  {
-    href: "/me",
-    label: "Me",
-    Icon: PersonIcon,
-    match: ["/me", "/friends", "/sharing", "/meals", "/saved-meals", "/settings"],
-  },
+  { href: "/friends", label: "Friends", Icon: FriendsIcon, match: ["/friends", "/people"] },
 ] as const
+// Me (and its settings pages) opens from the avatar at the top of Today, so
+// none of the tabs lights up there.
 
 function isActive(pathname: string, match: readonly string[]) {
   return match.some((m) => pathname === m || pathname.startsWith(`${m}/`))

@@ -126,6 +126,17 @@ It also fills the Gym tab:
 ### `PATCH /v1/profile` (any subset of Profile fields) → `200 {"profile": Profile}`
 Also `{"tour_done": true}` marks the post-onboarding walkthrough done, and
 `false` shows it again ("Show me around").
+
+### Profile photo
+- `POST /v1/profile/avatar` `{media_type, data}` → `200 {"user": User}`. `data` is base64 (no
+  `data:` prefix), at most 2 MB, JPEG, PNG or WebP. The type is checked from the bytes, not
+  `media_type`. The app sends a 512 px square JPEG. `user.avatar_url` becomes
+  `${APP_URL}/avatars/<user id>?v=<unix time>`, so it changes with every new photo.
+- `DELETE /v1/profile/avatar` → `200 {"user": User}`, back to the Google picture (or `null`).
+- `GET /v1/avatars/{user_id}` (**no auth**) → the image bytes, with `Cache-Control: public,
+  max-age=31536000, immutable`, or `404`. The PWA serves it at `/avatars/{user_id}`.
+
+Signing in with Google again updates the Google picture but never replaces an uploaded photo.
 ### `GET /v1/goal` → `200 {"goal": Goal}`
 ### `POST /v1/goal` (`mode`, `goal_weight_kg`, `pace`) → `201 {"goal": Goal}` — starts a new goal from the latest weigh-in.
 
@@ -141,11 +152,14 @@ type WeighIn = { id: string, date: string, weight_kg: number, note: string | nul
 ## Meals (the user's meal list)
 
 ```ts
-type MealSlot = { id: string, name: string, position: number, schedule: "daily" | "gym_days" }
+type MealSlot = {
+  id: string, name: string, position: number, schedule: "daily" | "gym_days",
+  remind_at: string | null   // local "12:30": push a reminder if nothing's logged in it by then
+}
 ```
 ### `GET /v1/meal-slots` → `200 {"meal_slots": MealSlot[]}`
-### `POST /v1/meal-slots` `{name, schedule?}` → `201 {"meal_slot": MealSlot}`
-### `PATCH /v1/meal-slots/{id}` `{name?, schedule?}` → `200 {"meal_slot": MealSlot}`
+### `POST /v1/meal-slots` `{name, schedule?, remind_at?}` → `201 {"meal_slot": MealSlot}`
+### `PATCH /v1/meal-slots/{id}` `{name?, schedule?, remind_at?}` → `200 {"meal_slot": MealSlot}` (`remind_at: null` clears it; leaving it out keeps it)
 ### `PUT /v1/meal-slots/order` `{"ids": [...]}` → `200 {"meal_slots": MealSlot[]}`
 ### `DELETE /v1/meal-slots/{id}` → `204` (archived; past entries keep their name)
 
@@ -507,6 +521,7 @@ type Sharing = {
   records: boolean           // new personal records
   weight_trend: boolean      // direction and milestones only, never the number
   food_streaks: boolean      // streak milestones: "is on a 7-day streak"
+  weekly_summary: boolean    // their week on the Friends tab (WeekSummary), never calories
 }
 type Friend = { id: string, name: string, avatar_url: string | null, since: string,
                 last_workout_on: string | null, notify_workouts: boolean }
@@ -515,11 +530,26 @@ type FeedItem = { id: string, actor: { id: string, name: string, avatar_url: str
                   text: string,              // "Upper-1 done: 4 exercises, 38 min"
                   data: Record<string, unknown>,
                   created_at: string, cheers: number, cheered_by_me: boolean }
+// Someone's week so far: Monday to today in *their* timezone. Days only say
+// whether they hit the target, never how much was eaten.
+type WeekSummary = {
+  week_start: string,          // the Monday
+  days_logged: number,
+  days_on_target: number,      // logged and calories within ±10% of their target
+  days_protein_hit: number,    // logged and protein at least 90% of their target
+  goal_days: number,           // 5: days on target that make the week's goal
+  goal_hit: boolean,           // days_on_target >= goal_days
+  streak: number, active_today: boolean,
+  workouts: number | null,     // finished this week; null when they don't share workouts
+  days: { date: string, logged: boolean, on_target: boolean, protein_hit: boolean }[]  // Mon–Sun
+}
 ```
 - `GET /v1/friends` → `200 {"friends": Friend[]}`
+- `GET /v1/friends/week` → `200 {"me": WeekSummary, "friends": {person: Person, since: string, summary: WeekSummary | null}[]}`
+  (`summary` is null when that friend turned `weekly_summary` off; goal hits first, then most days on target)
 - `DELETE /v1/friends/{user_id}` → `204`
 - `PATCH /v1/friends/{user_id}` `{notify_workouts}` → `200 {"friend": Friend}` (push me when this friend finishes a workout)
-- `GET /v1/sharing` / `PUT /v1/sharing` → `{"sharing": Sharing}` (what all my friends can see; defaults: workouts, records and streaks on, the rest off)
+- `GET /v1/sharing` / `PUT /v1/sharing` → `{"sharing": Sharing}` (what all my friends can see; defaults: workouts, records, streaks and weekly summary on, the rest off. `weekly_summary` keeps its value when left out of a PUT)
 - `GET /v1/feed?before=` → `200 {"items": FeedItem[]}` (friends' activity, newest first, 30 per page)
 - `POST /v1/feed/{id}/cheer` / `DELETE /v1/feed/{id}/cheer` → `200 {"item": FeedItem}` (a cheer pushes the actor)
 
@@ -649,7 +679,8 @@ type ShopItem = {
 type PersonView = {
   person: Person, is_me: boolean, is_friend: boolean,
   friends_since: string | null,
-  routines: ShopItem[], templates: ShopItem[], meals: ShopItem[]   // what they share with you, newest first
+  routines: ShopItem[], templates: ShopItem[], meals: ShopItem[],  // what they share with you, newest first
+  summary: WeekSummary | null   // yours, or a friend's when they share it; null otherwise
 }
 ```
 On your own id, it shows what you share (friends + public). `404` unless it's you,
@@ -727,13 +758,28 @@ Hiding any of their meals, templates or routines (whatever the visibility) uses
 type NotificationPrefs = {
   friend_workouts: boolean, cheers: boolean, meal_nudges: boolean,
   workout_day: boolean, weigh_in: boolean, weekly_checkin: boolean,
+  streak_risk: boolean, friend_goals: boolean,
   quiet_from: string | null, quiet_to: string | null   // "22:00", "07:00"
 }
 ```
+`streak_risk` and `friend_goals` default to on and keep their value when left out of a PUT.
 - `GET /v1/push/vapid-public-key` → `200 {"key": "B..."}` (no auth)
 - `POST /v1/push/subscriptions` `{endpoint, keys: {p256dh, auth}, user_agent?}` → `201`
 - `DELETE /v1/push/subscriptions` `{endpoint}` → `204`
 - `GET /v1/notification-prefs` / `PUT /v1/notification-prefs` → `{"prefs": NotificationPrefs}`
+
+Scheduled pushes are checked every minute, in each user's local time. Each one goes out at
+most once (tracked in `notification_log`), up to an hour late after a restart, and never in
+quiet hours:
+
+| Push | Switch | When | Only if |
+|---|---|---|---|
+| Meal reminder | `meal_nudges` | the meal's `remind_at` | nothing logged in that meal today; gym-day meals only on gym days |
+| Streak at risk | `streak_risk` | 20:00 | streak of 2+ days and nothing logged or trained today |
+| Weekly recap | `weekly_checkin` | Sunday 19:00 | something logged this week |
+| A friend hit their goal | `friend_goals` | the friend's Sunday 19:00 | they hit the goal and share their weekly summary |
+| Weigh-in | `weigh_in` | 08:00 | due by `weigh_in_cadence` (Mon/Wed/Fri, Mondays, the 1st, or the 1st of each quarter) and no weigh-in today |
+| Workout day | `workout_day` | 09:00 | the weekly plan has a workout today and none is finished |
 
 ## System
 

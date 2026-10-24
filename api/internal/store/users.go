@@ -82,7 +82,9 @@ func (s *Store) SignInWithGoogle(ctx context.Context, in GoogleSignIn) (User, bo
 				role = "admin"
 			}
 			u, err = scanUser(tx.QueryRow(ctx, `
-				update users set google_sub = $2, email = $3, avatar_url = nullif($4, ''),
+				update users set google_sub = $2, email = $3, google_avatar_url = nullif($4, ''),
+				       avatar_url = case when exists(select 1 from user_avatars a where a.user_id = users.id)
+				                         then avatar_url else nullif($4, '') end,
 				       name = case when name = '' then $5 else name end,
 				       role = $6, last_login_at = now(),
 				       pro_source = case when $6 = 'admin' and (plan <> 'pro' or pro_until is not null) then 'admin' else pro_source end,
@@ -118,8 +120,8 @@ func (s *Store) SignInWithGoogle(ctx context.Context, in GoogleSignIn) (User, bo
 				invitedBy = &link.CreatedBy
 			}
 			u, err = scanUser(tx.QueryRow(ctx, `
-				insert into users (google_sub, email, name, avatar_url, role, plan, pro_source, invited_by, last_login_at)
-				values ($1, $2, $3, nullif($4, ''), $5, $6, $7, $8::uuid, now())
+				insert into users (google_sub, email, name, avatar_url, google_avatar_url, role, plan, pro_source, invited_by, last_login_at)
+				values ($1, $2, $3, nullif($4, ''), nullif($4, ''), $5, $6, $7, $8::uuid, now())
 				returning `+userCols,
 				in.Subject, in.Email, in.Name, in.AvatarURL, role, plan, proSource, invitedBy))
 			if err != nil {

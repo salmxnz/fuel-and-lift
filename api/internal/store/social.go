@@ -331,16 +331,17 @@ type Sharing struct {
 	Records        bool `json:"records"`
 	WeightTrend    bool `json:"weight_trend"`
 	FoodStreaks    bool `json:"food_streaks"`
+	WeeklySummary  bool `json:"weekly_summary"`
 }
 
 // DefaultSharing is used until the user changes anything.
-var DefaultSharing = Sharing{Workouts: true, Records: true, FoodStreaks: true}
+var DefaultSharing = Sharing{Workouts: true, Records: true, FoodStreaks: true, WeeklySummary: true}
 
 // GetSharing returns the user's sharing settings.
 func (s *Store) GetSharing(ctx context.Context, userID string) (Sharing, error) {
 	sh := DefaultSharing
-	err := s.Pool.QueryRow(ctx, `select workouts, workout_details, records, weight_trend, food_streaks from sharing_settings where user_id = $1::uuid`, userID).
-		Scan(&sh.Workouts, &sh.WorkoutDetails, &sh.Records, &sh.WeightTrend, &sh.FoodStreaks)
+	err := s.Pool.QueryRow(ctx, `select workouts, workout_details, records, weight_trend, food_streaks, weekly_summary from sharing_settings where user_id = $1::uuid`, userID).
+		Scan(&sh.Workouts, &sh.WorkoutDetails, &sh.Records, &sh.WeightTrend, &sh.FoodStreaks, &sh.WeeklySummary)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return DefaultSharing, nil
 	}
@@ -350,11 +351,11 @@ func (s *Store) GetSharing(ctx context.Context, userID string) (Sharing, error) 
 // PutSharing saves sharing settings.
 func (s *Store) PutSharing(ctx context.Context, userID string, sh Sharing) error {
 	_, err := s.Pool.Exec(ctx, `
-		insert into sharing_settings (user_id, workouts, workout_details, records, weight_trend, food_streaks)
-		values ($1::uuid, $2, $3, $4, $5, $6)
+		insert into sharing_settings (user_id, workouts, workout_details, records, weight_trend, food_streaks, weekly_summary)
+		values ($1::uuid, $2, $3, $4, $5, $6, $7)
 		on conflict (user_id) do update set workouts = $2, workout_details = $3, records = $4,
-		  weight_trend = $5, food_streaks = $6, updated_at = now()`,
-		userID, sh.Workouts, sh.WorkoutDetails, sh.Records, sh.WeightTrend, sh.FoodStreaks)
+		  weight_trend = $5, food_streaks = $6, weekly_summary = $7, updated_at = now()`,
+		userID, sh.Workouts, sh.WorkoutDetails, sh.Records, sh.WeightTrend, sh.FoodStreaks, sh.WeeklySummary)
 	return err
 }
 

@@ -19,6 +19,7 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/login" ||
     pathname === "/offline" ||
     pathname.startsWith("/join/") ||
+    pathname.startsWith("/avatars/") ||
     pathname.startsWith("/api/auth/")
   )
 }

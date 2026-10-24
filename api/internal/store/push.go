@@ -67,21 +67,25 @@ type NotificationPrefs struct {
 	WorkoutDay     bool    `json:"workout_day"`
 	WeighIn        bool    `json:"weigh_in"`
 	WeeklyCheckin  bool    `json:"weekly_checkin"`
+	StreakRisk     bool    `json:"streak_risk"`
+	FriendGoals    bool    `json:"friend_goals"`
 	QuietFrom      *string `json:"quiet_from"` // "22:00"
 	QuietTo        *string `json:"quiet_to"`
 }
 
 // DefaultNotificationPrefs apply until the user changes anything.
-var DefaultNotificationPrefs = NotificationPrefs{FriendWorkouts: true, Cheers: true, WorkoutDay: true, WeighIn: true, WeeklyCheckin: true}
+var DefaultNotificationPrefs = NotificationPrefs{FriendWorkouts: true, Cheers: true, WorkoutDay: true, WeighIn: true, WeeklyCheckin: true,
+	StreakRisk: true, FriendGoals: true}
 
 // GetNotificationPrefs returns a user's preferences.
 func (s *Store) GetNotificationPrefs(ctx context.Context, userID string) (NotificationPrefs, error) {
 	p := DefaultNotificationPrefs
 	err := s.Pool.QueryRow(ctx, `
-		select friend_workouts, cheers, meal_nudges, workout_day, weigh_in, weekly_checkin,
+		select friend_workouts, cheers, meal_nudges, workout_day, weigh_in, weekly_checkin, streak_risk, friend_goals,
 		       to_char(quiet_from, 'HH24:MI'), to_char(quiet_to, 'HH24:MI')
 		from notification_prefs where user_id = $1::uuid`, userID).
-		Scan(&p.FriendWorkouts, &p.Cheers, &p.MealNudges, &p.WorkoutDay, &p.WeighIn, &p.WeeklyCheckin, &p.QuietFrom, &p.QuietTo)
+		Scan(&p.FriendWorkouts, &p.Cheers, &p.MealNudges, &p.WorkoutDay, &p.WeighIn, &p.WeeklyCheckin, &p.StreakRisk, &p.FriendGoals,
+			&p.QuietFrom, &p.QuietTo)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return DefaultNotificationPrefs, nil
 	}
@@ -91,11 +95,14 @@ func (s *Store) GetNotificationPrefs(ctx context.Context, userID string) (Notifi
 // PutNotificationPrefs saves preferences.
 func (s *Store) PutNotificationPrefs(ctx context.Context, userID string, p NotificationPrefs) error {
 	_, err := s.Pool.Exec(ctx, `
-		insert into notification_prefs (user_id, friend_workouts, cheers, meal_nudges, workout_day, weigh_in, weekly_checkin, quiet_from, quiet_to)
-		values ($1::uuid, $2, $3, $4, $5, $6, $7, $8::time, $9::time)
+		insert into notification_prefs (user_id, friend_workouts, cheers, meal_nudges, workout_day, weigh_in, weekly_checkin,
+		  streak_risk, friend_goals, quiet_from, quiet_to)
+		values ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10::time, $11::time)
 		on conflict (user_id) do update set friend_workouts = $2, cheers = $3, meal_nudges = $4, workout_day = $5,
-		  weigh_in = $6, weekly_checkin = $7, quiet_from = $8::time, quiet_to = $9::time, updated_at = now()`,
-		userID, p.FriendWorkouts, p.Cheers, p.MealNudges, p.WorkoutDay, p.WeighIn, p.WeeklyCheckin, p.QuietFrom, p.QuietTo)
+		  weigh_in = $6, weekly_checkin = $7, streak_risk = $8, friend_goals = $9,
+		  quiet_from = $10::time, quiet_to = $11::time, updated_at = now()`,
+		userID, p.FriendWorkouts, p.Cheers, p.MealNudges, p.WorkoutDay, p.WeighIn, p.WeeklyCheckin,
+		p.StreakRisk, p.FriendGoals, p.QuietFrom, p.QuietTo)
 	return err
 }
 

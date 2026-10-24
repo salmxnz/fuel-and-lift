@@ -15,6 +15,8 @@ export type User = {
   role: Role | string
 }
 
+export type UserResponse = { user: User }
+
 export type AuthGoogleRequest =
   | { code: string; code_verifier: string; redirect_uri: string; invite_token?: string }
   | { id_token: string; invite_token?: string }
@@ -116,7 +118,14 @@ export type NewWeighInRequest = { date: string; weight_kg: number; note?: string
 // ---------------------------------------------------------------- Meal slots
 
 export type MealSchedule = "daily" | "gym_days"
-export type MealSlot = { id: string; name: string; position: number; schedule: MealSchedule }
+export type MealSlot = {
+  id: string
+  name: string
+  position: number
+  schedule: MealSchedule
+  /** Local time ("12:30") to be reminded to log it, or null. */
+  remind_at: string | null
+}
 export type MealSlotsResponse = { meal_slots: MealSlot[] }
 export type MealSlotResponse = { meal_slot: MealSlot }
 
@@ -542,6 +551,8 @@ export type Sharing = {
   records: boolean
   weight_trend: boolean
   food_streaks: boolean
+  /** Friends see your week: days on target and streak, never calories. */
+  weekly_summary: boolean
 }
 export type SharingResponse = { sharing: Sharing }
 
@@ -555,6 +566,24 @@ export type Friend = {
 }
 export type FriendsResponse = { friends: Friend[] }
 export type FriendResponse = { friend: Friend }
+
+/** Someone's week so far (Monday to today, their timezone). No calories. */
+export type WeekSummary = {
+  week_start: string
+  days_logged: number
+  days_on_target: number
+  days_protein_hit: number
+  goal_days: number
+  goal_hit: boolean
+  streak: number
+  active_today: boolean
+  /** Finished workouts this week; null when they don't share workouts. */
+  workouts: number | null
+  /** Monday to Sunday; days after today are empty. */
+  days: { date: string; logged: boolean; on_target: boolean; protein_hit: boolean }[]
+}
+export type FriendWeek = { person: Person; since: string; summary: WeekSummary | null }
+export type FriendsWeekResponse = { me: WeekSummary; friends: FriendWeek[] }
 
 /** A meal, template or routine a friend sent, waiting for an answer. */
 export type Share = {
@@ -616,6 +645,8 @@ export type NotificationPrefs = {
   workout_day: boolean
   weigh_in: boolean
   weekly_checkin: boolean
+  streak_risk: boolean
+  friend_goals: boolean
   quiet_from: string | null
   quiet_to: string | null
 }
@@ -686,6 +717,8 @@ export type PersonViewResponse = {
   routines: ShopItem[]
   templates: ShopItem[]
   meals: ShopItem[]
+  /** Their week, for yourself and for friends who share it. */
+  summary: WeekSummary | null
 }
 
 export type ReportGroup = {

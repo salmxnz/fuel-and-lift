@@ -35,10 +35,15 @@ func (h *Handler) ListMealSlots(w http.ResponseWriter, r *http.Request) {
 // CreateMealSlot handles POST /v1/meal-slots.
 func (h *Handler) CreateMealSlot(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Name     string `json:"name"`
-		Schedule string `json:"schedule"`
+		Name     string  `json:"name"`
+		Schedule string  `json:"schedule"`
+		RemindAt *string `json:"remind_at"`
 	}
 	if !decode(w, r, &in) {
+		return
+	}
+	if !validClock(in.RemindAt) {
+		badRequest(w, `remind_at is a time like "12:30"`)
 		return
 	}
 	name, ok := cleanName(in.Name, 30)
@@ -53,7 +58,7 @@ func (h *Handler) CreateMealSlot(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "schedule must be daily or gym_days")
 		return
 	}
-	m, err := h.Store.CreateMealSlot(r.Context(), auth.UserID(r), name, in.Schedule)
+	m, err := h.Store.CreateMealSlot(r.Context(), auth.UserID(r), name, in.Schedule, in.RemindAt)
 	if err != nil {
 		h.storeError(w, r, err)
 		return
@@ -68,10 +73,15 @@ func (h *Handler) UpdateMealSlot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Name     *string `json:"name"`
-		Schedule *string `json:"schedule"`
+		Name     *string          `json:"name"`
+		Schedule *string          `json:"schedule"`
+		RemindAt optional[string] `json:"remind_at"`
 	}
 	if !decode(w, r, &in) {
+		return
+	}
+	if !validClock(in.RemindAt.Value) {
+		badRequest(w, `remind_at is a time like "12:30"`)
 		return
 	}
 	if in.Name != nil {
@@ -86,7 +96,7 @@ func (h *Handler) UpdateMealSlot(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "schedule must be daily or gym_days")
 		return
 	}
-	m, err := h.Store.UpdateMealSlot(r.Context(), auth.UserID(r), id, in.Name, in.Schedule)
+	m, err := h.Store.UpdateMealSlot(r.Context(), auth.UserID(r), id, in.Name, in.Schedule, in.RemindAt.Set, in.RemindAt.Value)
 	if err != nil {
 		h.storeError(w, r, err)
 		return
@@ -135,12 +145,9 @@ func (h *Handler) DeleteMealSlot(w http.ResponseWriter, r *http.Request) {
 
 // --- day and entries -----------------------------------------------------------------
 
+// target is the user's daily target from their active goal (zero without one).
 func (h *Handler) target(ctx context.Context, userID string) store.Macros {
-	g, err := h.Store.ActiveGoal(ctx, userID)
-	if err != nil {
-		return store.Macros{}
-	}
-	return store.Macros{Kcal: g.Plan.TargetKcal, ProteinG: g.Plan.Macros.ProteinG, CarbsG: g.Plan.Macros.CarbsG, FatG: g.Plan.Macros.FatG}
+	return h.Store.Target(ctx, userID)
 }
 
 func (h *Handler) day(ctx context.Context, userID string, d store.Date) (store.Day, error) {

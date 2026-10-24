@@ -293,3 +293,10 @@ export function CardioArt({ size = 56 }: { size?: number }) {
     </svg>
   )
 }
+export const MoreIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="5.5" cy="12" r="1.1" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.1" fill="currentColor" />
+    <circle cx="18.5" cy="12" r="1.1" fill="currentColor" />
+  </Svg>
+)

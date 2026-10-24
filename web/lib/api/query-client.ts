@@ -52,7 +52,7 @@ export function invalidate(prefixes: string[]) {
   })
 }
 
-const GYM = ["templates", "routines", "weekly-plan", "sessions", "progress/", "exercises", "shop", "people/"]
+const GYM = ["templates", "routines", "weekly-plan", "sessions", "progress/", "exercises", "shop", "people/", "friends/week"]
 
 /** Which cached paths a write to path can change. */
 export function affectedBy(path: string): string[] {
@@ -61,7 +61,7 @@ export function affectedBy(path: string): string[] {
   switch (first) {
     case "days":
     case "entries":
-      return ["days/", "progress/", "shares", "saved-meals", "photos", "billing", "ai/"]
+      return ["days/", "progress/", "shares", "saved-meals", "photos", "billing", "ai/", "friends/week", "people/"]
     case "templates":
     case "routines":
     case "splits":
@@ -73,11 +73,14 @@ export function affectedBy(path: string): string[] {
       return ["saved-meals", "shop", "people/"]
     case "meal-slots":
       return ["meal-slots", "days/"]
+    case "profile":
+      // A new profile photo shows on every friend card and feed item.
+      if (p.startsWith("profile/avatar")) return ["friends", "feed", "people/", "shares", "invite-links"]
+      return ["goal", "progress/", "days/", "profile", "friends/week", "people/"]
     case "weigh-ins":
     case "goal":
-    case "profile":
     case "onboarding":
-      return ["goal", "progress/", "days/", "profile"]
+      return ["goal", "progress/", "days/", "profile", "friends/week", "people/"]
     case "shop":
       return ["shop", "people/", "templates", "routines", "saved-meals", "exercises"]
     case "shares":

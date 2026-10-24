@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -210,6 +212,70 @@ func (h *Handler) ListFriends(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{"friends": list})
 }
 
+// weekOf is userID's week so far, against their own target and in their
+// own timezone.
+func (h *Handler) weekOf(ctx context.Context, userID string, withWorkouts bool) (store.WeekSummary, error) {
+	return h.Store.WeekSummary(ctx, userID, h.today(ctx, userID), h.Store.Target(ctx, userID), withWorkouts)
+}
+
+// sharedWeek is friendID's week when they share it with friends, else nil.
+func (h *Handler) sharedWeek(ctx context.Context, friendID string) (*store.WeekSummary, error) {
+	sh, err := h.Store.GetSharing(ctx, friendID)
+	if err != nil || !sh.WeeklySummary {
+		return nil, err
+	}
+	wk, err := h.weekOf(ctx, friendID, sh.Workouts)
+	if err != nil {
+		return nil, err
+	}
+	return &wk, nil
+}
+
+// FriendWeek is a friend and their week on the Friends tab.
+type FriendWeek struct {
+	Person  store.Person       `json:"person"`
+	Since   store.Date         `json:"since"`
+	Summary *store.WeekSummary `json:"summary"` // null when they don't share it
+}
+
+// FriendsWeek handles GET /v1/friends/week: my week, then each friend's,
+// those who hit their goal first.
+func (h *Handler) FriendsWeek(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID := auth.UserID(r)
+	me, err := h.weekOf(ctx, userID, true)
+	if err != nil {
+		h.storeError(w, r, err)
+		return
+	}
+	list, err := h.Store.ListFriends(ctx, userID)
+	if err != nil {
+		h.storeError(w, r, err)
+		return
+	}
+	friends := make([]FriendWeek, 0, len(list))
+	for _, f := range list {
+		wk, err := h.sharedWeek(ctx, f.ID)
+		if err != nil {
+			h.storeError(w, r, err)
+			return
+		}
+		friends = append(friends, FriendWeek{Person: store.Person{ID: f.ID, Name: f.Name, AvatarURL: f.AvatarURL}, Since: f.Since, Summary: wk})
+	}
+	score := func(s *store.WeekSummary) int {
+		if s == nil {
+			return -1
+		}
+		n := s.DaysOnTarget*10 + s.DaysLogged
+		if s.GoalHit {
+			n += 1000
+		}
+		return n
+	}
+	sort.SliceStable(friends, func(i, j int) bool { return score(friends[i].Summary) > score(friends[j].Summary) })
+	httpx.JSON(w, http.StatusOK, map[string]any{"me": me, "friends": friends})
+}
+
 // RemoveFriend handles DELETE /v1/friends/{user_id}.
 func (h *Handler) RemoveFriend(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "user_id")
@@ -264,13 +330,29 @@ func (h *Handler) GetSharing(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{"sharing": s})
 }
 
-// PutSharing handles PUT /v1/sharing.
+// PutSharing handles PUT /v1/sharing. weekly_summary keeps its value when
+// left out, so an older app doesn't turn it off.
 func (h *Handler) PutSharing(w http.ResponseWriter, r *http.Request) {
-	var in store.Sharing
-	if !decode(w, r, &in) {
+	var body struct {
+		store.Sharing
+		WeeklySummary *bool `json:"weekly_summary"`
+	}
+	if !decode(w, r, &body) {
 		return
 	}
-	if err := h.Store.PutSharing(r.Context(), auth.UserID(r), in); err != nil {
+	userID := auth.UserID(r)
+	in := body.Sharing
+	if body.WeeklySummary != nil {
+		in.WeeklySummary = *body.WeeklySummary
+	} else {
+		cur, err := h.Store.GetSharing(r.Context(), userID)
+		if err != nil {
+			h.storeError(w, r, err)
+			return
+		}
+		in.WeeklySummary = cur.WeeklySummary
+	}
+	if err := h.Store.PutSharing(r.Context(), userID, in); err != nil {
 		h.storeError(w, r, err)
 		return
 	}
@@ -402,11 +484,31 @@ func validClock(s *string) bool {
 	return err == nil
 }
 
-// PutNotificationPrefs handles PUT /v1/notification-prefs.
+// PutNotificationPrefs handles PUT /v1/notification-prefs. streak_risk and
+// friend_goals keep their value when left out (older apps don't send them).
 func (h *Handler) PutNotificationPrefs(w http.ResponseWriter, r *http.Request) {
-	var in store.NotificationPrefs
-	if !decode(w, r, &in) {
+	var body struct {
+		store.NotificationPrefs
+		StreakRisk  *bool `json:"streak_risk"`
+		FriendGoals *bool `json:"friend_goals"`
+	}
+	if !decode(w, r, &body) {
 		return
+	}
+	in := body.NotificationPrefs
+	if body.StreakRisk == nil || body.FriendGoals == nil {
+		cur, err := h.Store.GetNotificationPrefs(r.Context(), auth.UserID(r))
+		if err != nil {
+			h.storeError(w, r, err)
+			return
+		}
+		in.StreakRisk, in.FriendGoals = cur.StreakRisk, cur.FriendGoals
+	}
+	if body.StreakRisk != nil {
+		in.StreakRisk = *body.StreakRisk
+	}
+	if body.FriendGoals != nil {
+		in.FriendGoals = *body.FriendGoals
 	}
 	if !validClock(in.QuietFrom) || !validClock(in.QuietTo) {
 		badRequest(w, `quiet_from and quiet_to are times like "22:00"`)

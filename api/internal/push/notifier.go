@@ -39,6 +39,15 @@ func (n *Notifier) Notify(userIDs []string, msg Message) {
 	}()
 }
 
+// NotifyNow sends msg to users and waits, for callers already off the
+// request path (the reminder loop). Quiet hours still apply.
+func (n *Notifier) NotifyNow(ctx context.Context, userIDs []string, msg Message) {
+	if n == nil || n.Sender == nil || len(userIDs) == 0 {
+		return
+	}
+	n.send(ctx, userIDs, msg)
+}
+
 func (n *Notifier) send(ctx context.Context, userIDs []string, msg Message) {
 	now := time.Now()
 	if n.Now != nil {

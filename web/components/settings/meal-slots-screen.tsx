@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Button, ErrorCard, Field, PageHeader, Skeleton, TextInput } from "@/components/ui/primitives"
-import { ChevronRightIcon, DragIcon, InfoIcon, PlusIcon } from "@/components/ui/icons"
+import { BellIcon, ChevronRightIcon, DragIcon, InfoIcon, PlusIcon } from "@/components/ui/icons"
 import { Sheet } from "@/components/ui/sheet"
 import { api, errorMessage, seg } from "@/lib/api/client"
-import type { MealSchedule, MealSlot, MealSlotResponse, MealSlotsResponse } from "@/lib/api/types"
+import type { MealSchedule, MealSlot, MealSlotResponse, MealSlotsResponse, NotificationPrefsResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
 
@@ -76,7 +76,7 @@ export function MealSlotsScreen() {
     <div className="flex flex-col gap-3.5">
       <PageHeader back="/me" backLabel="Back to Me" eyebrow="Me" title="My meals" />
       <p className="m-0 text-[14px] leading-[1.45] text-muted">
-        These show on Today every day, in this order. Drag to reorder, tap to rename or change when they show.
+        These show on Today every day, in this order. Drag to reorder, tap to rename, change when they show or set a reminder.
       </p>
       <span role="status" aria-live="polite" className="sr-only">
         {announce}
@@ -133,11 +133,18 @@ export function MealSlotsScreen() {
                 >
                   <span className="flex flex-col">
                     <span className="text-[16px] font-bold">{slot.name}</span>
-                    {slot.schedule === "gym_days" ? (
-                      <span className="text-[12px] font-semibold text-protein">Gym days only</span>
-                    ) : (
-                      <span className="text-[12px] text-muted">Every day</span>
-                    )}
+                    <span className="flex items-center gap-1.5 text-[12px]">
+                      {slot.schedule === "gym_days" ? (
+                        <span className="font-semibold text-protein">Gym days only</span>
+                      ) : (
+                        <span className="text-muted">Every day</span>
+                      )}
+                      {slot.remind_at ? (
+                        <span className="flex items-center gap-0.5 text-muted">
+                          · <BellIcon size={12} /> {slot.remind_at}
+                        </span>
+                      ) : null}
+                    </span>
                   </span>
                   <ChevronRightIcon size={18} className="text-muted" />
                 </button>
@@ -182,6 +189,18 @@ export function MealSlotsScreen() {
   )
 }
 
+/** Setting a reminder time switches meal reminders on if they were off. */
+async function turnOnMealReminders() {
+  try {
+    const { prefs } = await api.get<NotificationPrefsResponse>("notification-prefs")
+    if (prefs.meal_nudges) return
+    await api.put<NotificationPrefsResponse>("notification-prefs", { ...prefs, meal_nudges: true })
+    toast.success("Meal reminders turned on", { description: "Change it any time in Notifications." })
+  } catch {
+    // The time is saved either way; the switch is in Notifications.
+  }
+}
+
 function SlotSheet({
   slot,
   onClose,
@@ -214,6 +233,7 @@ function SlotForm({
 }) {
   const [name, setName] = useState(slot?.name ?? "")
   const [schedule, setSchedule] = useState<MealSchedule>(slot?.schedule ?? "daily")
+  const [remindAt, setRemindAt] = useState(slot?.remind_at ?? "")
   const [busy, setBusy] = useState<"save" | "delete" | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -234,9 +254,11 @@ function SlotForm({
     setBusy("save")
     setError(null)
     try {
+      const body = { name: n, schedule, remind_at: remindAt || null }
       const res = slot
-        ? await api.patch<MealSlotResponse>(`meal-slots/${seg(slot.id)}`, { name: n, schedule })
-        : await api.post<MealSlotResponse>("meal-slots", { name: n, schedule })
+        ? await api.patch<MealSlotResponse>(`meal-slots/${seg(slot.id)}`, body)
+        : await api.post<MealSlotResponse>("meal-slots", body)
+      if (remindAt && remindAt !== slot?.remind_at) await turnOnMealReminders()
       onSaved(res.meal_slot, !slot)
     } catch (err) {
       setError(errorMessage(err))
@@ -305,6 +327,16 @@ function SlotForm({
           </label>
         ))}
       </fieldset>
+      <Field label="Remind me at" htmlFor="slot-remind" hint="A push at this time if nothing's logged in this meal yet.">
+        <div className="flex gap-2">
+          <TextInput id="slot-remind" type="time" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} className="flex-1" />
+          {remindAt ? (
+            <Button variant="outline" size="md" className="flex-none" onClick={() => setRemindAt("")}>
+              No reminder
+            </Button>
+          ) : null}
+        </div>
+      </Field>
       {error ? (
         <p role="alert" className="m-0 text-[14px] font-semibold text-danger">
           {error}

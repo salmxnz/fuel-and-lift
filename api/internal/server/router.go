@@ -21,6 +21,7 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"POST /v1/auth/logout":                 auth.CSRF(h.Logout),
 		"GET /v1/invite-links/preview/{token}": h.PreviewInviteLink,
 		"GET /v1/push/vapid-public-key":        h.VAPIDPublicKey,
+		"GET /v1/avatars/{user_id}":            h.Avatar,
 	}
 	for p, f := range open {
 		mux.HandleFunc(p, f)
@@ -34,6 +35,8 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"POST /v1/onboarding":       h.Onboard,
 		"GET /v1/profile":           h.GetProfile,
 		"PATCH /v1/profile":         h.PatchProfile,
+		"POST /v1/profile/avatar":   h.PutAvatar,
+		"DELETE /v1/profile/avatar": h.DeleteAvatar,
 		"GET /v1/goal":              h.GetGoal,
 		"POST /v1/goal":             h.NewGoal,
 		"GET /v1/weigh-ins":         h.ListWeighIns,
@@ -127,6 +130,7 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"DELETE /v1/invite-links/{id}": h.RevokeInviteLink,
 		"POST /v1/invite-links/accept": h.AcceptInviteLink,
 		"GET /v1/friends":              h.ListFriends,
+		"GET /v1/friends/week":         h.FriendsWeek,
 		"PATCH /v1/friends/{user_id}":  h.PatchFriend,
 		"DELETE /v1/friends/{user_id}": h.RemoveFriend,
 		"GET /v1/sharing":              h.GetSharing,

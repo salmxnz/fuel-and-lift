@@ -7,7 +7,8 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useAddFlow } from "@/components/food/add-flow"
 import { CalendarIcon, PlusIcon } from "@/components/ui/icons"
-import { Button, ErrorCard, Skeleton, TextInput } from "@/components/ui/primitives"
+import { Avatar, Button, ErrorCard, Skeleton, TextInput } from "@/components/ui/primitives"
+import { displayName, useMe } from "@/components/me-context"
 import { Sheet } from "@/components/ui/sheet"
 import { DayDot, WeekPager } from "@/components/ui/week-pager"
 import type { DayResponse, Entry, MealSlotsResponse, ProgressCaloriesResponse, SavedMealsResponse } from "@/lib/api/types"
@@ -22,6 +23,7 @@ import { ShareMealSheet } from "@/components/share/share-meal-sheet"
 import { ShopLink } from "@/components/community/shop-link"
 
 export function TodayScreen() {
+  const me = useMe()
   const router = useRouter()
   const params = useSearchParams()
   const today = todayISO()
@@ -105,10 +107,10 @@ export function TodayScreen() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <header className="flex items-end justify-between">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[14px] text-muted">{formatLong(date)}</span>
-          <h1 className="m-0 text-[30px] font-extrabold tracking-[-0.02em]">
+      <header className="flex items-end justify-between gap-2">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate text-[14px] text-muted">{formatLong(date)}</span>
+          <h1 className="m-0 truncate text-[30px] font-extrabold tracking-[-0.02em]">
             {isToday ? "Today" : parseISODate(date).toLocaleDateString("en-GB", { weekday: "long" })}
           </h1>
         </div>
@@ -145,6 +147,14 @@ export function TodayScreen() {
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
           </label>
+          <Link
+            href="/me"
+            aria-label="Me: profile and settings"
+            data-tour="me"
+            className="flex h-11 w-11 flex-none items-center justify-center rounded-full transition-transform duration-[160ms] ease-out active:scale-[0.95]"
+          >
+            <Avatar name={displayName(me)} url={me.user.avatar_url} size={44} tone="ink" />
+          </Link>
         </div>
       </header>
 

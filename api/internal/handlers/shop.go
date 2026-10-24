@@ -208,5 +208,19 @@ func (h *Handler) GetPerson(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
+	switch {
+	case v.IsMe:
+		wk, err := h.weekOf(r.Context(), id, true)
+		if err != nil {
+			h.storeError(w, r, err)
+			return
+		}
+		v.Summary = &wk
+	case v.IsFriend:
+		if v.Summary, err = h.sharedWeek(r.Context(), id); err != nil {
+			h.storeError(w, r, err)
+			return
+		}
+	}
 	httpx.JSON(w, http.StatusOK, v)
 }

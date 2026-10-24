@@ -43,20 +43,30 @@ const STEPS: Step[] = [
   { target: "tab-today", title: "Today", body: "Your calories and meals for the day. Swipe left or right to see other days." },
   { target: "tab-gym", title: "Gym", body: "Your week plan and workout templates. Tap a day to see what's on, then start." },
   { target: "tab-progress", title: "Progress", body: "Weight, strength and your streak, with badges as you keep it going." },
-  { target: "tab-me", title: "Me", body: "Settings, saved meals, your photos and your plan." },
   {
-    target: "friends-row",
-    route: "/me",
-    title: "Your friends",
-    body: "See when friends work out or hit a streak, and cheer them on.",
+    target: "tab-friends",
+    title: "Friends",
+    body: "How your friends' weeks are going, who hit their goal, and their workouts and streaks to cheer on.",
   },
   {
     target: "add-friend",
-    route: "/me",
+    route: "/friends",
     title: "Add a friend",
     body: "Send a link to add someone. When 8 friends join through your links, you get Pro forever.",
   },
-  { target: null, title: "You're set", body: "That's everything. Show me around again any time from Me.", nextLabel: "Let's go" },
+  {
+    target: "me",
+    route: "/today",
+    title: "Me",
+    body: "Tap your picture for your profile photo, settings, saved meals and your plan.",
+    round: true,
+  },
+  {
+    target: null,
+    title: "You're set",
+    body: "That's everything. Show me around again any time from Me (your picture on Today).",
+    nextLabel: "Let's go",
+  },
 ]
 
 type TourValue = { start: () => void; active: boolean }
