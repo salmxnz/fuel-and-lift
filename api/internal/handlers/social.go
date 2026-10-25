@@ -183,6 +183,7 @@ func (h *Handler) AcceptInviteLink(w http.ResponseWriter, r *http.Request) {
 		}
 		if me, err := h.Store.GetProfile(ctx, userID); err == nil {
 			h.Notifier.Notify([]string{prev.Inviter.ID}, push.Message{
+				Kind:  "friend_joined",
 				Title: me.DisplayName + " is your friend now",
 				Body:  "They opened your adebite link.",
 				URL:   "/friends", Tag: "friend-" + userID,
@@ -450,6 +451,7 @@ func (h *Handler) Cheer(w http.ResponseWriter, r *http.Request) {
 	if notify != "" && h.Store.WantsCheers(r.Context(), notify) {
 		if me, err := h.Store.GetProfile(r.Context(), userID); err == nil {
 			h.Notifier.Notify([]string{notify}, push.Message{
+				Kind:  "cheer",
 				Title: me.DisplayName + " cheered you on 🙌",
 				Body:  item.Text,
 				URL:   "/friends", Tag: "cheer-" + id,

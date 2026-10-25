@@ -73,6 +73,7 @@ func (h *Handler) announceTraining(ctx context.Context, userID string, s store.S
 		return
 	}
 	h.Notifier.Notify(friends, push.Message{
+		Kind:  "friend_training",
 		Title: p.DisplayName + " is at the gym 🏋️",
 		Body:  "On " + what + " right now. Tap to train together.",
 		URL:   "/people/" + userID,
@@ -103,6 +104,7 @@ func (h *Handler) announceShared(ctx context.Context, userID, what, url, tag str
 		return
 	}
 	h.Notifier.Notify(friends, push.Message{
+		Kind:  "friend_shared",
 		Title: p.DisplayName + " shared " + what,
 		Body:  "Have a look, and add it if you like it.",
 		URL:   url,
@@ -150,6 +152,7 @@ func (h *Handler) JoinWorkout(w http.ResponseWriter, r *http.Request) {
 			for _, f := range friends {
 				if f == friendID {
 					h.Notifier.Notify([]string{friendID}, push.Message{
+						Kind:  "training_joined",
 						Title: p.DisplayName + " joined your workout 🤝",
 						Body:  "You're training together. Keep each other honest.",
 						URL:   "/gym",

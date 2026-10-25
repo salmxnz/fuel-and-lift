@@ -22,6 +22,8 @@ type Store struct {
 var (
 	ErrNotFound = errors.New("not found")
 	ErrConflict = errors.New("conflict")
+	// ErrBadOrder: a new exercise order must list each of the workout's exercises once.
+	ErrBadOrder = errors.New("send every exercise of the workout exactly once")
 )
 
 // New opens a pool and checks connectivity.

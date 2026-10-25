@@ -1,9 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { isSameOrigin, publicUrl } from "@/lib/auth/public-origin"
+import { clientIp, isSameOrigin, publicUrl } from "@/lib/auth/public-origin"
 import { getApiEnv } from "@/config/env"
 import { AUTH_COOKIES, clearAuthCookies } from "@/lib/auth/cookies.shared"
 
 export const dynamic = "force-dynamic"
+
+const ipHeader = (request: NextRequest): Record<string, string> => {
+  const ip = clientIp(request)
+  return ip ? { "X-Client-IP": ip } : {}
+}
 
 // POST /api/auth/logout → Go revokes the refresh token (best effort), then we
 // clear every fl_* cookie regardless. Responds JSON for fetch() callers, or a
@@ -26,6 +31,7 @@ export async function POST(request: NextRequest) {
         headers: {
           "X-CSRF-Token": csrf,
           Cookie: `refresh_token=${refresh}; csrf_token=${csrf}`,
+          ...ipHeader(request),
         },
         cache: "no-store",
       })

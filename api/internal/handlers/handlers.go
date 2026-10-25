@@ -8,13 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"net"
 	"net/http"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/salmxnz/fuel-and-lift/api/internal/ai"
+	"github.com/salmxnz/fuel-and-lift/api/internal/audit"
 	"github.com/salmxnz/fuel-and-lift/api/internal/config"
 	"github.com/salmxnz/fuel-and-lift/api/internal/email"
 	"github.com/salmxnz/fuel-and-lift/api/internal/google"
@@ -38,6 +38,10 @@ type Handler struct {
 	Photos PhotoStorage
 	// Mail sends transactional emails; nil sends none.
 	Mail *email.Mailer
+	// Audit records every request for the admin app; nil records nothing.
+	Audit *audit.Recorder
+
+	rest restTimers // pending "rest's over" pushes
 }
 
 // PhotoStorage is where meal photos live (storage.R2, or a fake in tests).
@@ -75,6 +79,8 @@ func (h *Handler) storeError(w http.ResponseWriter, r *http.Request, err error) 
 		httpx.Error(w, http.StatusBadRequest, store.ErrNoMeal.Error())
 	case errors.Is(err, store.ErrUnknownExercise):
 		httpx.Error(w, http.StatusBadRequest, "one of the exercises doesn't exist")
+	case errors.Is(err, store.ErrBadOrder):
+		httpx.Error(w, http.StatusBadRequest, store.ErrBadOrder.Error())
 	case errors.Is(err, store.ErrInviteInvalid):
 		httpx.Error(w, http.StatusGone, store.ErrInviteInvalid.Error())
 	case errors.Is(err, context.Canceled):
@@ -172,20 +178,6 @@ func pathID(w http.ResponseWriter, r *http.Request, name string) (string, bool) 
 		return "", false
 	}
 	return id, true
-}
-
-// clientIP prefers the address the BFF forwarded.
-func clientIP(r *http.Request) string {
-	for _, h := range []string{"X-Client-IP", "X-Forwarded-For", "X-Real-IP"} {
-		if v := strings.TrimSpace(strings.Split(r.Header.Get(h), ",")[0]); v != "" && net.ParseIP(v) != nil {
-			return v
-		}
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil && net.ParseIP(host) != nil {
-		return host
-	}
-	return ""
 }
 
 func userAgent(r *http.Request) string {

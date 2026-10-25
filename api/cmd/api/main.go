@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/salmxnz/fuel-and-lift/api/internal/ai"
+	"github.com/salmxnz/fuel-and-lift/api/internal/audit"
 	"github.com/salmxnz/fuel-and-lift/api/internal/config"
 	"github.com/salmxnz/fuel-and-lift/api/internal/email"
 	"github.com/salmxnz/fuel-and-lift/api/internal/google"
@@ -108,6 +109,7 @@ func run(log *slog.Logger, args []string) error {
 		Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername, Password: cfg.SMTPPassword,
 		From: cfg.SMTPFrom, FromName: cfg.SMTPFromName, AppURL: cfg.AppURL, AssetsURL: cfg.EmailAssetsURL,
 	}, log)
+	h.Mail.Record = h.RecordEmail
 	if !h.Mail.Enabled() {
 		log.Warn("SMTP not configured: emails are logged, not sent (set SMTP_HOST and SMTP_FROM)")
 	}
@@ -118,6 +120,9 @@ func run(log *slog.Logger, args []string) error {
 		log.Warn("R2 not configured: meal photos are not stored (set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)")
 	}
 	go h.RunReminders(ctx)
+	go h.RunCleanup(ctx)
+	h.Audit = audit.New(st, log)
+	defer h.Audit.Close() // after Shutdown: writes what's still buffered
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           server.NewRouter(h),

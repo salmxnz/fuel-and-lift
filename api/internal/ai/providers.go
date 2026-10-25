@@ -72,14 +72,14 @@ func (o *OpenRouter) Name() string { return "openrouter" }
 // Model implements Provider.
 func (o *OpenRouter) Model() string { return o.ModelID }
 
-// Estimate implements Provider.
-func (o *OpenRouter) Estimate(ctx context.Context, req Request) (Estimate, Usage, error) {
+// Structured implements Provider.
+func (o *OpenRouter) Structured(ctx context.Context, c Call) (json.RawMessage, Usage, error) {
 	base := o.BaseURL
 	if base == "" {
 		base = "https://openrouter.ai/api/v1"
 	}
-	content := []map[string]any{{"type": "text", "text": UserPrompt(req)}}
-	for _, img := range req.Images {
+	content := []map[string]any{{"type": "text", "text": c.Text}}
+	for _, img := range c.Images {
 		content = append(content, map[string]any{
 			"type":      "image_url",
 			"image_url": map[string]string{"url": "data:" + img.MediaType + ";base64," + img.Data},
@@ -88,14 +88,14 @@ func (o *OpenRouter) Estimate(ctx context.Context, req Request) (Estimate, Usage
 	body := map[string]any{
 		"model": o.ModelID,
 		"messages": []map[string]any{
-			{"role": "system", "content": SystemPrompt(req.Voice)},
+			{"role": "system", "content": c.System},
 			{"role": "user", "content": content},
 		},
 		"temperature": 0.2,
-		"max_tokens":  1500,
+		"max_tokens":  c.maxTokens(),
 		"response_format": map[string]any{
 			"type":        "json_schema",
-			"json_schema": map[string]any{"name": "meal_estimate", "strict": true, "schema": Schema},
+			"json_schema": map[string]any{"name": c.Name, "strict": true, "schema": c.Schema},
 		},
 		"usage": map[string]bool{"include": true},
 	}
@@ -119,17 +119,17 @@ func (o *OpenRouter) Estimate(ctx context.Context, req Request) (Estimate, Usage
 		headers["X-Title"] = o.AppName
 	}
 	if err := postJSON(ctx, base+"/chat/completions", headers, body, &out); err != nil {
-		return Estimate{}, Usage{}, err
+		return nil, Usage{}, err
 	}
 	usage := Usage{InputTokens: out.Usage.PromptTokens, OutputTokens: out.Usage.CompletionTokens, CostUSD: out.Usage.Cost}
 	if len(out.Choices) == 0 {
-		return Estimate{}, usage, errors.New("empty response")
+		return nil, usage, errors.New("empty response")
 	}
-	var est Estimate
-	if err := parseJSONText(out.Choices[0].Message.Content, &est); err != nil {
-		return Estimate{}, usage, fmt.Errorf("model did not return valid JSON: %w", err)
+	var raw json.RawMessage
+	if err := parseJSONText(out.Choices[0].Message.Content, &raw); err != nil {
+		return nil, usage, fmt.Errorf("model did not return valid JSON: %w", err)
 	}
-	return est, usage, nil
+	return raw, usage, nil
 }
 
 // --- Anthropic (Claude, tool use for structured output) -----------------------
@@ -150,31 +150,31 @@ func (a *Anthropic) Name() string { return "anthropic" }
 // Model implements Provider.
 func (a *Anthropic) Model() string { return a.ModelID }
 
-// Estimate implements Provider.
-func (a *Anthropic) Estimate(ctx context.Context, req Request) (Estimate, Usage, error) {
+// Structured implements Provider: the answer comes back as a forced tool call.
+func (a *Anthropic) Structured(ctx context.Context, c Call) (json.RawMessage, Usage, error) {
 	base := a.BaseURL
 	if base == "" {
 		base = "https://api.anthropic.com"
 	}
 	var content []map[string]any
-	for _, img := range req.Images {
+	for _, img := range c.Images {
 		content = append(content, map[string]any{
 			"type":   "image",
 			"source": map[string]string{"type": "base64", "media_type": img.MediaType, "data": img.Data},
 		})
 	}
-	content = append(content, map[string]any{"type": "text", "text": UserPrompt(req)})
+	content = append(content, map[string]any{"type": "text", "text": c.Text})
 	body := map[string]any{
 		"model":      a.ModelID,
-		"max_tokens": 1500,
-		"system":     SystemPrompt(req.Voice),
+		"max_tokens": c.maxTokens(),
+		"system":     c.System,
 		"messages":   []map[string]any{{"role": "user", "content": content}},
 		"tools": []map[string]any{{
-			"name":         "record_estimate",
-			"description":  "Record the itemised meal estimate.",
-			"input_schema": Schema,
+			"name":         c.Name,
+			"description":  c.Description,
+			"input_schema": c.Schema,
 		}},
-		"tool_choice": map[string]string{"type": "tool", "name": "record_estimate"},
+		"tool_choice": map[string]string{"type": "tool", "name": c.Name},
 	}
 	var out struct {
 		Content []struct {
@@ -188,20 +188,16 @@ func (a *Anthropic) Estimate(ctx context.Context, req Request) (Estimate, Usage,
 	}
 	headers := map[string]string{"x-api-key": a.APIKey, "anthropic-version": "2023-06-01"}
 	if err := postJSON(ctx, base+"/v1/messages", headers, body, &out); err != nil {
-		return Estimate{}, Usage{}, err
+		return nil, Usage{}, err
 	}
 	usage := Usage{
 		InputTokens: out.Usage.InputTokens, OutputTokens: out.Usage.OutputTokens,
 		CostUSD: float64(out.Usage.InputTokens)*a.PriceInPerM/1e6 + float64(out.Usage.OutputTokens)*a.PriceOutPerM/1e6,
 	}
-	for _, c := range out.Content {
-		if c.Type == "tool_use" {
-			var est Estimate
-			if err := json.Unmarshal(c.Input, &est); err != nil {
-				return Estimate{}, usage, fmt.Errorf("model returned a malformed estimate: %w", err)
-			}
-			return est, usage, nil
+	for _, x := range out.Content {
+		if x.Type == "tool_use" {
+			return x.Input, usage, nil
 		}
 	}
-	return Estimate{}, usage, errors.New("model did not call the estimate tool")
+	return nil, usage, fmt.Errorf("model did not call the %s tool", c.Name)
 }

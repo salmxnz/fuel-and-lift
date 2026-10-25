@@ -25,13 +25,15 @@ type SessionSet struct {
 
 // SessionBlock is one exercise in a session.
 type SessionBlock struct {
-	ID         string       `json:"id"`
-	Position   int          `json:"position"`
-	Exercise   Exercise     `json:"exercise"`
-	Skipped    bool         `json:"skipped"`
-	Cardio     *Cardio      `json:"cardio"`
-	CardioDone bool         `json:"cardio_done"`
-	Sets       []SessionSet `json:"sets"`
+	ID         string   `json:"id"`
+	Position   int      `json:"position"`
+	Exercise   Exercise `json:"exercise"`
+	Skipped    bool     `json:"skipped"`
+	Cardio     *Cardio  `json:"cardio"`
+	CardioDone bool     `json:"cardio_done"`
+	// CardioActual is what was done (typed, or read off the machine's screen).
+	CardioActual *Cardio      `json:"cardio_actual"`
+	Sets         []SessionSet `json:"sets"`
 }
 
 // Session is one workout.
@@ -64,7 +66,8 @@ type Record struct {
 }
 
 // StartSession creates a session for a date, copied from the template's
-// current version when templateID is given (an empty session otherwise).
+// current version when templateID is given (an empty session otherwise),
+// plus any exercises added to that workout for that week.
 func (s *Store) StartSession(ctx context.Context, userID string, d Date, templateID *string) (Session, error) {
 	var id string
 	err := s.tx(ctx, func(tx pgx.Tx) error {
@@ -111,6 +114,10 @@ func (s *Store) StartSession(ctx context.Context, userID string, d Date, templat
 				}
 			}
 		}
+		if templateID != nil {
+			// Exercises added to this workout for this week only.
+			return appendWeekExtras(ctx, tx, userID, id, *templateID, d, len(blocks))
+		}
 		return nil
 	})
 	if err != nil {
@@ -119,8 +126,9 @@ func (s *Store) StartSession(ctx context.Context, userID string, d Date, templat
 	return s.GetSession(ctx, userID, id)
 }
 
-// AddSessionBlock adds an exercise to a session (for ad-hoc workouts).
-func (s *Store) AddSessionBlock(ctx context.Context, userID, sessionID, exerciseID string) (Session, error) {
+// AddSessionBlock adds an exercise to a session, with planned sets or cardio
+// when given (a machine photo fills in the weight and three sets).
+func (s *Store) AddSessionBlock(ctx context.Context, userID, sessionID, exerciseID string, sets []PlannedSet, cardio *Cardio) (Session, error) {
 	err := s.tx(ctx, func(tx pgx.Tx) error {
 		if err := ownSession(ctx, tx, userID, sessionID); err != nil {
 			return err
@@ -128,9 +136,23 @@ func (s *Store) AddSessionBlock(ctx context.Context, userID, sessionID, exercise
 		if err := checkExercises(ctx, tx, userID, []BlockInput{{ExerciseID: exerciseID}}); err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx, `insert into session_blocks (session_id, position, exercise_id)
-			values ($1::uuid, (select coalesce(max(position) + 1, 0) from session_blocks where session_id = $1::uuid), $2::uuid)`, sessionID, exerciseID)
-		return err
+		var raw []byte
+		if cardio != nil {
+			raw, _ = json.Marshal(cardio)
+		}
+		var bid string
+		if err := tx.QueryRow(ctx, `insert into session_blocks (session_id, position, exercise_id, cardio)
+			values ($1::uuid, (select coalesce(max(position) + 1, 0) from session_blocks where session_id = $1::uuid), $2::uuid, $3)
+			returning id::text`, sessionID, exerciseID, raw).Scan(&bid); err != nil {
+			return err
+		}
+		for j, set := range sets {
+			if _, err := tx.Exec(ctx, `insert into session_sets (block_id, position, warmup, target_kg, target_reps, to_failure)
+				values ($1::uuid, $2, $3, $4, $5, $6)`, bid, j, set.Warmup, set.TargetKg, set.TargetReps, set.ToFailure); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return Session{}, err
@@ -196,10 +218,10 @@ func (s *Store) loadSessions(ctx context.Context, userID, where string, args ...
 	}
 
 	brows, err := s.Pool.Query(ctx, `
-		select b.session_id::text, b.id::text, b.position, b.skipped, b.cardio, b.cardio_done,
-		       e.id::text, e.name, e.kind, e.muscle_group, e.equipment, e.media_url, e.gym_photo_url
+		select b.session_id::text, b.id::text, b.position, b.skipped, b.cardio, b.cardio_done, b.cardio_actual,
+		       `+exerciseCols("$2")+`
 		from session_blocks b join exercises e on e.id = b.exercise_id
-		where b.session_id = any($1::uuid[]) order by b.position`, ids)
+		where b.session_id = any($1::uuid[]) order by b.position`, ids, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -209,19 +231,15 @@ func (s *Store) loadSessions(ctx context.Context, userID, where string, args ...
 	for brows.Next() {
 		var sid string
 		var b SessionBlock
-		var cardio []byte
-		if err := brows.Scan(&sid, &b.ID, &b.Position, &b.Skipped, &cardio, &b.CardioDone,
+		var cardio, actual []byte
+		if err := brows.Scan(&sid, &b.ID, &b.Position, &b.Skipped, &cardio, &b.CardioDone, &actual,
 			&b.Exercise.ID, &b.Exercise.Name, &b.Exercise.Kind, &b.Exercise.MuscleGroup, &b.Exercise.Equipment,
-			&b.Exercise.MediaURL, &b.Exercise.GymPhotoURL); err != nil {
+			&b.Exercise.MediaURL, &b.Exercise.GymPhotoURL, &b.Exercise.Aliases, &b.Exercise.Muscles, &b.Exercise.Mine, &b.Exercise.Visibility); err != nil {
 			brows.Close()
 			return nil, err
 		}
-		if cardio != nil {
-			var c Cardio
-			if json.Unmarshal(cardio, &c) == nil {
-				b.Cardio = &c
-			}
-		}
+		b.Exercise.fillNil()
+		b.Cardio, b.CardioActual = decodeCardio(cardio), decodeCardio(actual)
 		b.Sets = []SessionSet{}
 		si := idx[sid]
 		sessions[si].Blocks = append(sessions[si].Blocks, b)
@@ -254,17 +272,81 @@ func (s *Store) loadSessions(ctx context.Context, userID, where string, args ...
 	return sessions, srows.Err()
 }
 
-// PatchBlock skips/unskips a block or marks cardio done.
-func (s *Store) PatchBlock(ctx context.Context, userID, sessionID, blockID string, skipped, cardioDone *bool) (Session, error) {
+func decodeCardio(raw []byte) *Cardio {
+	if raw == nil {
+		return nil
+	}
+	var c Cardio
+	if json.Unmarshal(raw, &c) != nil {
+		return nil
+	}
+	return &c
+}
+
+// BlockPatch is what changes on a session block. A non-nil CardioActual
+// replaces what was done; ClearCardioActual removes it.
+type BlockPatch struct {
+	Skipped           *bool
+	CardioDone        *bool
+	CardioActual      *Cardio
+	ClearCardioActual bool
+}
+
+// PatchBlock skips/unskips a block, marks cardio done or records what the
+// cardio actually was.
+func (s *Store) PatchBlock(ctx context.Context, userID, sessionID, blockID string, p BlockPatch) (Session, error) {
+	var actual []byte
+	if p.CardioActual != nil {
+		actual, _ = json.Marshal(p.CardioActual)
+	}
 	ct, err := s.Pool.Exec(ctx, `
-		update session_blocks b set skipped = coalesce($4, skipped), cardio_done = coalesce($5, cardio_done)
+		update session_blocks b set skipped = coalesce($4, skipped), cardio_done = coalesce($5, cardio_done),
+		       cardio_actual = case when $7 then null else coalesce($6, cardio_actual) end
 		from sessions s where b.id = $3::uuid and b.session_id = s.id and s.id = $2::uuid and s.user_id = $1::uuid`,
-		userID, sessionID, blockID, skipped, cardioDone)
+		userID, sessionID, blockID, p.Skipped, p.CardioDone, actual, p.ClearCardioActual)
 	if err != nil {
 		return Session{}, err
 	}
 	if ct.RowsAffected() == 0 {
 		return Session{}, ErrNotFound
+	}
+	return s.GetSession(ctx, userID, sessionID)
+}
+
+// ReorderSession puts a session's exercises in the given order ("machine's
+// taken, do it later"). blockIDs must be exactly the session's blocks.
+func (s *Store) ReorderSession(ctx context.Context, userID, sessionID string, blockIDs []string) (Session, error) {
+	err := s.tx(ctx, func(tx pgx.Tx) error {
+		if err := ownSession(ctx, tx, userID, sessionID); err != nil {
+			return err
+		}
+		var have []string
+		rows, err := tx.Query(ctx, `select id::text from session_blocks where session_id = $1::uuid`, sessionID)
+		if err != nil {
+			return err
+		}
+		if have, err = pgx.CollectRows(rows, pgx.RowTo[string]); err != nil {
+			return err
+		}
+		want := map[string]bool{}
+		for _, id := range blockIDs {
+			want[id] = true
+		}
+		if len(want) != len(blockIDs) || len(have) != len(blockIDs) {
+			return ErrBadOrder
+		}
+		for _, id := range have {
+			if !want[id] {
+				return ErrBadOrder
+			}
+		}
+		_, err = tx.Exec(ctx, `update session_blocks b set position = o.ord - 1
+			from unnest($2::uuid[]) with ordinality as o(id, ord)
+			where b.id = o.id and b.session_id = $1::uuid`, sessionID, blockIDs)
+		return err
+	})
+	if err != nil {
+		return Session{}, err
 	}
 	return s.GetSession(ctx, userID, sessionID)
 }

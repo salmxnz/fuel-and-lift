@@ -26,7 +26,7 @@ func (h *Handler) issueTokens(w http.ResponseWriter, r *http.Request, u store.Us
 		return "", "", err
 	}
 	expires := h.now().Add(time.Duration(h.Cfg.RefreshTTLDays) * 24 * time.Hour)
-	if err := h.Store.CreateRefreshToken(r.Context(), u.ID, auth.HashToken(raw), userAgent(r), clientIP(r), expires); err != nil {
+	if err := h.Store.CreateRefreshToken(r.Context(), u.ID, auth.HashToken(raw), userAgent(r), httpx.ClientIP(r), expires); err != nil {
 		return "", "", err
 	}
 	secure := h.Cfg.SecureCookies()

@@ -1,7 +1,10 @@
 /* adebite service worker (hand-written, no build step).
  *
  * - install: precache the app shell (offline page, manifest, icons)
- * - navigations: network first, falling back to the cached offline page
+ * - navigations: network first, falling back to the cached offline page;
+ *   gym pages (a workout in progress) are also kept, so a basement gym with no
+ *   signal still opens the workout (lib/offline-queue.ts syncs it later)
+ * - exercise photos (/exercises/*, /exercise-photos/*): cache first, they never change
  * - /_next/static/*: cache first in production (file names are content-hashed);
  *   skipped on localhost/LAN dev servers, where names are reused
  * - API traffic (/api/*) is never cached: it carries the user's data
@@ -9,9 +12,13 @@
  * - notificationclick: focus an open window on that url, or open one
  */
 
-const VERSION = "fl-v3"
+const VERSION = "fl-v4"
 const SHELL_CACHE = `${VERSION}-shell`
 const STATIC_CACHE = `${VERSION}-static`
+const MEDIA_CACHE = `${VERSION}-media`
+// Signed-in pages; cleared on sign-out (lib/api/query-client.ts clearCache).
+const PAGES_CACHE = `${VERSION}-pages`
+const KEEP_PAGES = /^\/gym(\/|$)/
 const OFFLINE_URL = "/offline"
 const IS_DEV = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)|\.local$/.test(self.location.hostname)
 
@@ -58,14 +65,38 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return
 
   if (request.mode === "navigate") {
+    const keep = KEEP_PAGES.test(url.pathname)
     event.respondWith(
-      fetch(request).catch(async () => {
-        const cache = await caches.open(SHELL_CACHE)
-        const offline = await cache.match(OFFLINE_URL)
-        return (
-          offline ||
-          new Response("<h1>You're offline</h1>", { headers: { "Content-Type": "text/html; charset=utf-8" } })
-        )
+      fetch(request)
+        .then((res) => {
+          if (keep && res.ok && !res.redirected) {
+            const copy = res.clone()
+            event.waitUntil(caches.open(PAGES_CACHE).then((c) => c.put(request, copy)))
+          }
+          return res
+        })
+        .catch(async () => {
+          const kept = keep ? await caches.match(request, { cacheName: PAGES_CACHE }) : undefined
+          if (kept) return kept
+          const cache = await caches.open(SHELL_CACHE)
+          const offline = await cache.match(OFFLINE_URL)
+          return (
+            offline ||
+            new Response("<h1>You're offline</h1>", { headers: { "Content-Type": "text/html; charset=utf-8" } })
+          )
+        })
+    )
+    return
+  }
+
+  if (url.pathname.startsWith("/exercises/") || url.pathname.startsWith("/exercise-photos/")) {
+    event.respondWith(
+      caches.open(MEDIA_CACHE).then(async (cache) => {
+        const hit = await cache.match(request)
+        if (hit) return hit
+        const res = await fetch(request)
+        if (res.ok) cache.put(request, res.clone())
+        return res
       })
     )
     return
@@ -103,6 +134,8 @@ self.addEventListener("push", (event) => {
   const title = typeof payload.title === "string" && payload.title ? payload.title : "adebite"
   const url = typeof payload.url === "string" && payload.url.startsWith("/") ? payload.url : "/today"
   const tag = typeof payload.tag === "string" ? payload.tag : undefined
+  // "Rest's over" replaces the quiet "resting until…" one and must buzz.
+  const rest = !!tag && tag.startsWith("rest-")
   event.waitUntil(
     Promise.all([
       self.registration.showNotification(title, {
@@ -110,6 +143,8 @@ self.addEventListener("push", (event) => {
         icon: "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
         tag,
+        renotify: rest,
+        vibrate: rest ? [220, 100, 220] : undefined,
         data: { url },
       }),
       // An open app shows a friend's share as a popup right away (components/share/share-popup.tsx).

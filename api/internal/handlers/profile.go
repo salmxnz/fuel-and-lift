@@ -179,6 +179,7 @@ func (h *Handler) Onboard(w http.ResponseWriter, r *http.Request) {
 	h.emailAfterOnboarding(r.Context(), userID, name, goal.Plan, upgraded)
 	if upgraded != "" {
 		h.Notifier.Notify([]string{upgraded}, push.Message{
+			Kind:  "pro_unlocked",
 			Title: "You've got Pro, for good",
 			Body:  "8 friends joined adebite through your links. Unlimited photo estimates are yours.",
 			URL:   "/me", Tag: "pro",

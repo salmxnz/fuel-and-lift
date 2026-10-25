@@ -92,6 +92,9 @@ func (h *Handler) remind(ctx context.Context, userID, kind, ref string, msg push
 	if err != nil || !ok {
 		return err
 	}
+	if msg.Kind == "" {
+		msg.Kind = kind
+	}
 	h.Notifier.NotifyNow(ctx, []string{userID}, msg)
 	return nil
 }

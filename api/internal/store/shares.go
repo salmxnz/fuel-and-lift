@@ -503,15 +503,17 @@ func copyName(ctx context.Context, tx pgx.Tx, userID, name, from string) (string
 	return name + suffix, nil
 }
 
-// ownExercise finds the user's exercise with e's name, or creates it.
+// ownExercise finds the user's exercise with e's name, or creates it (with
+// the same stock picture).
 func ownExercise(ctx context.Context, tx pgx.Tx, userID string, e Exercise) (string, error) {
 	var id string
 	err := tx.QueryRow(ctx, `select id::text from exercises where owner_id = $1::uuid and lower(name) = lower($2)`, userID, strings.TrimSpace(e.Name)).Scan(&id)
 	if err == nil || !errors.Is(err, pgx.ErrNoRows) {
 		return id, err
 	}
-	err = tx.QueryRow(ctx, `insert into exercises (owner_id, name, kind, muscle_group, equipment) values ($1::uuid, $2, $3, $4, $5) returning id::text`,
-		userID, strings.TrimSpace(e.Name), e.Kind, e.MuscleGroup, e.Equipment).Scan(&id)
+	err = tx.QueryRow(ctx, `insert into exercises (owner_id, name, kind, muscle_group, equipment, media_url, muscles)
+		values ($1::uuid, $2, $3, $4, $5, $6, coalesce($7::text[], '{}')) returning id::text`,
+		userID, strings.TrimSpace(e.Name), e.Kind, e.MuscleGroup, e.Equipment, e.MediaURL, e.Muscles).Scan(&id)
 	return id, err
 }
 

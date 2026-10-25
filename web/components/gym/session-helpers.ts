@@ -1,5 +1,8 @@
-import type { Cardio, SessionBlock, SessionSet } from "@/lib/api/types"
+import type { SessionBlock, SessionSet } from "@/lib/api/types"
+import { cardioText } from "@/lib/cardio"
 import { num1 } from "@/lib/format"
+
+export { cardioText }
 
 export function blockDone(b: SessionBlock): boolean {
   if (b.skipped) return true
@@ -7,16 +10,9 @@ export function blockDone(b: SessionBlock): boolean {
   return b.sets.length > 0 && b.sets.every((s) => s.done)
 }
 
-export function cardioText(c: Cardio): string {
-  const parts = [`${num1(c.minutes)} min`]
-  if (c.incline != null) parts.push(`incline ${num1(c.incline)}`)
-  if (c.speed != null) parts.push(`speed ${num1(c.speed)}`)
-  return parts.join(", ")
-}
-
 /** "2 × 7, 12 kg", "2 sets, 45 kg" or "Set weight on first use". */
 export function blockSummary(b: SessionBlock): { text: string; warn: boolean } {
-  if (b.cardio) return { text: cardioText(b.cardio), warn: false }
+  if (b.cardio) return { text: cardioText(b.cardio_actual ?? b.cardio), warn: false }
   const work = b.sets.filter((s) => !s.warmup)
   if (work.length === 0) return { text: `${b.sets.length} warm-up`, warn: false }
   const kgs = work.map((s) => s.target_kg)

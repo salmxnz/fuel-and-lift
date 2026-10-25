@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/salmxnz/fuel-and-lift/api/internal/ai"
+	"github.com/salmxnz/fuel-and-lift/api/internal/audit"
 	"github.com/salmxnz/fuel-and-lift/api/internal/auth"
 	"github.com/salmxnz/fuel-and-lift/api/internal/config"
 	"github.com/salmxnz/fuel-and-lift/api/internal/handlers"
@@ -35,23 +36,45 @@ const secret = "test-secret-test-secret-test-secret-123"
 
 type fakeAI struct {
 	calls atomic.Int32
-	last  atomic.Pointer[ai.Request]
+	last  atomic.Pointer[ai.Call]
 }
 
 func (f *fakeAI) Name() string  { return "fake" }
 func (f *fakeAI) Model() string { return "fake-1" }
-func (f *fakeAI) Estimate(ctx context.Context, req ai.Request) (ai.Estimate, ai.Usage, error) {
+func (f *fakeAI) Structured(ctx context.Context, c ai.Call) (json.RawMessage, ai.Usage, error) {
 	f.calls.Add(1)
-	f.last.Store(&req)
-	g := 250.0
-	e := ai.Estimate{Title: "Fish curry with rice", Items: []ai.Item{
-		{Name: "White rice", Grams: &g, Kcal: 325, ProteinG: 6, CarbsG: 71, FatG: 1, Assumption: "normal plate", Confidence: 0.7, Source: "ai"},
-		{Name: "Fish curry", Kcal: 160, ProteinG: 16, CarbsG: 4, FatG: 8, Confidence: 0.6, Source: "ai"},
-	}}
-	if len(req.Answers) == 0 {
-		e.Questions = []ai.Question{{ID: "rice_portion", Text: "How much rice?", Options: []ai.Option{{ID: "small", Label: "Small"}, {ID: "normal", Label: "Normal"}}}}
+	f.last.Store(&c)
+	usage := ai.Usage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.0001}
+	var out any
+	switch c.Name {
+	case "record_exercise":
+		// A photo is the pec deck with the pin at 40 kg; "rear delt" gets
+		// three variations, one of them not in the library.
+		if strings.Contains(c.Text, `The user says: "rear delt"`) {
+			out = obj{"found": true, "weight_kg": nil, "weight_source": "none", "weight_note": "", "sets": 3, "reps": 12, "note": "", "confidence": 0.8,
+				"options": []obj{
+					{"library_name": "Reverse pec deck", "name": "Reverse pec deck", "kind": "strength", "muscle_group": "shoulders", "muscles": []string{"rear delts"}, "equipment": "machine", "picture_like": "", "cue": "Machine, easy to load"},
+					{"library_name": "", "name": "Band pull-apart", "kind": "strength", "muscle_group": "shoulders", "muscles": []string{"rear delts", "upper back"}, "equipment": "bands", "picture_like": "Face pull", "cue": "Light, great warm-up"},
+					{"library_name": "Face pull", "name": "Face pull", "kind": "strength", "muscle_group": "shoulders", "muscles": []string{"rear delts"}, "equipment": "cable machine", "picture_like": "", "cue": "Cable, rear delts and upper back"},
+				}}
+		} else {
+			out = obj{"found": true, "weight_kg": 40, "weight_source": "pin", "weight_note": "pin at 40", "sets": 3, "reps": 10, "note": "", "confidence": 0.9,
+				"options": []obj{{"library_name": "Pec deck", "name": "N933 Pec Deck", "kind": "strength", "muscle_group": "chest", "muscles": []string{"mid chest"}, "equipment": "machine", "picture_like": "", "cue": ""}}}
+		}
+	case "record_screen":
+		out = obj{"found": true, "minutes": 25.5, "distance_km": 3.2, "incline": 6, "speed": 7.5, "level": nil, "kcal": 310, "note": ""}
+	default:
+		e := obj{"title": "Fish curry with rice", "icon": "", "items": []obj{
+			{"name": "White rice", "grams": 250, "kcal": 325, "protein_g": 6, "carbs_g": 71, "fat_g": 1, "assumption": "normal plate", "confidence": 0.7, "source": "ai"},
+			{"name": "Fish curry", "grams": nil, "kcal": 160, "protein_g": 16, "carbs_g": 4, "fat_g": 8, "assumption": "", "confidence": 0.6, "source": "ai"},
+		}, "questions": []obj{}}
+		if !strings.Contains(c.Text, "answers to your questions") {
+			e["questions"] = []obj{{"id": "rice_portion", "text": "How much rice?", "options": []obj{{"id": "small", "label": "Small"}, {"id": "normal", "label": "Normal"}}}}
+		}
+		out = e
 	}
-	return e, ai.Usage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.0001}, nil
+	raw, err := json.Marshal(out)
+	return raw, usage, err
 }
 
 type env struct {
@@ -140,8 +163,9 @@ func setup(t *testing.T) *env {
 				Per100g: store.Macros{Kcal: 420, ProteinG: 8, CarbsG: 60, FatG: 15}}, nil
 		},
 	}
+	h.Audit = audit.New(st, h.Log)
 	srv := httptest.NewServer(server.NewRouter(h))
-	t.Cleanup(func() { srv.Close(); st.Close() })
+	t.Cleanup(func() { srv.Close(); h.Audit.Close(); st.Close() })
 	return &env{t: t, h: h, srv: srv, st: st, ai: fake, ph: photos}
 }
 
@@ -412,9 +436,9 @@ func TestAPI(t *testing.T) {
 		"previous_estimate_id": get(first, "estimate_id"), "correction": "cooked in oil only, no butter",
 		"title": "Scrambled eggs in oil", "items": []obj{{"name": "Eggs", "kcal": 140, "protein_g": 12, "carbs_g": 1, "fat_g": 10}},
 	})
-	if last := e.ai.last.Load(); last.Title != "Scrambled eggs in oil" || last.Correction != "cooked in oil only, no butter" ||
-		!strings.Contains(string(last.Edited), "Eggs") || !strings.Contains(ai.UserPrompt(*last), "no butter") {
-		t.Fatalf("refine request: %+v", last)
+	if last := e.ai.last.Load(); !strings.Contains(last.Text, `named the dish: "Scrambled eggs in oil"`) ||
+		!strings.Contains(last.Text, `correction: "cooked in oil only, no butter"`) || !strings.Contains(last.Text, `"name":"Eggs"`) {
+		t.Fatalf("refine request: %+v", last.Text)
 	}
 	e.must(me, 200, "POST", "/v1/ai/meal-estimate", obj{"image": img}) // admin is Pro
 	bill := e.must(ravi, 200, "GET", "/v1/billing", nil)

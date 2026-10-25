@@ -5,6 +5,9 @@ const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short
 const shortFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" })
 const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
 const timeFmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" })
+const secondsFmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+const dayTimeFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+const fullFmt = new Intl.DateTimeFormat("en-GB", { dateStyle: "full", timeStyle: "medium" })
 
 /** "2026-03-12" as a local date (not UTC midnight). */
 export function parseDay(day: string): Date {
@@ -41,6 +44,17 @@ export function formatDay(day: string): string {
 
 export function formatTime(iso: string): string {
   return timeFmt.format(new Date(iso))
+}
+
+/** "22:05:31" today, "24 Oct, 22:05" before. */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  return d.toDateString() === new Date().toDateString() ? secondsFmt.format(d) : dayTimeFmt.format(d)
+}
+
+/** Everything, for a tooltip: "Saturday 24 October 2026 at 22:05:31". */
+export function formatFull(iso: string): string {
+  return fullFmt.format(new Date(iso))
 }
 
 /** "just now", "5 min ago", "3 h ago", "2 d ago", then a date. */

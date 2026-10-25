@@ -62,6 +62,16 @@ type Mailer struct {
 	log  *slog.Logger
 	// deliver sends a built message (replaceable in tests).
 	deliver func(ctx context.Context, to string, msg []byte) error
+	// Record, when set, is told the outcome of every Send (the API stores it
+	// for the admin app's notifications log).
+	Record func(ctx context.Context, r Result)
+}
+
+// Result is what happened to one email.
+type Result struct {
+	To, Template, Subject string
+	Status                string // sent, failed, disabled (no SMTP)
+	Err                   error
 }
 
 // New parses the templates up front, so a broken one fails at startup.
@@ -97,10 +107,20 @@ func (m *Mailer) Go(to string, msg Message) {
 
 // Send renders msg and delivers it as multipart HTML + plaintext. Without SMTP
 // configured it still renders (so template errors surface) and only logs.
-func (m *Mailer) Send(ctx context.Context, to string, msg Message) error {
+func (m *Mailer) Send(ctx context.Context, to string, msg Message) (err error) {
 	if m == nil {
 		return nil
 	}
+	status := "sent"
+	defer func() {
+		if m.Record == nil {
+			return
+		}
+		if err != nil {
+			status = "failed"
+		}
+		m.Record(context.WithoutCancel(ctx), Result{To: to, Template: msg.template(), Subject: msg.subject(), Status: status, Err: err})
+	}()
 	*msg.base() = Base{AppURL: m.cfg.AppURL, AssetsURL: m.cfg.AssetsURL}
 	html, text, err := m.Render(msg)
 	if err != nil {
@@ -108,6 +128,7 @@ func (m *Mailer) Send(ctx context.Context, to string, msg Message) error {
 	}
 	if m.deliver == nil {
 		m.log.Info("email: skipped, SMTP not configured", "template", msg.template())
+		status = "disabled"
 		return nil
 	}
 	raw, err := m.build(to, msg.subject(), html, text)

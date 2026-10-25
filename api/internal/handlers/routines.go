@@ -179,6 +179,7 @@ func (h *Handler) ShareRoutine(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		h.Notifier.Notify(ids, push.Message{
+			Kind:  "routine_shared",
 			Title: me.DisplayName + " shared a routine with you",
 			Body:  fmt.Sprintf("%s · %d day%s a week", rt.Name, n, plural(n)),
 			URL:   "/gym", Tag: "share-" + id,

@@ -1,0 +1,4 @@
+Exercise photos from free-exercise-db by Yuhonas
+https://github.com/yuhonas/free-exercise-db
+Released under the Unlicense (public domain). Resized for the app by
+scripts/import-exercise-photos.mjs.

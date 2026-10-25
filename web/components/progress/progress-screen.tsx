@@ -15,6 +15,7 @@ import { addDays, addMonths, formatDayMonth, formatMonthYear, todayISO } from "@
 import { num1, signed } from "@/lib/format"
 import { Sparkline, WeightChart } from "./weight-chart"
 import { RewardsCard } from "./rewards-card"
+import { ProgressPhotos } from "./progress-photos"
 
 type Range = "3m" | "6m" | "goal"
 type View = "week" | "month"
@@ -178,6 +179,8 @@ export function ProgressScreen() {
           </>
         )}
       </section>
+
+      <ProgressPhotos />
 
       <RewardsCard />
 

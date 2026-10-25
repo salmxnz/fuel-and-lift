@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { isSameOrigin } from "@/lib/auth/public-origin"
+import { clientIp, isSameOrigin } from "@/lib/auth/public-origin"
 import { getApiEnv } from "@/config/env"
 import { AUTH_COOKIES } from "@/lib/auth/cookies.shared"
 
@@ -70,6 +70,8 @@ async function forward(request: NextRequest, ctx: Ctx): Promise<NextResponse> {
   if (access) headers.Authorization = `Bearer ${access}`
   const ua = request.headers.get("user-agent")
   if (ua) headers["User-Agent"] = ua
+  const ip = clientIp(request)
+  if (ip) headers["X-Client-IP"] = ip
 
   let body: string | undefined
   if (method !== "GET") {

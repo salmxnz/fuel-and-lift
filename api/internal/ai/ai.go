@@ -87,16 +87,45 @@ type Usage struct {
 	CostUSD      float64
 }
 
+// Call is one structured request: instructions, text and photos, and the JSON
+// schema the answer must fill.
+type Call struct {
+	Name        string // the schema's (tool's) name, e.g. "record_estimate"
+	Description string
+	System      string
+	Text        string
+	Images      []Image
+	Schema      map[string]any
+	MaxTokens   int // default 1500
+}
+
+func (c Call) maxTokens() int {
+	if c.MaxTokens > 0 {
+		return c.MaxTokens
+	}
+	return 1500
+}
+
 // Provider is one AI backend.
 type Provider interface {
 	Name() string
 	Model() string
-	Estimate(ctx context.Context, req Request) (Estimate, Usage, error)
+	// Structured answers c with JSON matching c.Schema.
+	Structured(ctx context.Context, c Call) (json.RawMessage, Usage, error)
 }
 
 // Result is a successful estimate with where it came from.
 type Result struct {
 	Estimate Estimate
+	Usage    Usage
+	Provider string
+	Model    string
+	Latency  time.Duration
+}
+
+// RawResult is a successful structured call with where it came from.
+type RawResult struct {
+	JSON     json.RawMessage
 	Usage    Usage
 	Provider string
 	Model    string
@@ -120,11 +149,28 @@ type Attempt struct {
 	Latency  time.Duration
 }
 
-// Estimate returns the first provider's successful answer. Failed attempts are
-// returned too so the caller can log them.
+// Estimate returns the first provider's successful meal estimate. Failed
+// attempts are returned too so the caller can log them.
 func (g *Gateway) Estimate(ctx context.Context, req Request) (Result, []Attempt, error) {
+	var est Estimate
+	res, failed, err := g.Call(ctx, EstimateCall(req), func(raw json.RawMessage) error {
+		est = Estimate{}
+		if err := json.Unmarshal(raw, &est); err != nil {
+			return fmt.Errorf("model returned a malformed estimate: %w", err)
+		}
+		return Normalise(&est)
+	})
+	if err != nil {
+		return Result{}, failed, err
+	}
+	return Result{Estimate: est, Usage: res.Usage, Provider: res.Provider, Model: res.Model, Latency: res.Latency}, failed, nil
+}
+
+// Call returns the first provider's answer that check accepts (check may
+// also decode it). Failed attempts are returned too so the caller can log them.
+func (g *Gateway) Call(ctx context.Context, c Call, check func(json.RawMessage) error) (RawResult, []Attempt, error) {
 	if len(g.Providers) == 0 {
-		return Result{}, nil, ErrNoProviders
+		return RawResult{}, nil, ErrNoProviders
 	}
 	timeout := g.Timeout
 	if timeout == 0 {
@@ -134,13 +180,13 @@ func (g *Gateway) Estimate(ctx context.Context, req Request) (Result, []Attempt,
 	for _, p := range g.Providers {
 		start := time.Now()
 		cctx, cancel := context.WithTimeout(ctx, timeout)
-		est, usage, err := p.Estimate(cctx, req)
+		raw, usage, err := p.Structured(cctx, c)
 		cancel()
-		if err == nil {
-			err = Normalise(&est)
+		if err == nil && check != nil {
+			err = check(raw)
 		}
 		if err == nil {
-			return Result{Estimate: est, Usage: usage, Provider: p.Name(), Model: p.Model(), Latency: time.Since(start)}, failed, nil
+			return RawResult{JSON: raw, Usage: usage, Provider: p.Name(), Model: p.Model(), Latency: time.Since(start)}, failed, nil
 		}
 		failed = append(failed, Attempt{Provider: p.Name(), Model: p.Model(), Err: err, Latency: time.Since(start)})
 		if ctx.Err() != nil {
@@ -151,7 +197,15 @@ func (g *Gateway) Estimate(ctx context.Context, req Request) (Result, []Attempt,
 	for i, f := range failed {
 		msgs[i] = f.Provider + ": " + f.Err.Error()
 	}
-	return Result{}, failed, fmt.Errorf("every AI provider failed (%s)", strings.Join(msgs, "; "))
+	return RawResult{}, failed, fmt.Errorf("every AI provider failed (%s)", strings.Join(msgs, "; "))
+}
+
+// EstimateCall is the structured call for a meal estimate.
+func EstimateCall(req Request) Call {
+	return Call{
+		Name: "record_estimate", Description: "Record the itemised meal estimate.",
+		System: SystemPrompt(req.Voice), Text: UserPrompt(req), Images: req.Images, Schema: Schema,
+	}
 }
 
 // Normalise cleans a model answer: drops empty items, clamps negatives, caps

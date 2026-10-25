@@ -4,6 +4,7 @@ package server
 import (
 	"net/http"
 
+	"github.com/salmxnz/fuel-and-lift/api/internal/audit"
 	"github.com/salmxnz/fuel-and-lift/api/internal/auth"
 	"github.com/salmxnz/fuel-and-lift/api/internal/handlers"
 	"github.com/salmxnz/fuel-and-lift/api/internal/httpx"
@@ -22,6 +23,7 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/invite-links/preview/{token}": h.PreviewInviteLink,
 		"GET /v1/push/vapid-public-key":        h.VAPIDPublicKey,
 		"GET /v1/avatars/{user_id}":            h.Avatar,
+		"GET /v1/exercise-photos/{id}":         h.ExercisePhoto,
 	}
 	for p, f := range open {
 		mux.HandleFunc(p, f)
@@ -67,6 +69,8 @@ func NewRouter(h *handlers.Handler) http.Handler {
 
 		// AI and plan
 		"POST /v1/ai/meal-estimate": h.MealEstimate,
+		"POST /v1/ai/exercise":      h.ExerciseAI,
+		"POST /v1/ai/cardio-screen": h.CardioScreenAI,
 		"GET /v1/ai/usage":          h.AIUsage,
 		"GET /v1/billing":           h.Billing,
 		"POST /v1/billing/checkout": h.Checkout,
@@ -74,6 +78,14 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		// gym
 		"GET /v1/exercises":                             h.ListExercises,
 		"POST /v1/exercises":                            h.CreateExercise,
+		"GET /v1/exercises/shared":                      h.SharedExercises,
+		"PUT /v1/exercises/{id}/visibility":             h.SetExerciseVisibility,
+		"POST /v1/exercises/{id}/add":                   h.AddSharedExercise,
+		"PUT /v1/exercises/{id}/photo":                  h.PutExercisePhoto,
+		"DELETE /v1/exercises/{id}/photo":               h.DeleteExercisePhoto,
+		"GET /v1/gym/insights":                          h.GymInsights,
+		"POST /v1/gym/week-extras":                      h.AddWeekExtras,
+		"DELETE /v1/gym/week-extras/{id}":               h.DeleteWeekExtra,
 		"GET /v1/templates":                             h.ListTemplates,
 		"POST /v1/templates":                            h.CreateTemplate,
 		"GET /v1/templates/{id}":                        h.GetTemplate,
@@ -90,6 +102,9 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/sessions/{id}":                         h.GetSession,
 		"POST /v1/sessions/{id}/blocks":                 h.AddSessionBlock,
 		"PATCH /v1/sessions/{id}/blocks/{block_id}":     h.PatchBlock,
+		"PUT /v1/sessions/{id}/order":                   h.ReorderSession,
+		"POST /v1/sessions/{id}/rest":                   h.StartRest,
+		"DELETE /v1/sessions/{id}/rest":                 h.StopRest,
 		"POST /v1/sessions/{id}/blocks/{block_id}/sets": h.AddSet,
 		"PATCH /v1/sessions/{id}/sets/{set_id}":         h.PatchSet,
 		"POST /v1/sessions/{id}/accept-all":             h.AcceptAll,
@@ -125,6 +140,9 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/progress/exercises/{id}": h.ExerciseProgress,
 		"GET /v1/progress/records":        h.RecordsProgress,
 		"GET /v1/progress/streak":         h.StreakProgress,
+		"GET /v1/progress/photos":         h.ListProgressPhotos,
+		"POST /v1/progress/photos":        h.AddProgressPhoto,
+		"DELETE /v1/progress/photos/{id}": h.DeleteProgressPhoto,
 		// meal photos
 		"GET /v1/photos":         h.ListPhotos,
 		"DELETE /v1/photos/{id}": h.DeletePhoto,
@@ -181,10 +199,16 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/admin/users/{id}/sessions":              h.AdminUserSessions,
 		"GET /v1/admin/users/{id}/sessions/{session_id}": h.AdminUserSession,
 		"GET /v1/admin/users/{id}/friends":               h.AdminUserFriends,
+
+		// what the server sent and what it was asked
+		"GET /v1/admin/notifications":       h.ListSentNotifications,
+		"GET /v1/admin/notifications/stats": h.SentNotificationStats,
+		"GET /v1/admin/audit":               h.ListAudit,
 	}
 	for p, f := range admin {
 		mux.HandleFunc(p, secure(auth.RequireAdmin(f)))
 	}
 
-	return auth.CORS(h.Cfg.AllowedOrigins)(httpx.Recover(httpx.Logger(mux)))
+	// The audit log sits outside Recover so a panic is recorded as the 500 it becomes.
+	return auth.CORS(h.Cfg.AllowedOrigins)(audit.Middleware(h.Audit, mux)(httpx.Recover(httpx.Logger(mux))))
 }

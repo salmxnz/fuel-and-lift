@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/make-icons.mjs",
     "pixel-icons": "node scripts/import-pixel-pack.mjs",
-    "food-icons": "node scripts/import-food-pack.mjs"
+    "food-icons": "node scripts/import-food-pack.mjs",
+    "exercise-photos": "node scripts/import-exercise-photos.mjs"
   },
   "dependencies": {
     "@tanstack/query-sync-storage-persister": "^5.104.5",

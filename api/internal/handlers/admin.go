@@ -43,6 +43,7 @@ func (h *Handler) HideShopItem(w http.ResponseWriter, r *http.Request) {
 			url = "/saved-meals"
 		}
 		h.Notifier.Notify([]string{owner}, push.Message{
+			Kind:  "shop_hidden",
 			Title: name + " was removed from the Shop",
 			Body:  "A moderator hid it after it was reported. It's still in your account.",
 			URL:   url, Tag: "hidden-" + id,

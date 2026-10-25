@@ -71,7 +71,7 @@ func (s *Store) GetAIUsage(ctx context.Context, userID string, dayStart, monthSt
 	var u AIUsage
 	err := s.Pool.QueryRow(ctx, `
 		select count(*) filter (where ok and created_at >= $2),
-		       count(*) filter (where ok and has_image and created_at >= $3),
+		       count(*) filter (where ok and has_image and kind in ('photo', 'text', 'restaurant') and created_at >= $3),
 		       count(*) filter (where created_at >= now() - interval '1 minute')
 		from ai_estimates where user_id = $1::uuid and created_at >= least($2, $3, now() - interval '1 minute')`,
 		userID, dayStart, monthStart).Scan(&u.CallsToday, &u.PhotosThisMonth, &u.CallsLastMinute)

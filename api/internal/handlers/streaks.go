@@ -62,6 +62,7 @@ func (h *Handler) celebrateStreak(ctx context.Context, userID string) {
 		return
 	}
 	h.Notifier.Notify(friends, push.Message{
+		Kind:  "friend_streak",
 		Title: fmt.Sprintf("%s is on a %d-day streak 🔥", p.DisplayName, st.Current),
 		Body:  "Send them a cheer.",
 		URL:   "/friends",

@@ -113,19 +113,8 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, fmt.Sprintf("send at most %d photos", maxImages))
 		return
 	}
-	for _, img := range images {
-		if !validImageTypes[img.MediaType] {
-			badRequest(w, "images must be JPEG, PNG or WebP")
-			return
-		}
-		if base64.StdEncoding.DecodedLen(len(img.Data)) > maxImageBytes {
-			httpx.Error(w, http.StatusRequestEntityTooLarge, "a photo is over 2 MB — resize it first")
-			return
-		}
-		if _, err := base64.StdEncoding.DecodeString(img.Data); err != nil {
-			badRequest(w, "image data must be base64")
-			return
-		}
+	if !checkImages(w, images) {
+		return
 	}
 	if len(in.Answers) > 5 {
 		badRequest(w, "too many answers")
@@ -202,42 +191,9 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.AI == nil || len(h.AI.Providers) == 0 {
-		httpx.ErrorCode(w, http.StatusServiceUnavailable, "ai_unavailable", "AI estimates aren't set up on this server yet")
+	a, ok := h.aiGate(w, r, userID, len(images) > 0)
+	if !ok {
 		return
-	}
-	a, err := h.allowance(ctx, userID)
-	if err != nil {
-		h.storeError(w, r, err)
-		return
-	}
-	if a.usage.CallsLastMinute >= h.Cfg.AIPerMinute {
-		w.Header().Set("Retry-After", "60")
-		httpx.ErrorCode(w, http.StatusTooManyRequests, "rate_minute", "slow down a little — try again in a minute")
-		return
-	}
-	if a.usage.CallsToday >= h.Cfg.AIPerDay {
-		httpx.ErrorCode(w, http.StatusTooManyRequests, "rate_day", "you've hit today's AI limit — it resets at midnight")
-		return
-	}
-	// One estimate counts once, however many photos it has.
-	if len(images) > 0 && a.photoLimit != nil && a.usage.PhotosThisMonth >= *a.photoLimit {
-		httpx.ErrorCode(w, http.StatusPaymentRequired, "photo_limit",
-			fmt.Sprintf("you've used your %d free photo estimates this month — they reset on %s", *a.photoLimit, a.resetsOn.Format("2 January")))
-		return
-	}
-	if h.Cfg.AIMonthlyBudget > 0 {
-		n := h.now().UTC()
-		spent, err := h.Store.AISpendSince(ctx, time.Date(n.Year(), n.Month(), 1, 0, 0, 0, 0, time.UTC))
-		if err != nil {
-			h.storeError(w, r, err)
-			return
-		}
-		if spent >= h.Cfg.AIMonthlyBudget {
-			h.Log.Warn("AI monthly budget reached", "spent_usd", spent)
-			httpx.ErrorCode(w, http.StatusServiceUnavailable, "ai_budget", "AI estimates are paused until next month — log it manually for now")
-			return
-		}
 	}
 	if p, err := h.Store.GetProfile(ctx, userID); err == nil {
 		req.Voice = p.CoachVoice
@@ -247,13 +203,7 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 	res, failed, err := h.AI.Estimate(ctx, req)
 	base := store.AIRecord{UserID: userID, Kind: req.Kind, HasImage: len(images) > 0, ImageCount: len(images), InputText: req.Text,
 		Answers: req.Answers, PreviousID: in.PreviousEstimateID}
-	for _, f := range failed {
-		rec := base
-		rec.Provider, rec.Model, rec.Error, rec.LatencyMS = f.Provider, f.Model, truncate(f.Err.Error(), 500), int(f.Latency.Milliseconds())
-		if _, rerr := h.Store.RecordAI(context.WithoutCancel(ctx), rec); rerr != nil {
-			h.Log.Error("record AI failure", "err", rerr)
-		}
-	}
+	h.recordAIFailures(ctx, base, failed)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return
@@ -289,6 +239,81 @@ func (h *Handler) MealEstimate(w http.ResponseWriter, r *http.Request) {
 		"model":       res.Model,
 		"usage":       h.usageBody(a),
 	})
+}
+
+// aiGate checks the AI is set up and the user is within their limits,
+// writing the error when not. photo says the call counts as a photo estimate
+// (gym photos don't).
+func (h *Handler) aiGate(w http.ResponseWriter, r *http.Request, userID string, photo bool) (allowance, bool) {
+	ctx := r.Context()
+	if h.AI == nil || len(h.AI.Providers) == 0 {
+		httpx.ErrorCode(w, http.StatusServiceUnavailable, "ai_unavailable", "AI estimates aren't set up on this server yet")
+		return allowance{}, false
+	}
+	a, err := h.allowance(ctx, userID)
+	if err != nil {
+		h.storeError(w, r, err)
+		return a, false
+	}
+	if a.usage.CallsLastMinute >= h.Cfg.AIPerMinute {
+		w.Header().Set("Retry-After", "60")
+		httpx.ErrorCode(w, http.StatusTooManyRequests, "rate_minute", "slow down a little — try again in a minute")
+		return a, false
+	}
+	if a.usage.CallsToday >= h.Cfg.AIPerDay {
+		httpx.ErrorCode(w, http.StatusTooManyRequests, "rate_day", "you've hit today's AI limit — it resets at midnight")
+		return a, false
+	}
+	// One estimate counts once, however many photos it has.
+	if photo && a.photoLimit != nil && a.usage.PhotosThisMonth >= *a.photoLimit {
+		httpx.ErrorCode(w, http.StatusPaymentRequired, "photo_limit",
+			fmt.Sprintf("you've used your %d free photo estimates this month — they reset on %s", *a.photoLimit, a.resetsOn.Format("2 January")))
+		return a, false
+	}
+	if h.Cfg.AIMonthlyBudget > 0 {
+		n := h.now().UTC()
+		spent, err := h.Store.AISpendSince(ctx, time.Date(n.Year(), n.Month(), 1, 0, 0, 0, 0, time.UTC))
+		if err != nil {
+			h.storeError(w, r, err)
+			return a, false
+		}
+		if spent >= h.Cfg.AIMonthlyBudget {
+			h.Log.Warn("AI monthly budget reached", "spent_usd", spent)
+			httpx.ErrorCode(w, http.StatusServiceUnavailable, "ai_budget", "AI estimates are paused until next month — log it manually for now")
+			return a, false
+		}
+	}
+	return a, true
+}
+
+// recordAIFailures logs each failed provider attempt.
+func (h *Handler) recordAIFailures(ctx context.Context, base store.AIRecord, failed []ai.Attempt) {
+	for _, f := range failed {
+		rec := base
+		rec.Provider, rec.Model, rec.Error, rec.LatencyMS = f.Provider, f.Model, truncate(f.Err.Error(), 500), int(f.Latency.Milliseconds())
+		if _, rerr := h.Store.RecordAI(context.WithoutCancel(ctx), rec); rerr != nil {
+			h.Log.Error("record AI failure", "err", rerr)
+		}
+	}
+}
+
+// checkImages validates base64 photos, writing a 400/413 when one is bad.
+func checkImages(w http.ResponseWriter, images []ai.Image) bool {
+	for _, img := range images {
+		if !validImageTypes[img.MediaType] {
+			badRequest(w, "images must be JPEG, PNG or WebP")
+			return false
+		}
+		if base64.StdEncoding.DecodedLen(len(img.Data)) > maxImageBytes {
+			httpx.Error(w, http.StatusRequestEntityTooLarge, "a photo is over 2 MB — resize it first")
+			return false
+		}
+		if _, err := base64.StdEncoding.DecodeString(img.Data); err != nil {
+			badRequest(w, "image data must be base64")
+			return false
+		}
+	}
+	return true
 }
 
 // aiContext lists a few of the user's saved meals so guesses match how they

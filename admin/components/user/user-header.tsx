@@ -81,6 +81,8 @@ export function UserHeader({ id }: { id: string }) {
           { href: `${base}/routines`, label: "Routines", count: data?.user.counts.routines },
           { href: `${base}/sessions`, label: "Sessions", count: data?.user.counts.sessions_finished },
           { href: `${base}/friends`, label: "Friends", count: data?.user.counts.friends },
+          { href: `${base}/notifications`, label: "Notifications" },
+          { href: `${base}/activity`, label: "Activity" },
         ]}
       />
     </div>

@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server"
 import { getApiEnv } from "@/config/env"
+import { clientIp } from "./public-origin"
 import { AUTH_COOKIES } from "./cookies.shared"
 import { verifyAccessToken } from "./jwt"
 import { refreshAccessToken, type RefreshedTokens } from "./refresh-access"
@@ -34,7 +35,7 @@ export async function resolveProxyAuth(request: NextRequest): Promise<ProxyAuth>
   }
   if (!refresh || !csrf) return { authenticated: false, refreshed: null }
 
-  const refreshed = await refreshAccessToken(refresh, csrf)
+  const refreshed = await refreshAccessToken(refresh, csrf, clientIp(request))
   if (!refreshed || !(await verifyAccessToken(refreshed.accessToken, key))) {
     return { authenticated: false, refreshed: null }
   }

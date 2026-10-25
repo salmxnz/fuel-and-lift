@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server"
 // not the address the browser used. Redirects built from them send people to
 // localhost, and same-origin checks against them reject real requests.
 
-function firstHeader(request: NextRequest, name: string): string | null {
+function firstHeader(request: Pick<NextRequest, "headers">, name: string): string | null {
   return request.headers.get(name)?.split(",")[0]?.trim() || null
 }
 
@@ -55,4 +55,13 @@ export function signInOrigin(request: NextRequest, appUrl: string): string | nul
   const bare = (host: string) => host.replace(/^www\./, "")
   const twin = here.protocol === app.protocol && here.port === app.port && bare(here.hostname) === bare(app.hostname)
   return twin ? here.origin : null
+}
+
+/**
+ * The visitor's address as the reverse proxy in front reported it (first
+ * X-Forwarded-For hop, else X-Real-IP), forwarded to Go as X-Client-IP for
+ * refresh tokens and the audit log. Null when nothing sits in front (local dev).
+ */
+export function clientIp(request: Pick<NextRequest, "headers">): string | null {
+  return firstHeader(request, "x-forwarded-for") ?? firstHeader(request, "x-real-ip")
 }

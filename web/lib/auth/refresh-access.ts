@@ -22,7 +22,7 @@ function sweep(now: number) {
   }
 }
 
-async function callRefresh(refreshToken: string, csrfToken: string): Promise<RefreshedTokens | null> {
+async function callRefresh(refreshToken: string, csrfToken: string, ip: string | null): Promise<RefreshedTokens | null> {
   try {
     const { apiUrl } = getApiEnv()
     const res = await fetch(`${apiUrl}/v1/auth/refresh`, {
@@ -31,6 +31,7 @@ async function callRefresh(refreshToken: string, csrfToken: string): Promise<Ref
         Accept: "application/json",
         "X-CSRF-Token": csrfToken,
         Cookie: `refresh_token=${refreshToken}; csrf_token=${csrfToken}`,
+        ...(ip ? { "X-Client-IP": ip } : {}),
       },
       cache: "no-store",
     })
@@ -55,13 +56,14 @@ async function callRefresh(refreshToken: string, csrfToken: string): Promise<Ref
  */
 export function refreshAccessToken(
   refreshToken: string,
-  csrfToken: string
+  csrfToken: string,
+  ip: string | null = null
 ): Promise<RefreshedTokens | null> {
   const now = Date.now()
   sweep(now)
   const existing = inflight.get(refreshToken)
   if (existing) return existing.promise
-  const promise = callRefresh(refreshToken, csrfToken)
+  const promise = callRefresh(refreshToken, csrfToken, ip)
   inflight.set(refreshToken, { promise, at: now })
   return promise
 }

@@ -326,16 +326,49 @@ export type EstimateErrorCode =
 
 export type ExerciseKind = "strength" | "cardio"
 
+/** Finer than muscle_group, so the Gym tab can say what hasn't been trained. */
+export const MUSCLES = [
+  "upper chest",
+  "mid chest",
+  "lower chest",
+  "front delts",
+  "side delts",
+  "rear delts",
+  "lats",
+  "upper back",
+  "traps",
+  "lower back",
+  "biceps",
+  "triceps",
+  "forearms",
+  "quads",
+  "hamstrings",
+  "glutes",
+  "adductors",
+  "abductors",
+  "calves",
+  "abs",
+  "obliques",
+] as const
+export type Muscle = (typeof MUSCLES)[number]
+
 export type Exercise = {
   id: string
   name: string
   kind: ExerciseKind
   muscle_group: string | null
   equipment: string | null
+  /** Main one first; [] for cardio. */
+  muscles: Muscle[]
+  /** Stock photo, an app path ("/exercises/butterfly.jpg"). */
   media_url: string | null
+  /** The user's own photo of the machine, an app path. */
   gym_photo_url: string | null
   /** Other names people search by ("stairmaster", "rdl"). */
   aliases: string[]
+  /** One of the user's own (they can share it). */
+  mine: boolean
+  visibility: Visibility
   /** Search only: the other name that matched the query. */
   matched_alias?: string
 }
@@ -347,7 +380,15 @@ export type PlannedSet = {
   to_failure: boolean
 }
 
-export type Cardio = { minutes: number; incline: number | null; speed: number | null }
+/** Which fields apply depends on the machine (lib/cardio.ts). kcal only comes from a screen. */
+export type Cardio = {
+  minutes: number
+  incline: number | null
+  speed: number | null
+  level?: number | null
+  distance_km?: number | null
+  kcal?: number | null
+}
 
 export type TemplateBlock = {
   id: string
@@ -390,7 +431,77 @@ export type NewExerciseRequest = {
   kind: ExerciseKind
   muscle_group?: string | null
   equipment?: string | null
+  muscles?: Muscle[]
+  /** Borrow this exercise's stock photo. */
+  picture_from?: string | null
 }
+
+export type SharedExercise = Exercise & { owner: Person; added_id: string | null }
+export type SharedExercisesResponse = { exercises: SharedExercise[] }
+
+/** One exercise the AI offers for a photo or a description. */
+export type ExerciseOption = {
+  library_name: string
+  name: string
+  kind: ExerciseKind
+  muscle_group: string
+  muscles: Muscle[]
+  equipment: string
+  picture_like: string
+  /** "Rear delts, strict, easy to load" */
+  cue: string
+  /** The library (or the user's own) exercise to use. */
+  match: Exercise | null
+  /** No match: borrow this exercise's stock photo when creating it. */
+  picture_from: string | null
+  media_url: string | null
+}
+
+export type ExerciseAIResponse = {
+  found: boolean
+  options: ExerciseOption[]
+  weight_kg: number | null
+  weight_source: "pin" | "plates" | "dumbbell" | "text" | "none"
+  weight_note: string
+  sets: number
+  reps: number | null
+  note: string
+  confidence: number
+  usage: AiUsage
+}
+
+export type ScreenReading = {
+  found: boolean
+  minutes: number | null
+  distance_km: number | null
+  incline: number | null
+  speed: number | null
+  level: number | null
+  kcal: number | null
+  note: string
+}
+export type CardioScreenResponse = { reading: ScreenReading; usage: AiUsage }
+
+export type MuscleStat = { muscle: Muscle; last_trained: string; sets_this_week: number; days_4_weeks: number }
+export type Nudge = {
+  muscle: Muscle
+  /** "You haven't trained forearms in 2 weeks" */
+  text: string
+  days_since: number | null
+  exercises: { exercise: Exercise; last_kg: number | null }[]
+  /** The next workout this week the exercises can go into. */
+  add_to: { template_id: string; name: string; date: string } | null
+}
+export type WeekExtra = {
+  id: string
+  week_start: string
+  template_id: string
+  template_name: string
+  exercise: Exercise
+  sets: PlannedSet[]
+}
+export type GymInsightsResponse = { muscles: MuscleStat[]; nudges: Nudge[]; extras: WeekExtra[] }
+export type WeekExtrasResponse = { extras: WeekExtra[] }
 export type TemplatesResponse = { templates: Template[] }
 export type TemplateResponse = { template: Template }
 export type TemplateDetailResponse = { template: Template; versions: TemplateVersion[] }
@@ -457,6 +568,8 @@ export type SessionBlock = {
   skipped: boolean
   cardio: Cardio | null
   cardio_done: boolean
+  /** What was done (typed, or read off the machine's screen). */
+  cardio_actual: Cardio | null
   sets: SessionSet[]
 }
 
@@ -478,7 +591,7 @@ export type SessionResponse = { session: Session }
 export type SessionsResponse = { sessions: Session[] }
 export type SessionRecord = { exercise_id: string; exercise_name: string; kg: number; reps: number }
 export type FinishSessionResponse = { session: Session; proposals: Proposal[]; records: SessionRecord[] }
-export type AddSessionBlockRequest = { exercise_id: string }
+export type AddSessionBlockRequest = { exercise_id: string; sets?: PlannedSet[]; cardio?: Cardio | null }
 
 // ---------------------------------------------------------------- Progress
 
@@ -501,6 +614,20 @@ export type PersonalRecord = {
   date: string
 }
 export type ProgressRecordsResponse = { records: PersonalRecord[] }
+export type ProgressPose = "front" | "side" | "back" | "other"
+/** Private to its owner; url is a short-lived signed link. */
+export type ProgressPhoto = {
+  id: string
+  taken_on: string
+  pose: ProgressPose
+  url: string
+  content_type: string
+  /** Latest weigh-in on or before taken_on. */
+  weight_kg: number | null
+  created_at: string
+}
+export type ProgressPhotosResponse = { photos: ProgressPhoto[]; enabled: boolean; limit: number }
+export type ProgressPhotoResponse = { photo: ProgressPhoto }
 export type Streak = {
   current: number
   best: number

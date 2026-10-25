@@ -10,6 +10,12 @@ The back office: a Next.js app for admins to look people up and manage them.
   friends, public) and can be hidden from the Shop.
 - **Actions**: grant Pro (forever or until a date) or revoke it, make or remove
   admins, suspend or lift a suspension.
+- **Notifications**: every push and email the server tried to send (sent,
+  failed, skipped for quiet hours or no devices, or off on the server), with
+  24-hour counts. Kept 90 days.
+- **Audit log**: every API request: who, route, status, time taken, IP and the
+  error text. No bodies. Kept 30 days. Both logs have a Live mode, and each
+  user's page has Notifications and Activity tabs with just their rows.
 
 It talks to the same Go API as the PWA, only through the `/v1/admin/*` routes
 (see "Admin: users" in [docs/api.md](../docs/api.md)), behind a small BFF like

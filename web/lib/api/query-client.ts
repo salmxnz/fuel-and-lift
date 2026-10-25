@@ -52,7 +52,7 @@ export function invalidate(prefixes: string[]) {
   })
 }
 
-const GYM = ["templates", "routines", "weekly-plan", "sessions", "progress/", "exercises", "shop", "people/", "friends/week"]
+const GYM = ["templates", "routines", "weekly-plan", "sessions", "progress/", "exercises", "shop", "people/", "friends/week", "gym/"]
 
 /** Which cached paths a write to path can change. */
 export function affectedBy(path: string): string[] {
@@ -68,6 +68,7 @@ export function affectedBy(path: string): string[] {
     case "weekly-plan":
     case "sessions":
     case "exercises":
+    case "gym":
       return GYM
     case "saved-meals":
       return ["saved-meals", "shop", "people/"]
@@ -77,6 +78,8 @@ export function affectedBy(path: string): string[] {
       // A new profile photo shows on every friend card and feed item.
       if (p.startsWith("profile/avatar")) return ["friends", "feed", "people/", "shares", "invite-links"]
       return ["goal", "progress/", "days/", "profile", "friends/week", "people/"]
+    case "progress":
+      return ["progress/"]
     case "weigh-ins":
     case "goal":
     case "onboarding":
@@ -118,5 +121,12 @@ export function clearCache() {
     }
   } catch {
     /* storage unavailable */
+  }
+  // Gym pages the service worker kept for offline workouts (public/sw.js).
+  if (typeof caches !== "undefined") {
+    void caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k.endsWith("-pages")).map((k) => caches.delete(k))))
+      .catch(() => undefined)
   }
 }

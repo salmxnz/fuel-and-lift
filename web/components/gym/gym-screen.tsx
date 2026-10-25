@@ -19,6 +19,7 @@ import { Sky, SkyTitle, SKY_ICON } from "@/components/ui/sky"
 import { displayName, useMe } from "@/components/me-context"
 import { GymNowCard } from "@/components/friends/gym-now-card"
 import { PlanHero, TicketButton, TodayExercises, templateMinutes } from "./gym-hero"
+import { MuscleNudges } from "./muscle-nudges"
 import { RoutinesSection } from "./routines-section"
 
 const DAY_NAMES: Record<WeekdayKey, string> = {
@@ -148,6 +149,8 @@ export function GymScreen() {
       </Sky>
 
       <GymNowCard />
+
+      <MuscleNudges activeSessionId={active?.id ?? null} />
 
       <IncomingRoutines
         onAdded={(r) => {

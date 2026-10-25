@@ -1,5 +1,7 @@
 import "server-only"
+import { headers as requestHeaders } from "next/headers"
 import { getApiEnv } from "@/config/env"
+import { clientIp } from "./public-origin"
 
 export class GoApiError extends Error {
   constructor(
@@ -31,6 +33,12 @@ export async function goFetch<T>(
   const headers: Record<string, string> = { Accept: "application/json" }
   if (options.body !== undefined) headers["Content-Type"] = "application/json"
   if (options.accessToken) headers.Authorization = `Bearer ${options.accessToken}`
+  try {
+    const ip = clientIp({ headers: await requestHeaders() })
+    if (ip) headers["X-Client-IP"] = ip
+  } catch {
+    // Outside a request (nothing to forward).
+  }
 
   let res: Response
   try {

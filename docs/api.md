@@ -13,6 +13,14 @@ Authenticated routes need `Authorization: Bearer <access_token>`. Cookie routes
 talks to this API directly: the Next.js app is a BFF that keeps every token in
 httpOnly cookies (see `docs/auth.md`).
 
+The BFFs (web and admin) forward the visitor's address as `X-Client-IP`; the API
+uses it for refresh tokens and the audit log. It's only trustworthy while the
+API can't be reached except through a BFF, since anyone calling it directly can
+set the header.
+
+Every request (but `GET /health` and reads of the logs) is recorded in the audit log (see "Admin:
+audit log"): who, what route, status, time taken and error text, never bodies.
+
 ## Auth
 
 ### `POST /v1/auth/google`
@@ -364,22 +372,72 @@ after a day.
 Error codes on `POST /v1/ai/meal-estimate`: `rate_minute` / `rate_day` (429),
 `photo_limit` (402), `ai_unavailable` / `ai_budget` (503), `ai_failed` (502).
 
+## AI for the gym
+
+Both count toward the per-minute and per-day AI limits and the monthly budget
+(same error codes as meal estimates, never `photo_limit`): gym photos are
+**not** photo estimates and don't use up the free 10 a month.
+
+### `POST /v1/ai/exercise` `{text?, images?}`
+What exercise a photo of a machine (up to 2 photos, e.g. the machine and its
+placard) or a description is, and what weight is set on it.
+
+```ts
+type ExerciseOption = {
+  library_name: string,          // "" when nothing in the library is the same exercise
+  name: string, kind: "strength" | "cardio",
+  muscle_group: string, muscles: Muscle[], equipment: string,   // "" when unsure
+  picture_like: string,          // library exercise whose photo looks closest
+  cue: string,                   // "Rear delts, strict, easy to load"
+  match: Exercise | null,        // the library (or your own) exercise to use
+  picture_from: string | null,   // no match: send as POST /v1/exercises picture_from
+  media_url: string | null       // the picture either way
+}
+```
+`200 {found, options: ExerciseOption[], weight_kg: number | null,
+weight_source: "pin" | "plates" | "dumbbell" | "text" | "none", weight_note,
+sets, reps: number | null, note, confidence, model, usage}`.
+A photo or a specific description gives one option; something vague ("rear
+delt", "upper chest") gives up to three variations, best first. `found: false`
+(and no options) when the photo shows no gym equipment. `weight_kg` is read off
+the pin, the plates loaded or a dumbbell, or taken from the text; `sets` is 3
+unless the user said otherwise.
+
+### `POST /v1/ai/cardio-screen` `{image, exercise?}`
+`200 {"reading": {found, minutes, distance_km, incline, speed, level, kcal, note}, model, usage}`.
+The numbers on a cardio machine's screen, metric (`speed` in km/h; the note
+says when it converted). Anything not on the screen is `null`. Send it as
+`cardio_actual` on the block.
+
 ## Gym
 
 ```ts
+type Muscle = "upper chest" | "mid chest" | "lower chest" | "front delts" | "side delts" | "rear delts"
+            | "lats" | "upper back" | "traps" | "lower back" | "biceps" | "triceps" | "forearms"
+            | "quads" | "hamstrings" | "glutes" | "adductors" | "abductors" | "calves" | "abs" | "obliques"
+
 type Exercise = { id: string, name: string, kind: "strength" | "cardio",
                   muscle_group: string | null, equipment: string | null,
-                  media_url: string | null, gym_photo_url: string | null,
+                  muscles: Muscle[],              // main one first; [] for cardio
+                  media_url: string | null,       // stock photo, an app path ("/exercises/butterfly.jpg")
+                  gym_photo_url: string | null,   // your own photo of it, an app path ("/exercise-photos/…?v=…")
                   aliases: string[],              // other names: "stairmaster", "rdl"
+                  mine: boolean,                  // one of your own (you can share it)
+                  visibility: Visibility,         // yours only; library ones are "private"
                   matched_alias?: string }        // search only: the alias that matched
 
 type PlannedSet = { warmup: boolean, target_kg: number | null,
                     target_reps: number | null, to_failure: boolean }
 
+// Which fields a machine has is up to the app (a treadmill has incline and
+// speed, a bike a level, a rower a distance). kcal only comes from a screen.
+type Cardio = { minutes: number, incline: number | null, speed: number | null,
+                level?: number | null, distance_km?: number | null, kcal?: number | null }
+
 type TemplateBlock = {
   id: string, position: number, exercise: Exercise,
   sets: PlannedSet[],                       // strength
-  cardio: { minutes: number, incline: number | null, speed: number | null } | null,
+  cardio: Cardio | null,
   rest_seconds: number | null, notes: string | null
 }
 
@@ -392,7 +450,53 @@ Ranked search over the shared library and your own exercises: every word must
 match the name, an alias, the muscle group or the equipment, in any order,
 with a small typo allowed ("raise calf", "calf rasie", "stair master", "rdl").
 Best 50 results; an empty `q` returns everything by name.
-### `POST /v1/exercises` `{name, kind, muscle_group?, equipment?}` → `201 {"exercise": Exercise}`
+### `POST /v1/exercises` `{name, kind, muscle_group?, equipment?, muscles?, picture_from?}` → `201 {"exercise": Exercise}`
+`muscles`: up to 3 `Muscle`s. `picture_from`: an exercise you can use whose
+stock photo the new one borrows (from `POST /v1/ai/exercise`). `409` if you
+already have one by that name.
+
+### Your photo of a machine
+- `PUT /v1/exercises/{id}/photo` `{media_type, data}` (base64, up to 600 KB; send a ~800 px JPEG) → `200 {"exercise": Exercise}`
+  Any exercise you can use, library or yours; only you see it on library ones.
+- `DELETE /v1/exercises/{id}/photo` → `200 {"exercise": Exercise}`
+- `GET /v1/exercise-photos/{id}` (no auth; the web app serves it at `/exercise-photos/{id}`) → the image, cached for good.
+
+### Sharing exercises
+Your own exercises can be private (default), shown to friends, or public in the
+Shop. Adding someone else's copies it into yours, so templates and sessions
+only use the library and your own. Friends see your gym photo; the Shop shows
+only the stock picture.
+
+```ts
+type SharedExercise = Exercise & { owner: Person, added_id: string | null }  // your copy, if you have one
+```
+- `PUT /v1/exercises/{id}/visibility` `{visibility}` → `200 {"exercise": Exercise}` (yours only, else `404`)
+- `GET /v1/exercises/shared?scope=friends|public&q=` → `200 {"exercises": SharedExercise[]}` (newest first, 60 max)
+  `friends`: what friends share (friends-only or public); `public`: the Shop, everyone's but yours.
+- `POST /v1/exercises/{id}/add` → `200 {"exercise": Exercise}` (your copy; adding again returns it)
+
+### Muscles that need work
+```ts
+type MuscleStat = { muscle: Muscle, last_trained: string, sets_this_week: number, days_4_weeks: number }
+type Nudge = { muscle: Muscle, text: string,       // "You haven't trained forearms in 2 weeks"
+               days_since: number | null,           // null: not in the last 90 days
+               exercises: { exercise: Exercise, last_kg: number | null }[],   // 1-2 to do
+               add_to: { template_id: string, name: string, date: string } | null }  // next workout this week
+type WeekExtra = { id: string, week_start: string, template_id: string, template_name: string,
+                   exercise: Exercise, sets: PlannedSet[] }
+```
+- `GET /v1/gym/insights` → `200 {"muscles": MuscleStat[], "nudges": Nudge[], "extras": WeekExtra[]}`
+  A block counts for its exercise's first two muscles once a working set is
+  done. Up to two nudges, only for someone who trained on 3+ days in the last
+  4 weeks: muscles lapsed 2+ weeks (longest first), then regulars not trained
+  this week (from Thursday), then often-skipped ones (upper chest, rear and
+  side delts, forearms, hamstrings, calves, abs, lower back) not trained in 90
+  days. Muscles with extras planned this week are left out. `extras` are this
+  week's not yet used.
+- `POST /v1/gym/week-extras` `{template_id, date?, blocks: [{exercise_id, sets}]}` → `201 {"extras": WeekExtra[]}`
+  Adds 1–6 exercises to one of your workouts for the week of `date` (default
+  today) only: starting that workout that week appends them, once.
+- `DELETE /v1/gym/week-extras/{id}` → `204` (only while unused)
 ### `GET /v1/templates` → `200 {"templates": Template[]}`
 ### `POST /v1/templates` `{name, blocks: [{exercise_id, sets, cardio, rest_seconds, notes}], visibility?}` → `201 {"template": Template}`
 ### `GET /v1/templates/{id}` → `200 {"template": Template, "versions": [{version, version_id, created_at}]}`
@@ -459,8 +563,10 @@ type SessionSet = { id: string, position: number, warmup: boolean,
                     actual_kg: number | null, actual_reps: number | null, done: boolean }
 
 type SessionBlock = { id: string, position: number, exercise: Exercise, skipped: boolean,
-                      cardio: { minutes: number, incline: number | null, speed: number | null } | null,
-                      cardio_done: boolean, sets: SessionSet[] }
+                      cardio: Cardio | null,          // the plan
+                      cardio_done: boolean,
+                      cardio_actual: Cardio | null,   // what was done (typed or read off the screen)
+                      sets: SessionSet[] }
 
 type Session = { id: string, date: string, template_id: string | null, template_name: string | null,
                  template_version: number | null, status: "active" | "finished",
@@ -468,11 +574,18 @@ type Session = { id: string, date: string, template_id: string | null, template_
 
 type Proposal = { exercise_id: string, exercise_name: string, from_kg: number, to_kg: number }
 ```
-- `POST /v1/sessions` `{date, template_id?}` → `201 {"session": Session}` (a copy of the template's current version)
+- `POST /v1/sessions` `{date, template_id?}` → `201 {"session": Session}` (a copy of the template's current version, plus that week's extras for it)
 - `GET /v1/sessions?from=&to=` → `200 {"sessions": Session[]}`
 - `GET /v1/sessions/{id}` → `200 {"session": Session}`
-- `POST /v1/sessions/{id}/blocks` `{exercise_id}` → `201 {"session": Session}` (an extra exercise today only)
-- `PATCH /v1/sessions/{id}/blocks/{block_id}` `{skipped?, cardio_done?}` → `200 {"session": Session}`
+- `POST /v1/sessions/{id}/blocks` `{exercise_id, sets?, cardio?}` → `201 {"session": Session}` (an extra exercise today only, with planned sets when given)
+- `PATCH /v1/sessions/{id}/blocks/{block_id}` `{skipped?, cardio_done?, cardio_actual?}` → `200 {"session": Session}` (`cardio_actual: null` clears it)
+- `PUT /v1/sessions/{id}/order` `{block_ids}` → `200 {"session": Session}`
+  New order ("machine's taken, do it later"); must list every block once, else `400`.
+- `POST /v1/sessions/{id}/rest` `{seconds, next?}` → `202 {ends_at}`
+  A "Rest's over 💪" push (tag `rest-<session id>`, body "Next: <next>") after
+  `seconds` (5–1800), even in quiet hours, so it reaches a locked phone. A new
+  rest replaces the old one. `409` once the workout is finished.
+- `DELETE /v1/sessions/{id}/rest` → `204` (cancels it)
 - `POST /v1/sessions/{id}/blocks/{block_id}/sets` `{warmup?, target_kg?, target_reps?, to_failure?}` → `201 {"session": Session}` (a third set today)
 - `PATCH /v1/sessions/{id}/sets/{set_id}` `{actual_kg?, actual_reps?, done?}` → `200 {"session": Session}`
 - `POST /v1/sessions/{id}/accept-all` → marks every unskipped set done at its targets → `200 {"session": Session}`
@@ -487,6 +600,15 @@ type Proposal = { exercise_id: string, exercise_name: string, from_kg: number, t
 - `GET /v1/progress/calories?from=&to=` → `{"days": [{date, kcal, protein_g, target_kcal, logged}]}` (`logged`: at least one entry that day)
 - `GET /v1/progress/exercises/{exercise_id}` → `{"exercise": Exercise, "points": [{date, top_kg, top_reps, e1rm_kg}]}`
 - `GET /v1/progress/records` → `{"records": [{exercise_id, exercise_name, kg, reps, date}]}`
+- `GET /v1/progress/photos` → `{"photos": ProgressPhoto[], "enabled": boolean, "limit": 500}` (newest first)
+  `ProgressPhoto = {id, taken_on, pose: "front" | "side" | "back" | "other", url, content_type, weight_kg: number | null, created_at}`.
+  Private: only their owner ever sees them, through signed links valid for
+  `PHOTO_URL_TTL`. `weight_kg` is the latest weigh-in on or before `taken_on`.
+- `POST /v1/progress/photos` `{media_type, data, taken_on?, pose?}` → `201 {"photo": ProgressPhoto}`
+  Base64 up to 2 MB (send a ~1200 px JPEG); `taken_on` defaults to today and
+  can't be in the future. `503 photos_unavailable` without photo storage,
+  `409 photo_limit` past 500.
+- `DELETE /v1/progress/photos/{id}` → `204`
 - `GET /v1/progress/streak` → `{"streak": {current, best, active_today, last_active, last_7: bool[7], milestones: [{days, reached}], since}}`
   One combined streak: a day counts when a meal was logged or a workout
   finished (user's time zone). Today without activity yet doesn't break it.
@@ -824,6 +946,67 @@ type AdminUser = {
 
 Hiding any of their meals, templates or routines (whatever the visibility) uses
 `POST/DELETE /v1/admin/shop/{kind}/{id}/hide` above.
+
+### Admin: notifications (admins only)
+Every push and email the server tried to send. A push is recorded once per
+person it was meant for; `kind` names it (`friend_joined`, `shop_hidden`,
+`meal`, `weekly_recap`…) and an email's `kind` is its template (`welcome`…).
+
+```ts
+type SentNotification = {
+  id: number,                     // newest first; also the paging cursor
+  channel: "push" | "email",
+  user: Person | null,            // null: an email to an address with no account
+  recipient: string | null,       // email address
+  kind: string,
+  title: string,                  // push title / email subject
+  body: string | null, url: string | null,   // push only
+  status: "sent" | "partial" | "failed" | "no_devices" | "quiet_hours" | "disabled",
+  devices: number, delivered: number,        // push: subscriptions tried / delivered to
+  error: string | null,
+  created_at: string
+}
+```
+`partial`: some devices got it. `no_devices`: push was on but they have no
+subscription. `quiet_hours`: skipped by their quiet hours. `disabled`: no VAPID
+keys / no SMTP on this server, so nothing left it.
+
+- `GET /v1/admin/notifications?channel=&status=&kind=&user_id=&q=&before=&limit=50`
+  → `200 {"notifications": SentNotification[], "next_before": number|null}`. `q`
+  matches title, body or recipient; pass `next_before` as `before` for the next page;
+  `limit` ≤ 200.
+- `GET /v1/admin/notifications/stats` → `200 {"since": string, "counts": {"push": {status: n}, "email": {status: n}}}`
+  over the last 24 hours (every status present, 0 when none).
+
+Kept `NOTIFICATION_RETENTION_DAYS` (default 90).
+
+### Admin: audit log (admins only)
+One row per API request, written in the background
+within about a second. Not recorded: `GET /health` and reads of these two
+logs (`GET /v1/admin/audit`, `GET /v1/admin/notifications…`), which the admin
+app polls in Live mode. Bodies are never stored; a 4xx/5xx keeps its
+`error.message`. A path holding a secret (an invite token) is stored as its
+route (`/v1/invite-links/preview/{token}`).
+
+```ts
+type AuditEntry = {
+  id: number, at: string,
+  user: Person | null,            // null: signed out or a bad token
+  role: "admin" | "member" | null,
+  method: string, path: string,
+  route: string | null,           // "GET /v1/days/{date}"; null when nothing matched
+  query: string | null,
+  status: number, duration_ms: number,
+  ip: string | null,              // X-Client-IP from the BFF (see above)
+  user_agent: string | null,
+  error: string | null
+}
+```
+- `GET /v1/admin/audit?user_id=&method=&status=&q=&before=&limit=100`
+  → `200 {"entries": AuditEntry[], "next_before": number|null}`. `status` is a class
+  (`2xx`…`5xx`) or a code (`404`); `q` matches the path; `limit` ≤ 200.
+
+Kept `AUDIT_RETENTION_DAYS` (default 30).
 
 ## Notifications (Web Push)
 

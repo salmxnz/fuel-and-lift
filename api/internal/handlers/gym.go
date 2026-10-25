@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/salmxnz/fuel-and-lift/api/internal/ai"
 	"github.com/salmxnz/fuel-and-lift/api/internal/auth"
 	"github.com/salmxnz/fuel-and-lift/api/internal/httpx"
 	"github.com/salmxnz/fuel-and-lift/api/internal/push"
@@ -29,10 +31,14 @@ func (h *Handler) ListExercises(w http.ResponseWriter, r *http.Request) {
 // CreateExercise handles POST /v1/exercises.
 func (h *Handler) CreateExercise(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Name        string  `json:"name"`
-		Kind        string  `json:"kind"`
-		MuscleGroup *string `json:"muscle_group"`
-		Equipment   *string `json:"equipment"`
+		Name        string   `json:"name"`
+		Kind        string   `json:"kind"`
+		MuscleGroup *string  `json:"muscle_group"`
+		Equipment   *string  `json:"equipment"`
+		Muscles     []string `json:"muscles"`
+		// PictureFrom borrows the stock picture of an exercise the user can
+		// use (the AI's closest match).
+		PictureFrom *string `json:"picture_from"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -55,7 +61,31 @@ func (h *Handler) CreateExercise(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	e, err := h.Store.CreateExercise(r.Context(), auth.UserID(r), store.Exercise{Name: name, Kind: in.Kind, MuscleGroup: in.MuscleGroup, Equipment: in.Equipment})
+	if len(in.Muscles) > 3 {
+		badRequest(w, "list at most 3 muscles")
+		return
+	}
+	for _, m := range in.Muscles {
+		if !slices.Contains(ai.Muscles, m) {
+			badRequest(w, "unknown muscle: "+m)
+			return
+		}
+	}
+	userID := auth.UserID(r)
+	ex := store.Exercise{Name: name, Kind: in.Kind, MuscleGroup: in.MuscleGroup, Equipment: in.Equipment, Muscles: in.Muscles}
+	if in.PictureFrom != nil {
+		if !isUUID(*in.PictureFrom) {
+			badRequest(w, "picture_from must be an exercise id")
+			return
+		}
+		from, err := h.Store.GetExercise(r.Context(), userID, *in.PictureFrom)
+		if err != nil {
+			h.storeError(w, r, err)
+			return
+		}
+		ex.MediaURL = from.MediaURL
+	}
+	e, err := h.Store.CreateExercise(r.Context(), userID, ex)
 	if err != nil {
 		if err == store.ErrConflict {
 			httpx.Error(w, http.StatusConflict, "you already have an exercise with that name")
@@ -85,31 +115,39 @@ func checkTemplate(in templateBody) (string, string) {
 		return "", "a template can have at most 30 exercises"
 	}
 	for _, b := range in.Blocks {
-		if !isUUID(b.ExerciseID) {
-			return "", "every block needs an exercise_id"
-		}
-		if len(b.Sets) > 12 {
-			return "", "a block can have at most 12 sets"
-		}
-		for _, s := range b.Sets {
-			if s.TargetKg != nil && (*s.TargetKg < 0 || *s.TargetKg > 1000) {
-				return "", "target_kg must be between 0 and 1000"
-			}
-			if s.TargetReps != nil && (*s.TargetReps < 0 || *s.TargetReps > 200) {
-				return "", "target_reps must be between 0 and 200"
-			}
-		}
-		if b.Cardio != nil && (b.Cardio.Minutes <= 0 || b.Cardio.Minutes > 600) {
-			return "", "cardio minutes must be between 0 and 600"
-		}
-		if b.RestSeconds != nil && (*b.RestSeconds < 0 || *b.RestSeconds > 1800) {
-			return "", "rest_seconds must be between 0 and 1800"
-		}
-		if b.Notes != nil && utf8Len(*b.Notes) > 200 {
-			return "", "notes are limited to 200 characters"
+		if msg := checkBlock(b); msg != "" {
+			return "", msg
 		}
 	}
 	return name, ""
+}
+
+// checkBlock validates one exercise of a template or session.
+func checkBlock(b store.BlockInput) string {
+	if !isUUID(b.ExerciseID) {
+		return "every block needs an exercise_id"
+	}
+	if len(b.Sets) > 12 {
+		return "a block can have at most 12 sets"
+	}
+	for _, s := range b.Sets {
+		if s.TargetKg != nil && (*s.TargetKg < 0 || *s.TargetKg > 1000) {
+			return "target_kg must be between 0 and 1000"
+		}
+		if s.TargetReps != nil && (*s.TargetReps < 0 || *s.TargetReps > 200) {
+			return "target_reps must be between 0 and 200"
+		}
+	}
+	if b.Cardio != nil && !validCardio(b.Cardio, false) {
+		return "cardio minutes must be between 0 and 600, and its other values in range"
+	}
+	if b.RestSeconds != nil && (*b.RestSeconds < 0 || *b.RestSeconds > 1800) {
+		return "rest_seconds must be between 0 and 1800"
+	}
+	if b.Notes != nil && utf8Len(*b.Notes) > 200 {
+		return "notes are limited to 200 characters"
+	}
+	return ""
 }
 
 // ListTemplates handles GET /v1/templates.
@@ -365,23 +403,21 @@ func (h *Handler) sessionResponse(w http.ResponseWriter, r *http.Request, status
 	httpx.JSON(w, status, map[string]any{"session": s})
 }
 
-// AddSessionBlock handles POST /v1/sessions/{id}/blocks {exercise_id}.
+// AddSessionBlock handles POST /v1/sessions/{id}/blocks {exercise_id, sets?, cardio?}.
 func (h *Handler) AddSessionBlock(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
 		return
 	}
-	var in struct {
-		ExerciseID string `json:"exercise_id"`
-	}
+	var in store.BlockInput
 	if !decode(w, r, &in) {
 		return
 	}
-	if !isUUID(in.ExerciseID) {
-		badRequest(w, "exercise_id is required")
+	if msg := checkBlock(in); msg != "" {
+		badRequest(w, msg)
 		return
 	}
-	s, err := h.Store.AddSessionBlock(r.Context(), auth.UserID(r), id, in.ExerciseID)
+	s, err := h.Store.AddSessionBlock(r.Context(), auth.UserID(r), id, in.ExerciseID, in.Sets, in.Cardio)
 	h.sessionResponse(w, r, http.StatusCreated, s, err)
 }
 
@@ -396,13 +432,21 @@ func (h *Handler) PatchBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Skipped    *bool `json:"skipped"`
-		CardioDone *bool `json:"cardio_done"`
+		Skipped      *bool                  `json:"skipped"`
+		CardioDone   *bool                  `json:"cardio_done"`
+		CardioActual optional[store.Cardio] `json:"cardio_actual"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	s, err := h.Store.PatchBlock(r.Context(), auth.UserID(r), id, blockID, in.Skipped, in.CardioDone)
+	if c := in.CardioActual.Value; c != nil && !validCardio(c, true) {
+		badRequest(w, "cardio_actual values are out of range")
+		return
+	}
+	s, err := h.Store.PatchBlock(r.Context(), auth.UserID(r), id, blockID, store.BlockPatch{
+		Skipped: in.Skipped, CardioDone: in.CardioDone, CardioActual: in.CardioActual.Value,
+		ClearCardioActual: in.CardioActual.Set && in.CardioActual.Value == nil,
+	})
 	h.sessionResponse(w, r, http.StatusOK, s, err)
 }
 
@@ -587,6 +631,7 @@ func (h *Handler) announceWorkout(ctx context.Context, userID string, s store.Se
 		return
 	}
 	h.Notifier.Notify(friends, push.Message{
+		Kind:  "friend_workout",
 		Title: p.DisplayName + " just smashed a workout 💪",
 		Body:  text,
 		URL:   "/friends",
@@ -622,6 +667,16 @@ func (h *Handler) ApplyProposals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"template": t})
+}
+
+// validCardio checks cardio values are in range. A plan needs minutes; what
+// was done (actual) may be only a distance.
+func validCardio(c *store.Cardio, actual bool) bool {
+	if c.Minutes < 0 || c.Minutes > 600 || (!actual && c.Minutes == 0) {
+		return false
+	}
+	in := func(p *float64, max float64) bool { return p == nil || (*p >= 0 && *p <= max) }
+	return in(c.Incline, 40) && in(c.Speed, 60) && in(c.Level, 50) && in(c.DistanceKm, 300) && in(c.Kcal, 5000)
 }
 
 func plural(n int) string {

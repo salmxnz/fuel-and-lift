@@ -1,6 +1,6 @@
 "use client"
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { api, errorMessage, seg } from "./client"
 import type { AdminUserDetail, AdminUserResponse, MeResponse, ShopKind } from "./types"
@@ -62,5 +62,22 @@ export function useHide(userId: string) {
       qc.invalidateQueries({ queryKey: keys.user(userId) })
     },
     onError: (err) => toast.error(errorMessage(err)),
+  })
+}
+
+/**
+ * A page of a log (admin/notifications, admin/audit), newest first, with
+ * "load more" through the before cursor. Live refetches every 5 s.
+ */
+export function useLogPages<T extends { next_before: number | null }>(path: string, filters: Record<string, string>, live: boolean) {
+  return useInfiniteQuery({
+    queryKey: ["logs", path, filters],
+    queryFn: ({ pageParam, signal }) =>
+      api.get<T>(path, { ...filters, before: pageParam || undefined }, signal),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.next_before ?? undefined,
+    refetchInterval: live ? 5000 : false,
+    placeholderData: keepPreviousData,
+    staleTime: 0,
   })
 }

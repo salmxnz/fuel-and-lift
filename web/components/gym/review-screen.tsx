@@ -358,7 +358,7 @@ function SwipeCard({
   const diff = target != null && actual != null ? actual - target : null
   const badge =
     block.cardio != null
-      ? cardioText(block.cardio)
+      ? cardioText(block.cardio_actual ?? block.cardio)
       : diff == null
         ? "Planned"
         : Math.abs(diff) < 0.01
@@ -437,7 +437,7 @@ function SwipeCard({
       {block.cardio ? (
         <p className="m-0 text-[15px]">
           {block.cardio_done ? "Done: " : "Planned: "}
-          {cardioText(block.cardio)}
+          {cardioText(block.cardio_done ? (block.cardio_actual ?? block.cardio) : block.cardio)}
         </p>
       ) : (
         <div className="min-h-0 overflow-y-auto">
@@ -535,7 +535,7 @@ function EditForm({ block, session, onSaved }: { block: SessionBlock; session: S
       {block.cardio ? (
         <div className="flex min-h-14 items-center justify-between rounded-tile bg-white px-3.5">
           <span id="cardio-done-label" className="text-[15px] font-semibold">
-            Did {cardioText(block.cardio)}
+            Did {cardioText(block.cardio_actual ?? block.cardio)}
           </span>
           <Switch checked={cardioDone} onChange={setCardioDone} labelledBy="cardio-done-label" />
         </div>

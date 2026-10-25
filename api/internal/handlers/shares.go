@@ -85,6 +85,7 @@ func (h *Handler) ShareEntry(w http.ResponseWriter, r *http.Request) {
 			title = me.DisplayName + " split " + e.Name + " with you"
 		}
 		h.Notifier.Notify(ids, push.Message{
+			Kind:  "meal_shared",
 			Title: title,
 			Body:  fmt.Sprintf("%.0f kcal. Add it to your day?", e.Kcal),
 			URL:   "/today", Tag: "share-" + id,
@@ -118,6 +119,7 @@ func (h *Handler) ShareTemplate(w http.ResponseWriter, r *http.Request) {
 	if me, err := h.Store.GetProfile(r.Context(), userID); err == nil {
 		n := len(t.Blocks)
 		h.Notifier.Notify(ids, push.Message{
+			Kind:  "template_shared",
 			Title: me.DisplayName + " shared a workout with you",
 			Body:  fmt.Sprintf("%s · %d exercise%s", t.Name, n, plural(n)),
 			URL:   "/gym", Tag: "share-" + id,

@@ -28,11 +28,12 @@ import type {
   TemplateResponse,
 } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
+import { CARDIO_FIELD_LABEL, cardioFields, cardioText, onlyFields, type CardioField } from "@/lib/cardio"
 import { cn } from "@/lib/cn"
 import { parseDecimal } from "@/lib/format"
 import { PAGE_SLIDE, pageVariants, swipeDirection } from "@/lib/motion"
 import { ExerciseIcon } from "./exercise-icon"
-import { ExercisePicker } from "./exercise-picker"
+import { ExercisePicker, type PickPlan } from "./exercise-picker"
 import { QuickAddSets } from "./quick-add-sets"
 
 type SetDraft = { key: string; warmup: boolean; kg: string; reps: string; toFailure: boolean }
@@ -40,10 +41,14 @@ type BlockDraft = {
   key: string
   exercise: Exercise
   sets: SetDraft[]
-  cardio: { minutes: string; incline: string; speed: string } | null
+  cardio: CardioDraft | null
   rest: string
   notes: string
 }
+
+type CardioDraft = Record<"minutes" | CardioField, string>
+
+const str = (v: number | null | undefined) => (v != null ? String(v) : "")
 
 /** The API allows 12 sets per exercise. */
 const MAX_SETS = 12
@@ -73,8 +78,10 @@ function draftFrom(t: Template): { name: string; blocks: BlockDraft[] } {
         cardio: b.cardio
           ? {
               minutes: String(b.cardio.minutes),
-              incline: b.cardio.incline != null ? String(b.cardio.incline) : "",
-              speed: b.cardio.speed != null ? String(b.cardio.speed) : "",
+              incline: str(b.cardio.incline),
+              speed: str(b.cardio.speed),
+              level: str(b.cardio.level),
+              distance_km: str(b.cardio.distance_km),
             }
           : null,
         rest: b.rest_seconds != null ? String(b.rest_seconds) : "",
@@ -83,21 +90,25 @@ function draftFrom(t: Template): { name: string; blocks: BlockDraft[] } {
   }
 }
 
-function newBlock(ex: Exercise): BlockDraft {
-  return ex.kind === "cardio"
-    ? { key: k(), exercise: ex, sets: [], cardio: { minutes: "10", incline: "", speed: "" }, rest: "", notes: "" }
-    : {
-        key: k(),
-        exercise: ex,
-        sets: [
+/** A new block: a photo of the machine plans its sets (weight × reps), else a warm-up and two sets to failure. */
+function newBlock(ex: Exercise, plan?: PickPlan): BlockDraft {
+  if (ex.kind === "cardio") {
+    return { key: k(), exercise: ex, sets: [], cardio: { minutes: "10", incline: "", speed: "", level: "", distance_km: "" }, rest: "", notes: "" }
+  }
+  return {
+    key: k(),
+    exercise: ex,
+    sets: plan?.sets.length
+      ? plan.sets.map(setFrom)
+      : [
           { key: k(), warmup: true, kg: "", reps: "12", toFailure: false },
           { key: k(), warmup: false, kg: "", reps: "", toFailure: true },
           { key: k(), warmup: false, kg: "", reps: "", toFailure: true },
         ],
-        cardio: null,
-        rest: "90",
-        notes: "",
-      }
+    cardio: null,
+    rest: "90",
+    notes: "",
+  }
 }
 
 function toRequest(name: string, blocks: BlockDraft[]): TemplateRequest | string {
@@ -108,7 +119,16 @@ function toRequest(name: string, blocks: BlockDraft[]): TemplateRequest | string
     if (b.cardio) {
       const minutes = parseDecimal(b.cardio.minutes)
       if (minutes == null || minutes <= 0) return `Set the minutes for ${b.exercise.name}`
-      cardio = { minutes, incline: parseDecimal(b.cardio.incline), speed: parseDecimal(b.cardio.speed) }
+      cardio = onlyFields(
+        {
+          minutes,
+          incline: parseDecimal(b.cardio.incline),
+          speed: parseDecimal(b.cardio.speed),
+          level: parseDecimal(b.cardio.level),
+          distance_km: parseDecimal(b.cardio.distance_km),
+        },
+        cardioFields(b.exercise)
+      )
     }
     const sets: PlannedSet[] = b.sets.map((s) => ({
       warmup: s.warmup,
@@ -355,11 +375,7 @@ function VersionPreview({
 }
 
 function blockSummary(sets: PlannedSet[], cardio: Cardio | null): string {
-  if (cardio) {
-    return [`${cardio.minutes} min`, cardio.incline != null ? `incline ${cardio.incline}` : null, cardio.speed != null ? `speed ${cardio.speed}` : null]
-      .filter(Boolean)
-      .join(", ")
-  }
+  if (cardio) return cardioText(cardio)
   const warm = sets.filter((s) => s.warmup).length
   const work = sets.filter((s) => !s.warmup)
   const parts = work.map((s) => `${s.to_failure ? "to failure" : `${s.target_reps ?? "?"} reps`}${s.target_kg != null ? ` @ ${s.target_kg} kg` : ""}`)
@@ -530,15 +546,9 @@ function Editor({
 
             {b.cardio ? (
               <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    ["minutes", "Minutes"],
-                    ["incline", "Incline"],
-                    ["speed", "Speed"],
-                  ] as const
-                ).map(([f, label]) => (
+                {(["minutes", ...cardioFields(b.exercise)] as const).map((f) => (
                   <label key={f} className="flex flex-col gap-1 text-[12px] text-muted">
-                    {label}
+                    {CARDIO_FIELD_LABEL[f]}
                     <input
                       inputMode="decimal"
                       value={b.cardio![f]}
@@ -702,8 +712,8 @@ function Editor({
       <ExercisePicker
         open={picker}
         onClose={() => setPicker(false)}
-        onPick={(ex) => {
-          update([...blocks, newBlock(ex)])
+        onPick={(ex, plan) => {
+          update([...blocks, newBlock(ex, plan)])
           setPicker(false)
         }}
       />

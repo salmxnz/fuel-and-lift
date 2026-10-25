@@ -6,7 +6,9 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -89,4 +91,20 @@ func Logger(next http.Handler) http.Handler {
 		slog.Info("request", "method", r.Method, "path", r.URL.Path,
 			"status", sw.status, "ms", time.Since(start).Milliseconds())
 	})
+}
+
+// ClientIP is the caller's address: what the BFF forwarded (X-Client-IP, then
+// X-Forwarded-For, X-Real-IP), else the connection's. The headers are only
+// trustworthy while the API is reachable through the BFF alone.
+func ClientIP(r *http.Request) string {
+	for _, h := range []string{"X-Client-IP", "X-Forwarded-For", "X-Real-IP"} {
+		if v := strings.TrimSpace(strings.Split(r.Header.Get(h), ",")[0]); v != "" && net.ParseIP(v) != nil {
+			return v
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil && net.ParseIP(host) != nil {
+		return host
+	}
+	return ""
 }

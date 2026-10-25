@@ -84,7 +84,20 @@ type ctxKey int
 const (
 	ctxUserID ctxKey = iota
 	ctxRole
+	ctxSeen
 )
+
+// Seen is filled in by RequireAuth with who made the request, for middleware
+// further out (the audit log) that runs before the token is checked.
+type Seen struct {
+	UserID string
+	Role   string
+}
+
+// WithSeen returns a context carrying an empty Seen for RequireAuth to fill.
+func WithSeen(ctx context.Context, s *Seen) context.Context {
+	return context.WithValue(ctx, ctxSeen, s)
+}
 
 // RequireAuth requires a valid Bearer access token and puts the user id and
 // role in the request context.
@@ -103,6 +116,9 @@ func RequireAuth(secret string) func(http.HandlerFunc) http.HandlerFunc {
 			}
 			ctx := context.WithValue(r.Context(), ctxUserID, claims.UserID)
 			ctx = context.WithValue(ctx, ctxRole, claims.Role)
+			if seen, ok := ctx.Value(ctxSeen).(*Seen); ok {
+				seen.UserID, seen.Role = claims.UserID, claims.Role
+			}
 			next(w, r.WithContext(ctx))
 		}
 	}

@@ -52,6 +52,10 @@ type Config struct {
 	PhotoURLTTL       time.Duration // lifetime of signed photo links
 	FreePhotosStored  int           // photos a free user keeps; Pro is unlimited
 
+	// How long the admin app's logs are kept.
+	AuditRetentionDays        int
+	NotificationRetentionDays int
+
 	// Web Push (VAPID). Generate once with `api vapid`.
 	VAPIDPublicKey  string
 	VAPIDPrivateKey string
@@ -131,6 +135,9 @@ func Load() (Config, error) {
 		R2Bucket:          env("R2_BUCKET", "adebite-photos"),
 		PhotoURLTTL:       envDuration("PHOTO_URL_TTL", time.Hour),
 		FreePhotosStored:  envInt("FREE_PHOTOS_STORED", 20),
+
+		AuditRetentionDays:        envInt("AUDIT_RETENTION_DAYS", 30),
+		NotificationRetentionDays: envInt("NOTIFICATION_RETENTION_DAYS", 90),
 
 		VAPIDPublicKey:  os.Getenv("VAPID_PUBLIC_KEY"),
 		VAPIDPrivateKey: os.Getenv("VAPID_PRIVATE_KEY"),

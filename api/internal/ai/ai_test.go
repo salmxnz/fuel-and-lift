@@ -59,11 +59,11 @@ func TestOpenRouter(t *testing.T) {
 	defer srv.Close()
 	p := &OpenRouter{APIKey: "k", ModelID: "google/gemini-2.5-flash", BaseURL: srv.URL}
 	imgs := []Image{{MediaType: "image/jpeg", Data: "AAAA"}, {MediaType: "image/jpeg", Data: "BBBB"}, {MediaType: "image/png", Data: "CCCC"}}
-	est, usage, err := p.Estimate(context.Background(), Request{Kind: "photo", Text: "lunch", Images: imgs})
+	res, _, err := (&Gateway{Providers: []Provider{p}}).Estimate(context.Background(), Request{Kind: "photo", Text: "lunch", Images: imgs})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if est.Title != "Fish curry with rice" || len(est.Items) != 3 || usage.CostUSD != 0.0015 {
+	if est, usage := res.Estimate, res.Usage; est.Title != "Fish curry with rice" || len(est.Items) != 3 || usage.CostUSD != 0.0015 {
 		t.Fatalf("est=%+v usage=%+v", est, usage)
 	}
 	msgs := got["messages"].([]any)
@@ -91,11 +91,11 @@ func TestAnthropic(t *testing.T) {
 	}))
 	defer srv.Close()
 	p := &Anthropic{APIKey: "k", ModelID: "claude-haiku-5-5", BaseURL: srv.URL, PriceInPerM: 1, PriceOutPerM: 5}
-	est, usage, err := p.Estimate(context.Background(), Request{Kind: "text", Text: "fish curry"})
+	res, _, err := (&Gateway{Providers: []Provider{p}}).Estimate(context.Background(), Request{Kind: "text", Text: "fish curry"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(est.Items) != 3 || usage.CostUSD < 0.0044 || usage.CostUSD > 0.0046 {
+	if est, usage := res.Estimate, res.Usage; len(est.Items) != 3 || usage.CostUSD < 0.0044 || usage.CostUSD > 0.0046 {
 		t.Fatalf("est=%+v usage=%+v", est, usage)
 	}
 }
@@ -107,13 +107,11 @@ type stub struct {
 
 func (s stub) Name() string  { return s.name }
 func (s stub) Model() string { return s.name + "-model" }
-func (s stub) Estimate(context.Context, Request) (Estimate, Usage, error) {
+func (s stub) Structured(context.Context, Call) (json.RawMessage, Usage, error) {
 	if s.err != nil {
-		return Estimate{}, Usage{}, s.err
+		return nil, Usage{}, s.err
 	}
-	var e Estimate
-	_ = json.Unmarshal([]byte(lunchJSON), &e)
-	return e, Usage{}, nil
+	return json.RawMessage(lunchJSON), Usage{}, nil
 }
 
 func TestGatewayFallsBack(t *testing.T) {
@@ -165,5 +163,48 @@ func TestNormaliseIcon(t *testing.T) {
 	enum := icon["enum"].([]string)
 	if len(enum) != len(foodicon.Keys)+1 || enum[len(enum)-1] != foodicon.None {
 		t.Fatalf("icon enum = %v", enum)
+	}
+}
+
+func TestNormaliseExercise(t *testing.T) {
+	lib := []LibraryExercise{{Name: "Pec deck", MuscleGroup: "chest", Equipment: "machine"}, {Name: "Chest press (machine)"}}
+	w, reps := 52.4, 500
+	g := ExerciseGuess{Found: true, Options: []ExerciseOption{{LibraryName: "pec DECK", Name: "N933 Pec Deck", Kind: "strength", MuscleGroup: "chest",
+		Muscles: []string{"mid chest", "pecs", "mid chest"}, Equipment: "machine", PictureLike: "nope"}},
+		WeightKg: &w, WeightSource: "pin", Sets: 0, Reps: &reps}
+	if err := NormaliseExercise(&g, lib); err != nil {
+		t.Fatal(err)
+	}
+	o := g.Options[0]
+	if o.LibraryName != "Pec deck" || o.Name != "Pec deck" || o.PictureLike != "Pec deck" || len(o.Muscles) != 1 ||
+		*g.WeightKg != 52.5 || g.Sets != 1 || g.Reps != nil {
+		t.Fatalf("got %+v", g)
+	}
+	// Not in the library: keeps its own name, drops made-up words and
+	// duplicate options, keeps at most three.
+	g = ExerciseGuess{Found: true, Sets: 3, Options: []ExerciseOption{
+		{LibraryName: "Plate chest press", Name: "Plate-loaded chest press", MuscleGroup: "pecs", Equipment: "plate machine", PictureLike: "Chest press (machine)"},
+		{Name: "plate-loaded chest press"}, {Name: "B"}, {Name: "C"}, {Name: "D"},
+	}}
+	if err := NormaliseExercise(&g, lib); err != nil {
+		t.Fatal(err)
+	}
+	o = g.Options[0]
+	if len(g.Options) != 3 || g.Options[1].Name != "B" || o.LibraryName != "" || o.MuscleGroup != "" || o.Equipment != "" ||
+		o.PictureLike != "Chest press (machine)" || g.WeightSource != "none" {
+		t.Fatalf("got %+v", g)
+	}
+}
+
+func TestNormaliseScreen(t *testing.T) {
+	m, d, sp, k := 25.55, 4.123, 99.0, 310.4
+	s := ScreenReading{Found: true, Minutes: &m, DistanceKm: &d, Speed: &sp, Kcal: &k}
+	NormaliseScreen(&s)
+	if *s.Minutes != 25.6 || *s.DistanceKm != 4.12 || s.Speed != nil || *s.Kcal != 310 || !s.Found {
+		t.Fatalf("got %+v", s)
+	}
+	s = ScreenReading{Found: true}
+	if NormaliseScreen(&s); s.Found {
+		t.Fatal("empty reading counted as found")
 	}
 }

@@ -212,3 +212,49 @@ export type Friend = {
   notify_workouts: boolean
 }
 export type FriendsResponse = { friends: Friend[] }
+
+// ---------------------------------------------------------------- Logs
+
+export type NotificationStatus = "sent" | "partial" | "failed" | "no_devices" | "quiet_hours" | "disabled"
+export const NOTIFICATION_STATUSES: NotificationStatus[] = ["sent", "partial", "failed", "no_devices", "quiet_hours", "disabled"]
+
+export type SentNotification = {
+  id: number
+  channel: "push" | "email"
+  /** null: an email to an address with no account. */
+  user: Person | null
+  recipient: string | null
+  kind: string
+  /** Push title, or the email's subject. */
+  title: string
+  body: string | null
+  url: string | null
+  status: NotificationStatus
+  devices: number
+  delivered: number
+  error: string | null
+  created_at: string
+}
+export type NotificationsResponse = { notifications: SentNotification[]; next_before: number | null }
+export type NotificationStats = {
+  since: string
+  counts: Record<"push" | "email", Record<NotificationStatus, number>>
+}
+
+export type AuditEntry = {
+  id: number
+  at: string
+  /** null: signed out, or a token that didn't check out. */
+  user: Person | null
+  role: string | null
+  method: string
+  path: string
+  route: string | null
+  query: string | null
+  status: number
+  duration_ms: number
+  ip: string | null
+  user_agent: string | null
+  error: string | null
+}
+export type AuditResponse = { entries: AuditEntry[]; next_before: number | null }

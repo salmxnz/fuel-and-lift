@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { publicUrl } from "@/lib/auth/public-origin"
+import { clientIp, publicUrl } from "@/lib/auth/public-origin"
 import { EnvError, getEnv } from "@/config/env"
 import type { AuthGoogleRequest, AuthGoogleResponse } from "@/lib/api/types"
 import { safeCallbackUrl } from "@/lib/auth/callback-url"
@@ -8,6 +8,11 @@ import { decodeOAuthCookie } from "@/lib/auth/pkce"
 import { extractGoCookies } from "@/lib/auth/set-cookie"
 
 export const dynamic = "force-dynamic"
+
+const ipHeader = (request: NextRequest): Record<string, string> => {
+  const ip = clientIp(request)
+  return ip ? { "X-Client-IP": ip } : {}
+}
 
 function fail(request: NextRequest, error: string, invite?: string | null) {
   const target = publicUrl("/login", request)
@@ -57,7 +62,7 @@ export async function GET(request: NextRequest) {
   try {
     res = await fetch(`${env.apiUrl}/v1/auth/google`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: { "Content-Type": "application/json", Accept: "application/json", ...ipHeader(request) },
       body: JSON.stringify(body),
       cache: "no-store",
     })

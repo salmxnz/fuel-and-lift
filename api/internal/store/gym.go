@@ -16,35 +16,58 @@ import (
 
 // Exercise is a movement in the library.
 type Exercise struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Kind        string   `json:"kind"` // strength | cardio
-	MuscleGroup *string  `json:"muscle_group"`
-	Equipment   *string  `json:"equipment"`
-	MediaURL    *string  `json:"media_url"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Kind        string  `json:"kind"` // strength | cardio
+	MuscleGroup *string `json:"muscle_group"`
+	Equipment   *string `json:"equipment"`
+	MediaURL    *string `json:"media_url"`
+	// GymPhotoURL is the viewer's own photo of the machine, when they took one.
 	GymPhotoURL *string  `json:"gym_photo_url"`
 	Aliases     []string `json:"aliases"`
+	// Muscles it works, finer than MuscleGroup, main one first.
+	Muscles []string `json:"muscles"`
+	// Mine is true for the viewer's own exercises (they can share them).
+	Mine       bool   `json:"mine"`
+	Visibility string `json:"visibility"` // private | friends | public
 	// MatchedAlias is set by search when the hit came from another name
 	// ("stairmaster" → Stair climber).
 	MatchedAlias *string `json:"matched_alias,omitempty"`
 }
 
-const exerciseCols = `id::text, name, kind, muscle_group, equipment, media_url, gym_photo_url, aliases`
+// exerciseCols reads exercises aliased e, as seen by the user in parameter
+// user (e.g. "$1"): their own gym photo wins.
+func exerciseCols(user string) string {
+	return `e.id::text, e.name, e.kind, e.muscle_group, e.equipment, e.media_url,
+		coalesce((select ` + photoURLSQL + ` from exercise_photos p where p.exercise_id = e.id and p.user_id = ` + user + `::uuid), e.gym_photo_url),
+		e.aliases, e.muscles, coalesce(e.owner_id = ` + user + `::uuid, false), e.visibility`
+}
+
+// photoURLSQL is an exercise photo's URL (photo aliased p); ?v= changes with
+// every new photo so it can be cached for good.
+const photoURLSQL = `'/exercise-photos/' || p.id::text || '?v=' || floor(extract(epoch from p.updated_at))::bigint::text`
 
 func scanExercise(r pgx.CollectableRow) (Exercise, error) {
 	var e Exercise
-	err := r.Scan(&e.ID, &e.Name, &e.Kind, &e.MuscleGroup, &e.Equipment, &e.MediaURL, &e.GymPhotoURL, &e.Aliases)
+	err := r.Scan(&e.ID, &e.Name, &e.Kind, &e.MuscleGroup, &e.Equipment, &e.MediaURL, &e.GymPhotoURL, &e.Aliases, &e.Muscles, &e.Mine, &e.Visibility)
+	e.fillNil()
+	return e, err
+}
+
+func (e *Exercise) fillNil() {
 	if e.Aliases == nil {
 		e.Aliases = []string{}
 	}
-	return e, err
+	if e.Muscles == nil {
+		e.Muscles = []string{}
+	}
 }
 
 // ListExercises searches the shared library and the user's own exercises
 // (see RankExercises): any word order, other names and small typos match.
 func (s *Store) ListExercises(ctx context.Context, userID, q string) ([]Exercise, error) {
-	rows, err := s.Pool.Query(ctx, `select `+exerciseCols+` from exercises
-		where owner_id is null or owner_id = $1::uuid order by name`, userID)
+	rows, err := s.Pool.Query(ctx, `select `+exerciseCols("$1")+` from exercises e
+		where e.owner_id is null or e.owner_id = $1::uuid order by e.name`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -59,9 +82,10 @@ func (s *Store) ListExercises(ctx context.Context, userID, q string) ([]Exercise
 	return RankExercises(all, q, limit), nil
 }
 
-// GetExercise returns one exercise the user can see.
+// GetExercise returns one exercise the user can use.
 func (s *Store) GetExercise(ctx context.Context, userID, id string) (Exercise, error) {
-	rows, err := s.Pool.Query(ctx, `select `+exerciseCols+` from exercises where id = $1::uuid and (owner_id is null or owner_id = $2::uuid)`, id, userID)
+	rows, err := s.Pool.Query(ctx, `select `+exerciseCols("$2")+` from exercises e
+		where e.id = $1::uuid and (e.owner_id is null or e.owner_id = $2::uuid)`, id, userID)
 	if err != nil {
 		return Exercise{}, err
 	}
@@ -69,10 +93,12 @@ func (s *Store) GetExercise(ctx context.Context, userID, id string) (Exercise, e
 	return e, notFound(err)
 }
 
-// CreateExercise adds one of the user's own exercises.
+// CreateExercise adds one of the user's own exercises. MediaURL may borrow a
+// library exercise's picture (the AI picks the closest one).
 func (s *Store) CreateExercise(ctx context.Context, userID string, e Exercise) (Exercise, error) {
-	rows, err := s.Pool.Query(ctx, `insert into exercises (owner_id, name, kind, muscle_group, equipment)
-		values ($1::uuid, $2, $3, $4, $5) returning `+exerciseCols, userID, e.Name, e.Kind, e.MuscleGroup, e.Equipment)
+	rows, err := s.Pool.Query(ctx, `insert into exercises as e (owner_id, name, kind, muscle_group, equipment, media_url, muscles)
+		values ($1::uuid, $2, $3, $4, $5, $6, coalesce($7::text[], '{}')) returning `+exerciseCols("$1"),
+		userID, e.Name, e.Kind, e.MuscleGroup, e.Equipment, e.MediaURL, e.Muscles)
 	if err != nil {
 		return Exercise{}, err
 	}
@@ -87,8 +113,8 @@ func (s *Store) CreateExercise(ctx context.Context, userID string, e Exercise) (
 func exercisesByID(ctx context.Context, q interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 }, userID string, ids []string) (map[string]Exercise, error) {
-	rows, err := q.Query(ctx, `select `+exerciseCols+` from exercises
-		where id = any($1::uuid[]) and (owner_id is null or owner_id = $2::uuid)`, ids, userID)
+	rows, err := q.Query(ctx, `select `+exerciseCols("$2")+` from exercises e
+		where e.id = any($1::uuid[]) and (e.owner_id is null or e.owner_id = $2::uuid)`, ids, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -132,11 +158,16 @@ type PlannedSet struct {
 	ToFailure  bool     `json:"to_failure"`
 }
 
-// Cardio parameters for a cardio block.
+// Cardio parameters for a cardio block. Which ones apply depends on the
+// machine (a treadmill has incline and speed, a bike a level, a rower a
+// distance); the app only shows those. Kcal is only ever read off a screen.
 type Cardio struct {
-	Minutes float64  `json:"minutes"`
-	Incline *float64 `json:"incline"`
-	Speed   *float64 `json:"speed"`
+	Minutes    float64  `json:"minutes"`
+	Incline    *float64 `json:"incline"`
+	Speed      *float64 `json:"speed"`
+	Level      *float64 `json:"level,omitempty"`
+	DistanceKm *float64 `json:"distance_km,omitempty"`
+	Kcal       *float64 `json:"kcal,omitempty"`
 }
 
 // BlockInput is a block as the client sends it.

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { publicUrl } from "@/lib/auth/public-origin"
+import { clientIp, publicUrl } from "@/lib/auth/public-origin"
 import { EnvError, getEnv } from "@/config/env"
 import type { AuthGoogleResponse } from "@/lib/api/types"
 import { safeCallbackUrl } from "@/lib/auth/callback-url"
@@ -8,6 +8,11 @@ import { decodeOAuthCookie } from "@/lib/auth/pkce"
 import { extractGoCookies } from "@/lib/auth/set-cookie"
 
 export const dynamic = "force-dynamic"
+
+const ipHeader = (request: NextRequest): Record<string, string> => {
+  const ip = clientIp(request)
+  return ip ? { "X-Client-IP": ip } : {}
+}
 
 function fail(request: NextRequest, error: string) {
   const target = publicUrl("/login", request)
@@ -46,7 +51,7 @@ export async function GET(request: NextRequest) {
   try {
     res = await fetch(`${env.apiUrl}/v1/auth/google`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: { "Content-Type": "application/json", Accept: "application/json", ...ipHeader(request) },
       body: JSON.stringify({ code, code_verifier: oauth.verifier, redirect_uri: redirectUri }),
       cache: "no-store",
     })
@@ -79,7 +84,7 @@ export async function GET(request: NextRequest) {
       const csrf = go.csrfToken ?? data.csrf_token
       await fetch(`${env.apiUrl}/v1/auth/logout`, {
         method: "POST",
-        headers: { "X-CSRF-Token": csrf, Cookie: `refresh_token=${go.refreshToken}; csrf_token=${csrf}` },
+        headers: { "X-CSRF-Token": csrf, Cookie: `refresh_token=${go.refreshToken}; csrf_token=${csrf}`, ...ipHeader(request) },
         cache: "no-store",
       }).catch(() => null)
     }
