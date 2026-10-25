@@ -17,13 +17,14 @@ const InviteLinkTTL = 14 * 24 * time.Hour
 // InviteLink is a friend link as its creator sees it.
 type InviteLink struct {
 	ID               string     `json:"id"`
-	URL              string     `json:"url,omitempty"` // set only right after creation
+	URL              string     `json:"url,omitempty"` // open links that can be copied again; empty for older ones
 	Status           string     `json:"status"`        // open, accepted, revoked, expired
 	AcceptedBy       *Person    `json:"accepted_by"`
 	CountsAsReferral bool       `json:"counts_as_referral"`
 	ExpiresAt        time.Time  `json:"expires_at"`
 	CreatedAt        time.Time  `json:"created_at"`
 	acceptedAt       *time.Time // internal
+	TokenEnc         []byte     `json:"-"` // the token, sealed (auth.Seal); nil for links made before copies were kept
 }
 
 // Person is a small public view of a user.
@@ -89,11 +90,11 @@ func befriend(ctx context.Context, tx pgx.Tx, a, b string) error {
 }
 
 // CreateInviteLink stores a new link and returns it with its status.
-func (s *Store) CreateInviteLink(ctx context.Context, userID, tokenHash string) (InviteLink, error) {
+func (s *Store) CreateInviteLink(ctx context.Context, userID, tokenHash string, tokenEnc []byte) (InviteLink, error) {
 	var l InviteLink
 	err := s.Pool.QueryRow(ctx, `
-		insert into invite_links (token_hash, created_by, expires_at) values ($1, $2::uuid, $3)
-		returning id::text, expires_at, created_at`, tokenHash, userID, time.Now().Add(InviteLinkTTL)).
+		insert into invite_links (token_hash, created_by, expires_at, token_enc) values ($1, $2::uuid, $3, $4)
+		returning id::text, expires_at, created_at`, tokenHash, userID, time.Now().Add(InviteLinkTTL), tokenEnc).
 		Scan(&l.ID, &l.ExpiresAt, &l.CreatedAt)
 	l.Status = "open"
 	return l, err
@@ -103,7 +104,7 @@ func (s *Store) CreateInviteLink(ctx context.Context, userID, tokenHash string) 
 func (s *Store) ListInviteLinks(ctx context.Context, userID string) ([]InviteLink, error) {
 	rows, err := s.Pool.Query(ctx, `
 		select l.id::text, l.expires_at, l.created_at, l.revoked_at, l.accepted_at,
-		       u.id::text, u.name, u.avatar_url, coalesce(l.new_user and u.referral_counted, false)
+		       u.id::text, u.name, u.avatar_url, coalesce(l.new_user and u.referral_counted, false), l.token_enc
 		from invite_links l left join users u on u.id = l.accepted_by
 		where l.created_by = $1::uuid order by l.created_at desc limit 100`, userID)
 	if err != nil {
@@ -115,7 +116,7 @@ func (s *Store) ListInviteLinks(ctx context.Context, userID string) ([]InviteLin
 		var revoked *time.Time
 		var aid, aname *string
 		var avatar *string
-		if err := r.Scan(&l.ID, &l.ExpiresAt, &l.CreatedAt, &revoked, &l.acceptedAt, &aid, &aname, &avatar, &l.CountsAsReferral); err != nil {
+		if err := r.Scan(&l.ID, &l.ExpiresAt, &l.CreatedAt, &revoked, &l.acceptedAt, &aid, &aname, &avatar, &l.CountsAsReferral, &l.TokenEnc); err != nil {
 			return l, err
 		}
 		switch {

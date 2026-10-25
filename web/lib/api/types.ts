@@ -530,7 +530,8 @@ export type CheckoutResponse = { url: string }
 export type InviteLinkStatus = "open" | "accepted" | "revoked" | "expired"
 export type InviteLink = {
   id: string
-  url: string
+  /** Open links you can copy again; absent once used, revoked or expired (and on links from before copies were kept). */
+  url?: string
   status: InviteLinkStatus
   accepted_by: { id: string; name: string } | null
   counts_as_referral: boolean

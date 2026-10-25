@@ -16,6 +16,9 @@ import (
 
 const maxOpenLinks = 20
 
+// invitePurpose labels the key invite tokens are sealed with.
+const invitePurpose = "invite-link"
+
 // --- invite links ------------------------------------------------------------------
 
 // CreateInviteLink handles POST /v1/invite-links. The raw token is only ever
@@ -46,7 +49,12 @@ func (h *Handler) CreateInviteLink(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
-	l, err := h.Store.CreateInviteLink(r.Context(), userID, auth.HashToken(token))
+	sealed, err := auth.Seal(h.Cfg.JWTSecret, invitePurpose, token)
+	if err != nil {
+		h.storeError(w, r, err)
+		return
+	}
+	l, err := h.Store.CreateInviteLink(r.Context(), userID, auth.HashToken(token), sealed)
 	if err != nil {
 		h.storeError(w, r, err)
 		return
@@ -65,6 +73,15 @@ func (h *Handler) ListInviteLinks(w http.ResponseWriter, r *http.Request) {
 	}
 	if links == nil {
 		links = []store.InviteLink{}
+	}
+	// Open links can be copied again: unseal their tokens.
+	for i := range links {
+		if links[i].Status != "open" || links[i].TokenEnc == nil {
+			continue
+		}
+		if token, err := auth.Open(h.Cfg.JWTSecret, invitePurpose, links[i].TokenEnc); err == nil {
+			links[i].URL = h.Cfg.AppURL + "/join/" + token
+		}
 	}
 	joined, err := h.Store.ReferralCount(r.Context(), userID)
 	if err != nil {

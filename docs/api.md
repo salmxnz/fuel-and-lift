@@ -502,12 +502,16 @@ of you friends. A **new** user who joins through your link and finishes
 onboarding counts towards your 8 referrals.
 
 ```ts
-type InviteLink = { id: string, url: string, status: "open" | "accepted" | "revoked" | "expired",
+type InviteLink = { id: string, url?: string, status: "open" | "accepted" | "revoked" | "expired",
                     accepted_by: { id: string, name: string } | null, counts_as_referral: boolean,
                     expires_at: string, created_at: string }
 ```
-- `POST /v1/invite-links` `{}` → `201 {"invite_link": InviteLink}` (`url` = `${APP_URL}/join/<token>`; the raw token is returned only here)
-- `GET /v1/invite-links` → `200 {"invite_links": InviteLink[], "referrals": {joined, needed}}`
+- `POST /v1/invite-links` `{}` → `201 {"invite_link": InviteLink}` (`url` = `${APP_URL}/join/<token>`).
+  Each call makes a new link, so you can invite several people. 20 open links at most: `429` code `too_many_links`.
+- `GET /v1/invite-links` → `200 {"invite_links": InviteLink[], "referrals": {joined, needed}}`.
+  Open links carry their `url` again, so they can be copied until someone uses them. The token
+  is stored sealed (AES-GCM, key derived from `JWT_SECRET`), never in the clear; links made
+  before this have no `url`.
 - `DELETE /v1/invite-links/{id}` → `204` (revoke)
 - `GET /v1/invite-links/preview/{token}` (**no auth**) → `200 {"inviter": {"name", "avatar_url"}, "valid": bool}`
 - `POST /v1/invite-links/accept` `{token}` (signed-in user) → `200 {"friend": Friend, "billing": Billing}`
