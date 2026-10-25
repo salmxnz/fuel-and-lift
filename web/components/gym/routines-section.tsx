@@ -72,7 +72,7 @@ export function RoutinesSection({
     try {
       const res = await api.post<{ days: WeeklyPlan["days"] }>(`routines/${seg(r.id)}/apply`, {})
       onPlanChange(res.days)
-      toast.success(`${r.name} is your week now`)
+      toast.success(`${r.name} is your week now. Let's get it.`)
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {

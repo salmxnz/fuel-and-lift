@@ -129,7 +129,7 @@ export function BarcodeScreen() {
           },
         ],
       })
-      toast.success(`Logged to ${target.label}`)
+      toast.success(`Logged to ${target.label}. Nice one.`)
       router.push(`/today?date=${target.date}`)
     } catch (err) {
       toast.error(errorMessage(err))

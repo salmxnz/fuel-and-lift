@@ -612,11 +612,11 @@ function SessionStats({ blocks }: { blocks: SessionBlock[] }) {
         {[
           ["Exercises", `${p.done}/${p.total}`],
           ["Sets", String(p.sets)],
-          ["Volume", p.volume >= 1000 ? `${num1(p.volume / 1000)}t` : `${Math.round(p.volume)} kg`],
+          ["Volume", p.volume >= 1000 ? `${num1(p.volume / 1000)}t` : `${Math.round(p.volume)}kg`],
         ].map(([k, v]) => (
           <div key={k} className="flex min-w-0 flex-col">
             <dt className="text-[11.5px] font-semibold text-muted">{k}</dt>
-            <dd className="m-0 truncate text-[19px] font-black tracking-[-0.03em]">{v}</dd>
+            <dd className="m-0 text-[17px] font-black tracking-[-0.04em] min-[360px]:text-[19px]">{v}</dd>
           </div>
         ))}
       </dl>

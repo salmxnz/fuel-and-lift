@@ -145,7 +145,7 @@ function EntryForm({
     try {
       const res = await api.del<DayResponse>(`entries/${seg(entry.id)}`)
       if (res?.day) onDayChange(res.day)
-      toast.success(`Removed ${entry.name}`)
+      toast.success(`${entry.name}, binned`)
       onClose()
     } catch (err) {
       setError(errorMessage(err))

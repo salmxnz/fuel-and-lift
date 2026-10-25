@@ -130,6 +130,22 @@ Quick and soft, never bouncy, except one rare celebration. Tokens live in
 The back button is one component (`web/components/ui/back-button.tsx`): a bare
 22 px chevron in a 44 px round hit area, aligned to the content edge.
 
+## The pink sky
+
+Every tab opens under the sky from the emails: white at the top, blush lower
+down, and a scalloped cloud line where it meets the page
+(`web/components/ui/sky.tsx`, clouds from `web/lib/clouds.ts`, shared with the
+landing page). One title per screen, round frosted icon buttons on the right.
+
+- **Today:** calories are a sun rising from the clouds (`calorie-sun.tsx`).
+  The arc fills as you eat; the middle shows what's left; over target it
+  turns rose.
+- **Shop:** Bite, the mascot (`components/shop/bite-mascot.tsx`), is the
+  bitten "a" with a face, legs and a shopping bag. It hops and blinks; a tap
+  makes it jump with hearts. Bite only lives in the Shop.
+- **Who can see it** is always the top-right button on a workout, routine or
+  saved meal: a lock (just me), two people (friends) or a globe (everyone).
+
 ## Pixel icons
 
 Exercises and rewards use "Free Pixel Gym & Fitness Icons 32x32" by reodesuxz
@@ -152,8 +168,10 @@ The button follows Google's branding guidelines
 
 ## Voice
 
-Short, friendly, plain. Talk about food and training like a friend would:
-"Eat, lift, and see it add up." No guilt, no diet-culture language, no
+Short, friendly, plain, a bit slangy. Talk about food and training like a
+friend would: "Eat, lift, and see it add up", "Target hit. Chef's kiss",
+"New PR 🔥". Your friends are your crew. Slang is for wins and nudges;
+instructions and errors stay plain. No guilt, no diet-culture language, no
 exclamation marks on every line.
 
 ## Files

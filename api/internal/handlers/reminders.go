@@ -128,8 +128,8 @@ func (h *Handler) remindUser(ctx context.Context, u store.ReminderUser, now time
 		}
 		if st.Current >= 2 && !st.ActiveToday {
 			if err := h.remind(ctx, u.ID, "streak_risk", date, push.Message{
-				Title: fmt.Sprintf("Keep your %d-day streak going 🔥", st.Current),
-				Body:  "Log a meal or a workout before midnight.",
+				Title: fmt.Sprintf("Your %d-day streak is on the line 🔥", st.Current),
+				Body:  "One meal or one workout before midnight keeps it alive.",
 				URL:   "/today", Tag: "streak-risk",
 			}); err != nil {
 				return err
@@ -167,7 +167,7 @@ func (h *Handler) remindUser(ctx context.Context, u store.ReminderUser, now time
 		if planned && !done {
 			if err := h.remind(ctx, u.ID, "workout_day", date, push.Message{
 				Title: "It's a gym day 💪",
-				Body:  "Your plan has a workout today.",
+				Body:  "Your plan's got a workout today. Let's get it.",
 				URL:   "/gym", Tag: "workout-day",
 			}); err != nil {
 				return err
@@ -254,7 +254,7 @@ func (h *Handler) weekly(ctx context.Context, u store.ReminderUser, today store.
 		return err
 	}
 	msg := push.Message{
-		Title: u.Name + " hit their food goal this week 🎉",
+		Title: u.Name + " smashed their food goal this week 🎉",
 		Body:  fmt.Sprintf("%d/7 days on target. Send them a cheer.", wk.DaysOnTarget),
 		URL:   "/people/" + u.ID, Tag: "friend-goal-" + u.ID,
 	}

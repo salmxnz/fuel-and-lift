@@ -144,8 +144,8 @@ export function GymScreen() {
           <span className="text-[13px] font-semibold text-muted">{DAY_NAMES[todayKey]}</span>
           <span className="text-[15px]">
             {list.length === 0
-              ? "Make your first template, then put it on your week."
-              : "Rest day on your plan. Start any template below if you feel like it."}
+              ? "Make your first workout, then put it on your week."
+              : "Rest day. Recover, or start any workout below if you're itching to train."}
           </span>
         </section>
       )}

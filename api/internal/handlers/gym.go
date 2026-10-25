@@ -587,7 +587,7 @@ func (h *Handler) announceWorkout(ctx context.Context, userID string, s store.Se
 		return
 	}
 	h.Notifier.Notify(friends, push.Message{
-		Title: p.DisplayName + " worked out today 💪",
+		Title: p.DisplayName + " just smashed a workout 💪",
 		Body:  text,
 		URL:   "/friends",
 		Tag:   "workout-" + userID,

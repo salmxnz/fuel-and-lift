@@ -183,7 +183,7 @@ function Detail({ kind, data, onChange }: { kind: ShopKind; data: ShopDetailResp
       setAdded(out)
       onChange({ ...data, item: { ...item, added: true, add_count: item.added ? item.add_count : item.add_count + 1 } })
       const where = kind === "meal" ? "your saved meals" : kind === "routine" ? "your routines" : "your workouts"
-      toast.success(`Added to ${where}`, { action: { label: "Open", onClick: () => openAdded(out) } })
+      toast.success(`In ${where}. Sorted.`, { action: { label: "Open", onClick: () => openAdded(out) } })
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {
@@ -196,7 +196,7 @@ function Detail({ kind, data, onChange }: { kind: ShopKind; data: ShopDetailResp
     setBusy("apply")
     try {
       await api.post<{ days: WeeklyPlan["days"] }>(`routines/${seg(added.routine.id)}/apply`, {})
-      toast.success(`${added.routine.name} is your week now`, { action: { label: "Gym", onClick: () => router.push("/gym") } })
+      toast.success(`${added.routine.name} is your week now. Let's get it.`, { action: { label: "Gym", onClick: () => router.push("/gym") } })
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {

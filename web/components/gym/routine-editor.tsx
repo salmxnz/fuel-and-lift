@@ -99,7 +99,7 @@ function Editor({ routine, templates, onSaved }: { routine: Routine; templates: 
       if (!saved) return
       const out = await api.post<{ days: WeeklyPlan["days"] }>(`routines/${seg(routine.id)}/apply`, {})
       plan.setData({ days: out.days })
-      toast.success(`${saved.name} is your week now`, { action: { label: "Gym", onClick: () => router.push("/gym") } })
+      toast.success(`${saved.name} is your week now. Let's get it.`, { action: { label: "Gym", onClick: () => router.push("/gym") } })
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {

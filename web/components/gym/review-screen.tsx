@@ -90,7 +90,7 @@ export function ReviewScreen({ id }: { id: string }) {
       setFinishedSession(out.session)
       res.setData({ session: out.session })
       for (const r of out.records ?? []) {
-        toast.success(`New record: ${r.exercise_name} ${num1(r.kg)} kg × ${r.reps}`)
+        toast.success(`New PR 🔥 ${r.exercise_name} ${num1(r.kg)} kg × ${r.reps}`)
       }
       if (out.proposals.length > 0) setProposals(out.proposals)
       else {
@@ -623,7 +623,7 @@ function UpdateTemplateSheet({
       onClose={onDone}
       surface="ground"
       title={`Update ${name}?`}
-      description="You lifted more than planned on every working set. Pick what next time should start from."
+      description="You beat the plan on every working set. Beast. Pick what next time starts from."
       showClose={false}
     >
       <div className="flex flex-col rounded-card bg-white px-3.5 py-1">

@@ -51,7 +51,7 @@ export function ManualScreen() {
         fat_g: parseDecimal(form.fat) ?? 0,
         icon: icon ?? "none",
       })
-      toast.success(`Logged to ${target.label}`)
+      toast.success(`Logged to ${target.label}. Nice one.`)
       router.push(`/today?date=${target.date}`)
     } catch (err) {
       toast.error(errorMessage(err))

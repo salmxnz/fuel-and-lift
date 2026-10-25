@@ -101,7 +101,7 @@ function AddFoodBody({
         addon_ids: [],
       })
       onLogged(res.day)
-      toast.success(`${name} added to ${mealTarget.label}`)
+      toast.success(`${name} in ${mealTarget.label}. Sorted.`)
       onClose()
     } catch (err) {
       toast.error(errorMessage(err))

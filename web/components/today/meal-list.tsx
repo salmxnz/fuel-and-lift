@@ -57,7 +57,7 @@ export function MealList({
                   <span className="text-[15px]">
                     {day.remaining_kcal > 0
                       ? `${kcal(day.remaining_kcal)} kcal left for ${joinAnd(rest)}`
-                      : "You've reached today's target"}
+                      : "Target hit. Chef's kiss."}
                   </span>
                 </div>
                 <button

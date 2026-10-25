@@ -27,7 +27,7 @@ export function AcceptInvite({ token, inviter }: { token: string; inviter: strin
           setError(null)
           try {
             const res = await api.post<AcceptInviteResponse>("invite-links/accept", { token })
-            toast.success(`You and ${res.friend.name || inviter} are now friends`)
+            toast.success(`You and ${res.friend.name || inviter} are a crew now 🤝`)
             router.push("/friends")
           } catch (err) {
             setError(errorMessage(err))

@@ -169,7 +169,7 @@ export function SavedMealsScreen() {
                   ...targetBody(target),
                   addon_ids: addonIds,
                 })
-                toast.success(`${picking.name} logged to ${target.label}`)
+                toast.success(`${picking.name} logged to ${target.label}. Sorted.`)
                 router.push(`/today?date=${target.date}`)
               } catch (err) {
                 toast.error(errorMessage(err))

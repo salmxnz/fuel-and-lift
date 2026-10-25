@@ -47,7 +47,7 @@ export function WeighInForm({ onDone }: { onDone: () => void }) {
     setError(null)
     try {
       await api.post<WeighInResponse>("weigh-ins", { date, weight_kg: weightKg, note: note.trim() || null })
-      toast.success(`Saved ${num1(weightKg)} kg for ${date === todayISO() ? "today" : formatDayMonth(date)}`)
+      toast.success(`${num1(weightKg)} kg locked in for ${date === todayISO() ? "today" : formatDayMonth(date)}`)
       onDone()
     } catch (err) {
       setError(errorMessage(err))

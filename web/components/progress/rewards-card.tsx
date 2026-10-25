@@ -78,10 +78,10 @@ export function RewardsCard() {
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6))
   const hint =
     st.current === 0
-      ? "Log a meal or finish a workout to start a streak."
+      ? "Log a meal or smash a workout to get a streak going."
       : st.active_today
-        ? "Today counts. Come back tomorrow to keep it going."
-        : "Log something today to keep it going."
+        ? "Today's in the bag. Back tomorrow to keep it rolling 🔥"
+        : "Log something today so the streak stays alive."
 
   return (
     <section aria-labelledby="rewards-title" className="flex flex-col gap-3.5 rounded-card bg-white p-4">
