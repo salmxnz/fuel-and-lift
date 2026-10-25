@@ -612,3 +612,23 @@ body [data-sonner-toast] {
     scroll-behavior: auto !important;
   }
 }
+
+/* /privacy and /terms */
+.legal p,
+.legal ul {
+  margin: 0;
+}
+.legal ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  padding-left: 1.25em;
+  list-style: disc;
+}
+.legal strong {
+  color: var(--color-ink);
+}
+.legal a {
+  color: var(--color-protein);
+  font-weight: 600;
+}

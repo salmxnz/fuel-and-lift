@@ -203,7 +203,15 @@ export function Footer() {
             Sign in
           </Link>
         </nav>
-        <p className="m-0 text-[13px] text-ink-soft sm:justify-self-end">© 2026 adebite</p>
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[13px] text-ink-soft sm:justify-self-end">
+          <Link href="/privacy" className="font-semibold no-underline hover:underline">
+            Privacy policy
+          </Link>
+          <Link href="/terms" className="font-semibold no-underline hover:underline">
+            Terms of service
+          </Link>
+          <span>© 2026 adebite</span>
+        </div>
       </div>
     </footer>
   )
