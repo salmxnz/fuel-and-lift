@@ -1,16 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import Link from "next/link"
+import { useState, type CSSProperties } from "react"
 import { Sky, SkyTitle } from "@/components/ui/sky"
-import { PeriodRecap } from "./period-recap"
-import { ErrorCard, Skeleton } from "@/components/ui/primitives"
+import { Strawberry } from "@/components/landing/art"
+import { displayName, useMe } from "@/components/me-context"
+import { PeriodNav, PeriodRecap } from "./period-recap"
+import { Avatar, ErrorCard, Skeleton } from "@/components/ui/primitives"
 import { ChevronDownIcon } from "@/components/ui/icons"
-import type {
-  GoalResponse,
-  ProgressExerciseResponse,
-  ProgressRecordsResponse,
-  ProgressWeightResponse,
-} from "@/lib/api/types"
+import type { GoalResponse, ProgressExerciseResponse, ProgressRecordsResponse, ProgressWeightResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
 import { addDays, addMonths, formatDayMonth, formatMonthYear, todayISO } from "@/lib/dates"
@@ -51,10 +49,14 @@ export function ProgressScreen() {
   const wd = weight.data
   const g = wd?.goal ?? goal
   const latest = wd ? [...wd.weigh_ins].sort((a, b) => (a.date < b.date ? 1 : -1))[0] : undefined
+  const tr = wd?.trend ?? []
+  const slope = tr.length > 1 ? tr[tr.length - 1].weight_kg - tr[Math.max(0, tr.length - 8)].weight_kg : 0
+  const trendWord = tr.length < 2 ? null : slope > 0.15 ? "up" : slope < -0.15 ? "down" : "steady"
+  const me = useMe()
 
   return (
     <div className="flex flex-col gap-3">
-      <Sky className="pb-14">
+      <Sky className="pb-[58px]">
         <SkyTitle title="Progress">
           <div role="radiogroup" aria-label="View" className="flex rounded-[14px] border border-white/85 bg-white/65 p-1 backdrop-blur-md">
             {(["week", "month"] as const).map((v) => (
@@ -68,7 +70,7 @@ export function ProgressScreen() {
                   setOffset(0)
                 }}
                 className={cn(
-                  "min-h-[36px] rounded-[10px] px-3 text-[13px] font-bold transition-colors duration-200",
+                  "min-h-[34px] rounded-[10px] px-2.5 text-[13px] font-bold transition-colors duration-200",
                   view === v ? "bg-ink text-white" : "text-ink-soft"
                 )}
               >
@@ -76,11 +78,38 @@ export function ProgressScreen() {
               </button>
             ))}
           </div>
+          <Link
+            href="/me"
+            aria-label="Me: profile and settings"
+            className="relative z-10 flex h-11 w-11 flex-none items-center justify-center rounded-full"
+          >
+            <Avatar name={displayName(me)} url={me.user.avatar_url} size={42} tone="ink" />
+          </Link>
         </SkyTitle>
-        <PeriodRecap view={view} offset={offset} onOffset={setOffset} today={today} />
+        <div className="relative mt-4 pr-[84px]">
+          <PeriodNav view={view} offset={offset} onOffset={setOffset} today={today} />
+          <p className="m-0 mt-1.5 text-[30px] font-black leading-none tracking-[-0.045em]">
+            {offset === 0 ? (
+              <>
+                Here&apos;s how it&apos;s
+                <br />
+                going.
+              </>
+            ) : (
+              <>
+                Here&apos;s how it
+                <br />
+                added up.
+              </>
+            )}
+          </p>
+          <div aria-hidden="true" className="app-float absolute right-0 top-1 w-[72px]" style={{ "--r": "12deg", "--t": "5.5s" } as CSSProperties}>
+            <Strawberry className="w-full" />
+          </div>
+        </div>
       </Sky>
 
-      <RewardsCard />
+      <PeriodRecap view={view} offset={offset} onOffset={setOffset} today={today} />
 
       {/* Weight */}
       <section aria-label="Weight" className="flex flex-col gap-3 rounded-card bg-white p-4">
@@ -88,47 +117,16 @@ export function ProgressScreen() {
           <ErrorCard message={weight.error.message} onRetry={() => void weight.reload()} className="p-0" />
         ) : !wd ? (
           <>
-            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-6 w-32" />
             <Skeleton className="h-[132px]" />
           </>
         ) : (
           <>
-            <div role="radiogroup" aria-label="Weight range" className="-mt-1 flex self-end rounded-full bg-field p-[3px]">
-              {(
-                [
-                  ["3m", "3M"],
-                  ["6m", "6M"],
-                  ["goal", "To goal"],
-                ] as const
-              ).map(([v, label]) => (
-                <button
-                  key={v}
-                  type="button"
-                  role="radio"
-                  aria-checked={effective === v}
-                  disabled={v === "goal" && !canGoal}
-                  onClick={() => setRange(v)}
-                  className={cn("min-h-[32px] rounded-full px-2.5 text-[12px] disabled:opacity-40", effective === v ? "bg-ink font-bold text-white" : "text-muted")}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-0.5">
-                <h2 className="m-0 text-[13px] font-semibold text-muted">Weight</h2>
-                <span className="text-[34px] font-extrabold leading-none tracking-[-0.03em]">
-                  {latest ? num1(latest.weight_kg) : "–"} <span className="text-[14px] font-medium text-muted">kg</span>
-                </span>
-              </div>
-              {g?.goal_weight_kg != null && g.plan.forecast_date ? (
-                <div className="flex flex-col items-end gap-0.5 text-right">
-                  <span className="text-[12px] text-muted">{num1(g.goal_weight_kg)} kg around</span>
-                  <span className="text-[16px] font-bold">{formatMonthYear(g.plan.forecast_date)}</span>
-                </div>
-              ) : g?.mode === "maintain" ? (
-                <span className="text-[13px] font-semibold text-muted">Maintaining</span>
-              ) : null}
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="m-0 text-[17px] font-extrabold tracking-[-0.02em]">Weight</h2>
+              <span className="text-[13px] text-muted">
+                {latest ? `${num1(latest.weight_kg)} kg${trendWord ? `, trend ${trendWord}` : ""}` : "No weigh-ins yet"}
+              </span>
             </div>
             {wd.weigh_ins.length === 0 && wd.plan.length === 0 ? (
               <div className="rounded-tile border-[1.5px] border-dashed border-dash p-3.5 text-[14px] text-muted">
@@ -137,19 +135,56 @@ export function ProgressScreen() {
             ) : (
               <WeightChart from={from} to={to} weighIns={wd.weigh_ins} trend={wd.trend} plan={wd.plan} goal={g} />
             )}
-            <p className="m-0 text-[12px] text-muted">
+            <p className="m-0 text-[12.5px] text-muted">
               {wd.trend.length > 1
-                ? "The line is your trend, dots are weigh-ins, dashed line is your plan."
+                ? "Rose line is your trend, dots are weigh-ins, dashed line is your plan."
                 : "Dashed line is your plan. Weigh in weekly and your real trend draws over it."}
             </p>
+            <div className="flex items-center justify-between gap-2">
+              {g?.goal_weight_kg != null && g.plan.forecast_date ? (
+                <span className="text-[13px] text-muted">
+                  {num1(g.goal_weight_kg)} kg around <b className="text-ink">{formatMonthYear(g.plan.forecast_date)}</b>
+                </span>
+              ) : g?.mode === "maintain" ? (
+                <span className="text-[13px] text-muted">Maintaining</span>
+              ) : (
+                <span />
+              )}
+              <div role="radiogroup" aria-label="Weight range" className="flex rounded-full bg-field p-[3px]">
+                {(
+                  [
+                    ["3m", "3M"],
+                    ["6m", "6M"],
+                    ["goal", "To goal"],
+                  ] as const
+                ).map(([v, label]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    role="radio"
+                    aria-checked={effective === v}
+                    disabled={v === "goal" && !canGoal}
+                    onClick={() => setRange(v)}
+                    className={cn(
+                      "min-h-[32px] rounded-full px-2.5 text-[12px] disabled:opacity-40",
+                      effective === v ? "bg-ink font-bold text-white" : "text-muted"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </>
         )}
       </section>
 
+      <RewardsCard />
+
       {/* Strength */}
       <section aria-label="Strength" className="flex flex-col gap-2.5 rounded-card bg-white p-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="m-0 text-[13px] font-semibold text-muted">Strength, top set</h2>
+          <h2 className="m-0 text-[17px] font-extrabold tracking-[-0.02em]">Strength, top set</h2>
           {recordList.length > 0 ? (
             <label className="relative flex min-h-[36px] items-center gap-1 rounded-full border border-line pl-2.5 pr-7 text-[13px] font-semibold">
               <span className="sr-only">Exercise</span>
@@ -218,7 +253,6 @@ export function ProgressScreen() {
           </>
         )}
       </section>
-
     </div>
   )
 }

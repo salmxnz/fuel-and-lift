@@ -117,10 +117,12 @@ export function TodayScreen() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <Sky className="pb-2">
+      <Sky className="pb-0">
         <SkyTitle title={dayTitle(date, today)}>
           <ShopLink kind="meal" className={SKY_ICON} />
-          <label className={cn(SKY_ICON, "relative cursor-pointer")}>
+          {/* The date input is clipped to this button: iOS sizes date inputs wider
+              than their box, and an unclipped one covered the profile picture. */}
+          <label className={cn(SKY_ICON, "relative cursor-pointer overflow-hidden [contain:paint]")}>
             <span className="sr-only">Pick a date</span>
             <CalendarIcon size={20} />
             <input
@@ -139,7 +141,7 @@ export function TodayScreen() {
                   /* not supported: the native control still opens */
                 }
               }}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              className="absolute inset-0 h-full w-full min-w-0 max-w-full cursor-pointer appearance-none opacity-0"
             />
           </label>
           {/* A 44 px target that's always on screen: the title shrinks first. */}
@@ -147,7 +149,7 @@ export function TodayScreen() {
             href="/me"
             aria-label="Me: profile and settings"
             data-tour="me"
-            className="flex h-11 w-11 flex-none items-center justify-center rounded-full transition-transform duration-[160ms] ease-out active:scale-[0.95]"
+            className="relative z-10 flex h-11 w-11 flex-none items-center justify-center rounded-full transition-transform duration-[160ms] ease-out active:scale-[0.95]"
           >
             <Avatar name={displayName(me)} url={me.user.avatar_url} size={42} tone="ink" />
           </Link>
@@ -175,7 +177,7 @@ export function TodayScreen() {
         {day.data && day.data.day.date === date ? (
           <CalorieSun day={day.data.day} />
         ) : (
-          <div className="mx-auto mt-2 aspect-[360/200] w-full max-w-[360px]" aria-hidden="true" />
+          <div className="-mx-4 mt-1 h-[calc(min(108vw,420px)*0.5556+26px)]" aria-hidden="true" />
         )}
       </Sky>
 
@@ -221,14 +223,14 @@ export function TodayScreen() {
             <>
               <MacroCard day={day.data.day} />
 
-              <div className="-mb-1 mt-0.5 flex items-center justify-between">
-                <h2 className="m-0 text-[17px] font-extrabold">Meals</h2>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <h2 className="m-0 text-[24px] font-black tracking-[-0.035em]">Meals</h2>
                 <button
                   type="button"
                   onClick={() => setOneOffOpen(true)}
-                  className="flex min-h-[36px] items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-dash px-3 text-[13px] font-semibold text-ink"
+                  className="flex h-[42px] items-center gap-1.5 whitespace-nowrap rounded-[14px] border-[1.5px] border-dashed border-dash px-4 text-[15px] font-bold text-ink transition-transform duration-150 ease-out active:scale-[0.97]"
                 >
-                  <PlusIcon size={16} />
+                  <PlusIcon size={18} />
                   {isToday ? "Add a meal today" : "Add a meal"}
                 </button>
               </div>

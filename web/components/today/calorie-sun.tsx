@@ -29,8 +29,13 @@ export function CalorieSun({ day }: { day: Day }) {
   }, [left, shown, reduce])
 
   return (
-    <section aria-label="Calories" className="relative mx-auto -mb-1 mt-2 aspect-[360/200] w-full max-w-[360px]">
-      <svg viewBox="0 0 360 200" aria-hidden="true" className="absolute inset-0 h-full w-full overflow-hidden">
+    // Full bleed and sitting low, so the sky's clouds cut across its base.
+    <section aria-label="Calories" className="relative -mx-4 mt-1 h-[calc(min(108vw,420px)*0.5556+26px)] overflow-hidden">
+      <svg
+        viewBox="0 0 360 200"
+        aria-hidden="true"
+        className="absolute bottom-0 left-1/2 aspect-[360/200] w-[min(108vw,420px)] -translate-x-1/2 overflow-visible"
+      >
         <defs>
           <radialGradient id="sun-glow" cx="50%" cy="97%" r="55%">
             <stop offset="0" stopColor="#fff" stopOpacity="0.95" />
@@ -67,18 +72,18 @@ export function CalorieSun({ day }: { day: Day }) {
         <circle cx="180" cy="194" r="120" fill="#fff" />
       </svg>
 
-      <div className="absolute inset-x-0 bottom-[22%] flex flex-col items-center text-center">
+      <div className="absolute inset-x-0 bottom-[40px] flex flex-col items-center text-center">
         <motion.span
           aria-hidden="true"
           className={cn(
-            "text-[clamp(32px,11vw,50px)] font-black leading-[0.9] tracking-[-0.05em]",
+            "text-[clamp(40px,13.4vw,50px)] font-black leading-[0.9] tracking-[-0.06em]",
             over ? "text-protein" : "text-ink"
           )}
         >
           {text}
         </motion.span>
-        <span className="mt-0.5 text-[13.5px] font-bold text-ink-soft">{over ? "kcal over" : "kcal to go"}</span>
-        <span className="text-[12px] text-muted">
+        <span className="mt-1 text-[14px] font-bold text-ink-soft">{over ? "kcal over" : "kcal to go"}</span>
+        <span className="mt-0.5 text-[13px] text-muted">
           {kcal(eaten)} eaten of {kcal(target)}
         </span>
         <span className="sr-only">

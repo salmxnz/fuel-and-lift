@@ -115,6 +115,12 @@ export const ListIcon = (p: IconProps) => (
     <path d="M4 6h16M4 12h16M4 18h10" />
   </Svg>
 )
+export const TemplatesIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="4" y="4" width="16" height="16" rx="3" />
+    <path d="M8 9h8M8 13h8M8 17h5" />
+  </Svg>
+)
 export const StoreIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 10h16l-1.5-5h-13Z" />

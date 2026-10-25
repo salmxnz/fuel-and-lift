@@ -498,6 +498,22 @@ input[type="number"]::-webkit-inner-spin-button {
   animation: bite-say 260ms var(--ease-out) both;
 }
 
+/* Cheer: a little burst of dots. */
+@keyframes cheer-burst {
+  from {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(0.4);
+    opacity: 0;
+  }
+}
+.cheer-burst {
+  pointer-events: none;
+  animation: cheer-burst 700ms var(--ease-out) forwards;
+}
+
 /* ------------------------------------------------------------ Bits */
 
 .hatch-pink {

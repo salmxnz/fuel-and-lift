@@ -121,10 +121,10 @@ function MealCard({
   const single = meal.entries.length === 1
   const first = meal.entries[0]
   return (
-    <section aria-label={meal.name} className="flex flex-col gap-2.5 rounded-card bg-white px-4 py-3.5">
+    <section aria-label={meal.name} className="flex flex-col gap-2.5 rounded-card bg-white px-4 pb-1.5 pt-4">
       <div className="flex items-baseline justify-between">
-        <h2 className="m-0 text-[13px] font-semibold text-muted">{meal.name}</h2>
-        <span className="text-[13px] text-muted">
+        <h2 className="m-0 text-[14px] font-semibold text-muted">{meal.name}</h2>
+        <span className="text-[14px] font-semibold text-muted">
           {single ? timeHM(first.logged_at) : `${kcal(meal.totals.kcal)} kcal`}
         </span>
       </div>
@@ -139,7 +139,7 @@ function MealCard({
       <button
         type="button"
         onClick={onAdd}
-        className="-mb-1.5 flex min-h-[40px] items-center self-start text-[13px] font-semibold text-protein transition-transform duration-[160ms] ease-out active:scale-[0.97]"
+        className="flex min-h-[40px] items-center self-start text-[13px] font-bold text-protein transition-transform duration-[160ms] ease-out active:scale-[0.97]"
       >
         + Add to {meal.name.toLowerCase()}
       </button>
@@ -169,9 +169,9 @@ function EntryRow({ entry, onEdit }: { entry: Entry; onEdit: () => void }) {
       {tile ? <FoodIconTile icon={icon} origin={entry.origin} /> : null}
       <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
         <span className="flex items-baseline justify-between gap-3">
-          <span className="text-[17px] font-bold">{entry.name}</span>
+          <span className="text-[16px] font-extrabold leading-[1.25] tracking-[-0.01em]">{entry.name}</span>
           {!tile ? (
-            <span className="flex-none text-[17px] font-bold">
+            <span className="flex-none text-[18px] font-extrabold tracking-[-0.02em]">
               {kcal(entry.kcal)} <span className="text-[13px] font-normal text-muted">kcal</span>
             </span>
           ) : null}
@@ -184,7 +184,7 @@ function EntryRow({ entry, onEdit }: { entry: Entry; onEdit: () => void }) {
         {shared ? <SharedLine entry={entry} text={shared} /> : null}
       </span>
       {tile ? (
-        <span className="flex-none text-[17px] font-bold">
+        <span className="flex-none text-[18px] font-extrabold tracking-[-0.02em]">
           {kcal(entry.kcal)} <span className="text-[13px] font-normal text-muted">kcal</span>
         </span>
       ) : null}

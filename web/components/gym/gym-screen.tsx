@@ -5,18 +5,10 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 import { Avatar, Button, ErrorCard, Field, Skeleton, TextInput } from "@/components/ui/primitives"
-import { ChevronRightIcon, DumbbellIcon, PlusIcon } from "@/components/ui/icons"
+import { ChevronRightIcon, DumbbellIcon, PlusIcon, TemplatesIcon } from "@/components/ui/icons"
 import { Sheet } from "@/components/ui/sheet"
 import { api, errorMessage } from "@/lib/api/client"
-import type {
-  RoutinesResponse,
-  SessionResponse,
-  SessionsResponse,
-  Template,
-  TemplateResponse,
-  TemplatesResponse,
-  WeeklyPlan,
-} from "@/lib/api/types"
+import type { RoutinesResponse, SessionResponse, SessionsResponse, Template, TemplateResponse, TemplatesResponse, WeeklyPlan } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { addDays, formatDayMonth, relativeDay, todayISO, weekdayKey, type WeekdayKey } from "@/lib/dates"
 import { GymWeek } from "./gym-week"
@@ -24,9 +16,9 @@ import { IncomingRoutines, IncomingTemplates } from "@/components/share/incoming
 import { VisibilityBadge } from "@/components/community/visibility-select"
 import { ShopLink } from "@/components/community/shop-link"
 import { Sky, SkyTitle, SKY_ICON } from "@/components/ui/sky"
-import { Dumbbell } from "@/components/landing/art"
-import { useMe } from "@/components/me-context"
-import type { FeedResponse } from "@/lib/api/types"
+import { displayName, useMe } from "@/components/me-context"
+import { GymNowCard } from "@/components/friends/gym-now-card"
+import { PlanHero, TicketButton, TodayExercises, templateMinutes } from "./gym-hero"
 import { RoutinesSection } from "./routines-section"
 
 const DAY_NAMES: Record<WeekdayKey, string> = {
@@ -62,6 +54,8 @@ export function GymScreen() {
   const todayTemplate = todayTemplateId ? byId.get(todayTemplateId) : undefined
   const active = (sessions.data?.sessions ?? []).find((s) => s.status === "active")
   const recent = (sessions.data?.sessions ?? []).filter((s) => s.status === "finished").slice(0, 5)
+  const lastOfToday = todayTemplate ? recent.find((s) => s.template_id === todayTemplate.id) : undefined
+  const me = useMe()
 
   async function start(templateId: string | null) {
     setStarting(templateId ?? "empty")
@@ -92,16 +86,74 @@ export function GymScreen() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <Sky className="pb-12">
+      <Sky className="pb-0">
         <SkyTitle title="Gym">
           <ShopLink kind="routine" className={SKY_ICON} />
+          <a href="#templates" aria-label="Your templates" className={SKY_ICON}>
+            <TemplatesIcon size={20} strokeWidth={2} />
+          </a>
+          <Link
+            href="/me"
+            aria-label="Me: profile and settings"
+            className="relative z-10 flex h-11 w-11 flex-none items-center justify-center rounded-full"
+          >
+            <Avatar name={displayName(me)} url={me.user.avatar_url} size={42} tone="ink" />
+          </Link>
         </SkyTitle>
-        <FriendsAtTheGym />
+        {templates.loading || plan.loading || sessions.loading ? (
+          <div className="relative -mx-4 h-[204px]">
+            <Skeleton className="absolute inset-x-4 bottom-[40px] h-[104px] rounded-[22px] bg-white/60" />
+          </div>
+        ) : active ? (
+          <PlanHero
+            label={`In progress · ${relativeDay(active.started_at)}`}
+            title={active.template_name ?? "Workout"}
+            sub={`${active.blocks.filter((b) => !b.skipped).length} exercises, keep going`}
+            action={<TicketButton href={`/gym/session/${active.id}`}>Resume</TicketButton>}
+          />
+        ) : todayTemplate ? (
+          <PlanHero
+            label="Today's workout"
+            title={todayTemplate.name}
+            sub={`${todayTemplate.blocks.length} exercise${todayTemplate.blocks.length === 1 ? "" : "s"}, about ${templateMinutes(todayTemplate)} min`}
+            action={
+              <TicketButton
+                onClick={() => void start(todayTemplate.id)}
+                loading={starting === todayTemplate.id}
+                disabled={starting !== null || todayTemplate.blocks.length === 0}
+              >
+                Start
+              </TicketButton>
+            }
+          />
+        ) : list.length === 0 ? (
+          <PlanHero
+            label={DAY_NAMES[todayKey]}
+            title="First workout"
+            sub="Make one, or start from a split below"
+            action={<TicketButton onClick={() => setNewOpen(true)}>Make one</TicketButton>}
+          />
+        ) : (
+          <PlanHero
+            label={DAY_NAMES[todayKey]}
+            title="Rest day"
+            sub="Recover, or train anyway"
+            action={
+              <TicketButton onClick={() => void start(null)} loading={starting === "empty"} disabled={starting !== null}>
+                Train
+              </TicketButton>
+            }
+          />
+        )}
       </Sky>
+
+      <GymNowCard />
 
       <IncomingRoutines
         onAdded={(r) => {
-          routines.setData((prev) => ({ routines: [r, ...(prev?.routines ?? [])] }))
+          routines.setData((prev) => ({
+            routines: [r, ...(prev?.routines ?? [])],
+          }))
           void templates.reload()
         }}
       />
@@ -114,58 +166,16 @@ export function GymScreen() {
         }
       />
 
-      {/* Today */}
-      {templates.loading || plan.loading || sessions.loading ? (
-        <Skeleton className="h-[120px] rounded-card" />
-      ) : active ? (
-        <section aria-label="Workout in progress" className="flex flex-col gap-3 rounded-card bg-ink p-4 text-white">
-          <span className="text-[13px] text-night-muted">In progress · {relativeDay(active.started_at)}</span>
-          <span className="text-[22px] font-extrabold tracking-[-0.01em]">{active.template_name ?? "Workout"}</span>
-          <Link
-            href={`/gym/session/${active.id}`}
-            className="flex min-h-[52px] items-center justify-center rounded-btn bg-pink text-[16px] font-bold text-ink no-underline"
-          >
-            Resume workout
-          </Link>
-        </section>
-      ) : todayTemplate ? (
-        <section aria-label="Today's workout" className="flex flex-col gap-3 rounded-card bg-ink p-4 text-white">
-          <span className="text-[13px] text-night-muted">{DAY_NAMES[todayKey]}</span>
-          <span className="text-[22px] font-extrabold tracking-[-0.01em]">
-            {todayTemplate.name} <span className="text-[13px] font-semibold text-night-muted">v{todayTemplate.version}</span>
-          </span>
-          <span className="text-[13px] text-night-soft">{summarizeTemplate(todayTemplate)}</span>
-          <Button variant="pink" onClick={() => start(todayTemplate.id)} loading={starting === todayTemplate.id}>
-            Start today&apos;s workout
-          </Button>
-        </section>
-      ) : (
-        <section aria-label="Today" className="flex flex-col gap-2 rounded-card border-[1.5px] border-dashed border-dash p-4">
-          <span className="text-[13px] font-semibold text-muted">{DAY_NAMES[todayKey]}</span>
-          <span className="text-[15px]">
-            {list.length === 0
-              ? "Make your first workout, then put it on your week."
-              : "Rest day. Recover, or start any workout below if you're itching to train."}
-          </span>
-        </section>
-      )}
-
-      {templates.error && !templates.data ? (
-        <ErrorCard message={templates.error.message} onRetry={() => void templates.reload()} />
-      ) : null}
+      {templates.error && !templates.data ? <ErrorCard message={templates.error.message} onRetry={() => void templates.reload()} /> : null}
 
       {/* Weekly plan */}
       {plan.error && !plan.data ? (
         <p className="m-0 rounded-card bg-white p-3.5 text-[14px] text-danger">{plan.error.message}</p>
       ) : (
-        <GymWeek
-          plan={plan.data ?? null}
-          templates={list}
-          onSetDay={setDay}
-          onStart={(id) => void start(id)}
-          starting={starting}
-        />
+        <GymWeek plan={plan.data ?? null} templates={list} onSetDay={setDay} onStart={(id) => void start(id)} starting={starting} />
       )}
+
+      {todayTemplate && !active ? <TodayExercises template={todayTemplate} last={lastOfToday} /> : null}
 
       <RoutinesSection
         routines={routines}
@@ -175,8 +185,8 @@ export function GymScreen() {
       />
 
       {/* Templates */}
-      <div className="-mb-1 mt-1 flex items-center justify-between">
-        <h2 className="m-0 text-[17px] font-extrabold">Templates</h2>
+      <div id="templates" className="-mb-1 mt-2 flex scroll-mt-4 items-center justify-between">
+        <h2 className="m-0 text-[24px] font-black tracking-[-0.035em]">Templates</h2>
         <button
           type="button"
           onClick={() => setNewOpen(true)}
@@ -234,7 +244,8 @@ export function GymScreen() {
                   <span className="font-semibold">{s.template_name ?? "Workout"}</span>
                 </span>
                 <span className="text-muted">
-                  {formatDayMonth(s.date)} · {done} exercise{done === 1 ? "" : "s"}
+                  {formatDayMonth(s.date)} · {done} exercise
+                  {done === 1 ? "" : "s"}
                 </span>
               </div>
             )
@@ -269,7 +280,10 @@ function NewTemplateSheet({ open, onClose }: { open: boolean; onClose: () => voi
           if (!n) return
           setBusy(true)
           try {
-            const res = await api.post<TemplateResponse>("templates", { name: n, blocks: [] })
+            const res = await api.post<TemplateResponse>("templates", {
+              name: n,
+              blocks: [],
+            })
             router.push(`/gym/templates/${res.template.id}`)
           } catch (err) {
             toast.error(errorMessage(err))
@@ -285,47 +299,5 @@ function NewTemplateSheet({ open, onClose }: { open: boolean; onClose: () => voi
         </Button>
       </form>
     </Sheet>
-  )
-}
-
-/** Friends training right now (tap to train together), else a floating dumbbell. */
-function FriendsAtTheGym() {
-  const me = useMe()
-  const feed = useApi<FeedResponse>("feed")
-  const live = (feed.data?.items ?? []).filter(
-    (it, i, a) => it.kind === "workout_started" && it.actor.id !== me.user.id && a.findIndex((x) => x.kind === it.kind && x.actor.id === it.actor.id) === i
-  )
-  if (live.length === 0) {
-    return (
-      <div aria-hidden="true" className="relative mt-1 h-[64px]">
-        <div className="app-float absolute right-6 top-0 w-[112px]" style={{ "--r": "-16deg", "--t": "6s" } as React.CSSProperties}>
-          <Dumbbell className="w-full drop-shadow-[0_10px_18px_rgba(46,26,36,0.22)]" />
-        </div>
-      </div>
-    )
-  }
-  return (
-    <div className="mt-3 flex flex-col gap-2">
-      <span className="flex items-center gap-2 text-[13px] font-bold text-protein">
-        <span aria-hidden="true" className="live-dot h-2.5 w-2.5 rounded-full bg-protein" />
-        Your crew is training
-      </span>
-      <ul className="no-scrollbar -mx-4 m-0 flex list-none gap-2 overflow-x-auto px-4 pb-1">
-        {live.map((t) => (
-          <li key={t.id} className="flex-none">
-            <Link
-              href={`/people/${t.actor.id}`}
-              className="flex min-h-[56px] items-center gap-2.5 rounded-[18px] border border-white/85 bg-white/70 py-2 pl-2 pr-3.5 text-ink no-underline backdrop-blur-md"
-            >
-              <Avatar name={t.actor.name} url={t.actor.avatar_url} size={36} tone="lilac" />
-              <span className="flex flex-col">
-                <span className="text-[14px] font-extrabold">{t.actor.name}</span>
-                <span className="text-[12px] text-muted">{typeof t.data.template === "string" ? t.data.template : "Training"} · join</span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
   )
 }

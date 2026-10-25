@@ -1,15 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useMemo, useState } from "react"
-import { CalendarIcon, CheckIcon, ListIcon } from "@/components/ui/icons"
+import { useMemo, useState } from "react"
+import { CalendarIcon, CheckIcon, DumbbellIcon, ListIcon } from "@/components/ui/icons"
 import { Button, Skeleton } from "@/components/ui/primitives"
 import { Sheet } from "@/components/ui/sheet"
-import { WeekPager } from "@/components/ui/week-pager"
 import type { Session, SessionsResponse, Template, WeeklyPlan } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
-import { addDays, formatLong, startOfWeek, todayISO, weekdayKey, WEEKDAY_KEYS, type WeekdayKey } from "@/lib/dates"
+import { addDays, formatLong, startOfWeek, todayISO, weekDays, weekdayKey, weekdayLetter, WEEKDAY_KEYS, type WeekdayKey } from "@/lib/dates"
 import { useStoredChoice } from "@/lib/use-stored-choice"
 import { ExerciseIcon } from "./exercise-icon"
 
@@ -23,14 +22,10 @@ const DAY_NAMES: Record<WeekdayKey, string> = {
   sun: "Sunday",
 }
 
-/** "Upper-1" → "Upper-1"; long names shrink to fit a day cell. */
-function shortName(name: string): string {
-  return name.length > 7 ? `${name.slice(0, 6)}…` : name
-}
-
 /**
- * "Your week": a swipeable week strip (default) or the classic list of
- * dropdowns, toggled top-right. Tapping a day opens its plan and history.
+ * "Your gym week": this week as tiles (done in pink, today in plum), or the
+ * classic list of dropdowns, toggled top-right. Tapping a day opens its plan
+ * and history.
  */
 export function GymWeek({
   plan,
@@ -47,14 +42,9 @@ export function GymWeek({
 }) {
   const today = todayISO()
   const [view, setView] = useStoredChoice("adebite:gym-week-view", ["rows", "list"] as const, "rows")
-  const [visibleWeek, setVisibleWeek] = useState(() => startOfWeek(today))
+  const monday = startOfWeek(today)
   const [openDay, setOpenDay] = useState<string | null>(null)
-  // The pill stays on the last day opened after its sheet closes.
-  const [picked, setPicked] = useState<string | null>(null)
-  const selectedDay = openDay ?? picked ?? today
-  const sessions = useApi<SessionsResponse>(view === "rows" ? `sessions?from=${visibleWeek}&to=${addDays(visibleWeek, 6)}` : null, {
-    keepPrevious: true,
-  })
+  const sessions = useApi<SessionsResponse>(`sessions?from=${monday}&to=${addDays(monday, 6)}`, { keepPrevious: true })
   const byId = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates])
   const byDate = useMemo(() => {
     const m = new Map<string, Session>()
@@ -68,61 +58,69 @@ export function GymWeek({
   const todayKey = weekdayKey(today)
 
   const days = plan?.days
-  const renderDay = useCallback(
-    (d: string) => {
-      const tplId = days?.[weekdayKey(d)]
-      const t = tplId ? byId.get(tplId) : undefined
-      const session = byDate.get(d)
-      const done = session?.status === "finished"
-      const selected = d === selectedDay
-      // A day you trained shows what you did, even off-plan.
-      const label = done && session?.template_name ? session.template_name : t ? t.name : "Rest"
-      return (
-        <span
-          className={cn(
-            "flex max-w-full items-center gap-0.5 truncate px-0.5 text-[10px] font-semibold leading-tight",
-            selected ? "text-pink" : t || done ? "text-ink-soft" : "text-muted"
-          )}
-        >
-          {done ? <CheckIcon size={10} className={selected ? "text-pink" : "text-protein"} /> : null}
-          {label === "Rest" ? label : shortName(label)}
-        </span>
-      )
-    },
-    [days, byId, byDate, selectedDay]
-  )
+  const week = weekDays(today)
+  const planned = week.filter((d) => days?.[weekdayKey(d)])
+  const doneCount = week.filter((d) => byDate.get(d)?.status === "finished").length
+  const goal = Math.max(planned.length, doneCount)
 
   return (
-    <section aria-labelledby="week-title" className="flex flex-col gap-1 rounded-card bg-white px-3.5 pb-2 pt-1">
-      <div className="flex items-center justify-between">
-        <h2 id="week-title" className="m-0 pt-2 text-[13px] font-semibold text-muted">
-          Your week
+    <section aria-labelledby="week-title" className="flex flex-col rounded-card bg-white px-4 pb-4 pt-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 id="week-title" className="m-0 text-[18px] font-black tracking-[-0.035em]">
+          Your gym week
         </h2>
-        <button
-          type="button"
-          onClick={() => setView(view === "rows" ? "list" : "rows")}
-          aria-label={view === "rows" ? "Show the week as a list" : "Show the week as a strip"}
-          className="-mr-1.5 mt-1 flex h-10 w-10 items-center justify-center rounded-[12px] text-ink transition-transform duration-150 ease-out hover:bg-ink/5 active:scale-[0.97]"
-        >
-          {view === "rows" ? <ListIcon size={20} /> : <CalendarIcon size={20} />}
-        </button>
+        <span className="flex items-center gap-1">
+          {plan && goal > 0 ? (
+            <span className="text-[13px] text-muted">
+              {doneCount} of {goal} done
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setView(view === "rows" ? "list" : "rows")}
+            aria-label={view === "rows" ? "Edit the week as a list" : "Show the week as tiles"}
+            className="-mr-2 flex h-10 w-10 items-center justify-center rounded-[12px] text-ink transition-transform duration-150 ease-out hover:bg-ink/5 active:scale-[0.97]"
+          >
+            {view === "rows" ? <ListIcon size={20} /> : <CalendarIcon size={20} />}
+          </button>
+        </span>
       </div>
 
       {!plan ? (
-        <Skeleton className="my-1 h-[70px]" />
+        <Skeleton className="h-[78px]" />
       ) : view === "rows" ? (
-        <WeekPager
-          selected={selectedDay}
-          onSelect={(d) => {
-            setPicked(d)
-            setOpenDay(d)
-          }}
-          dimAfter={today}
-          label="Your gym week"
-          pillId="gym-day"
-          onWeekChange={setVisibleWeek}
-          renderDay={renderDay}
-        />
+        <ol className="m-0 grid list-none grid-cols-7 gap-[5px] p-0" aria-label="This week">
+          {week.map((d) => {
+            const tplId = days?.[weekdayKey(d)]
+            const t = tplId ? byId.get(tplId) : undefined
+            const session = byDate.get(d)
+            const done = session?.status === "finished"
+            const now = d === today
+            // A day you trained shows what you did, even off-plan.
+            const label = done && session?.template_name ? session.template_name : t ? t.name : "Rest"
+            return (
+              <li key={d} className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setOpenDay(d)}
+                  aria-label={`${formatLong(d)}: ${label}${done ? ", done" : ""}`}
+                  className="flex w-full flex-col items-center gap-1.5 text-[12px] font-semibold text-muted transition-transform duration-150 ease-out active:scale-[0.95]"
+                >
+                  <span
+                    className={cn(
+                      "flex aspect-square w-full items-center justify-center rounded-[12px]",
+                      now ? "bg-ink text-pink" : done ? "bg-pink text-ink" : "bg-line-soft text-protein"
+                    )}
+                  >
+                    {done ? <CheckIcon size={16} strokeWidth={3} /> : now && t ? <DumbbellIcon size={16} strokeWidth={2.4} /> : null}
+                  </span>
+                  {weekdayLetter(d)}
+                  <b className="max-w-full truncate text-[10px] font-bold tracking-[-0.02em] text-ink-soft">{label}</b>
+                </button>
+              </li>
+            )
+          })}
+        </ol>
       ) : (
         WEEKDAY_KEYS.map((d) => {
           const id = `plan-${d}`
@@ -208,9 +206,7 @@ function DaySheet({
             {session.status === "finished" ? <CheckIcon size={18} className="text-protein" /> : null}
             {session.template_name ?? "Workout"} {session.status === "finished" ? "done" : "in progress"}
           </span>
-          <span className="text-[13px] text-muted">
-            {session.blocks.filter((b) => !b.skipped).length} exercises · Open
-          </span>
+          <span className="text-[13px] text-muted">{session.blocks.filter((b) => !b.skipped).length} exercises · Open</span>
         </Link>
       ) : isPast ? (
         <p className="m-0 rounded-tile bg-white px-3.5 py-3 text-[14px] text-muted">No workout logged that day.</p>
@@ -219,7 +215,13 @@ function DaySheet({
       <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
         <legend className="mb-1.5 p-0 text-[13px] font-semibold text-muted">{DAY_NAMES[key]}s are for</legend>
         <div className="flex flex-wrap gap-1.5">
-          {[{ id: null as string | null, name: "Rest" }, ...templates.map((x) => ({ id: x.id as string | null, name: x.name }))].map((o) => {
+          {[
+            { id: null as string | null, name: "Rest" },
+            ...templates.map((x) => ({
+              id: x.id as string | null,
+              name: x.name,
+            })),
+          ].map((o) => {
             const on = (o.id ?? null) === planned
             return (
               <button
