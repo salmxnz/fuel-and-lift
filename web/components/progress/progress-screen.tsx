@@ -1,23 +1,25 @@
 "use client"
 
 import { useState } from "react"
+import { Sky, SkyTitle } from "@/components/ui/sky"
+import { PeriodRecap } from "./period-recap"
 import { ErrorCard, Skeleton } from "@/components/ui/primitives"
 import { ChevronDownIcon } from "@/components/ui/icons"
 import type {
   GoalResponse,
-  ProgressCaloriesResponse,
   ProgressExerciseResponse,
   ProgressRecordsResponse,
   ProgressWeightResponse,
 } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
-import { addDays, addMonths, formatDayMonth, formatMonthYear, todayISO, weekDays, weekdayLetter } from "@/lib/dates"
-import { kcal, num1, signed } from "@/lib/format"
+import { addDays, addMonths, formatDayMonth, formatMonthYear, todayISO } from "@/lib/dates"
+import { num1, signed } from "@/lib/format"
 import { Sparkline, WeightChart } from "./weight-chart"
 import { RewardsCard } from "./rewards-card"
 
 type Range = "3m" | "6m" | "goal"
+type View = "week" | "month"
 
 export function ProgressScreen() {
   const today = todayISO()
@@ -38,8 +40,8 @@ export function ProgressScreen() {
   // Wait for the goal before choosing the range, so we fetch once.
   const weight = useApi<ProgressWeightResponse>(goalRes.loading ? null : `progress/weight?from=${from}&to=${to}`)
 
-  const week = weekDays(today)
-  const calories = useApi<ProgressCaloriesResponse>(`progress/calories?from=${week[0]}&to=${week[6]}`)
+  const [view, setView] = useState<View>("week")
+  const [offset, setOffset] = useState(0)
   const records = useApi<ProgressRecordsResponse>("progress/records")
   const [exerciseId, setExerciseId] = useState<string | null>(null)
   const recordList = records.data?.records ?? []
@@ -52,33 +54,31 @@ export function ProgressScreen() {
 
   return (
     <div className="flex flex-col gap-3">
-      <header className="flex items-end justify-between">
-        <h1 className="m-0 text-[30px] font-extrabold tracking-[-0.02em]">Progress</h1>
-        <div role="radiogroup" aria-label="Range" className="flex rounded-full bg-white p-[3px]">
-          {(
-            [
-              ["3m", "3M"],
-              ["6m", "6M"],
-              ["goal", "To goal"],
-            ] as const
-          ).map(([v, label]) => (
-            <button
-              key={v}
-              type="button"
-              role="radio"
-              aria-checked={effective === v}
-              disabled={v === "goal" && !canGoal}
-              onClick={() => setRange(v)}
-              className={cn(
-                "min-h-[36px] rounded-full px-2.5 text-[12px] disabled:opacity-40",
-                effective === v ? "bg-ink font-bold text-white" : "text-muted"
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </header>
+      <Sky className="pb-14">
+        <SkyTitle title="Progress">
+          <div role="radiogroup" aria-label="View" className="flex rounded-[14px] border border-white/85 bg-white/65 p-1 backdrop-blur-md">
+            {(["week", "month"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="radio"
+                aria-checked={view === v}
+                onClick={() => {
+                  setView(v)
+                  setOffset(0)
+                }}
+                className={cn(
+                  "min-h-[36px] rounded-[10px] px-3 text-[13px] font-bold transition-colors duration-200",
+                  view === v ? "bg-ink text-white" : "text-ink-soft"
+                )}
+              >
+                {v === "week" ? "Week" : "Month"}
+              </button>
+            ))}
+          </div>
+        </SkyTitle>
+        <PeriodRecap view={view} offset={offset} onOffset={setOffset} today={today} />
+      </Sky>
 
       <RewardsCard />
 
@@ -93,6 +93,27 @@ export function ProgressScreen() {
           </>
         ) : (
           <>
+            <div role="radiogroup" aria-label="Weight range" className="-mt-1 flex self-end rounded-full bg-field p-[3px]">
+              {(
+                [
+                  ["3m", "3M"],
+                  ["6m", "6M"],
+                  ["goal", "To goal"],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={effective === v}
+                  disabled={v === "goal" && !canGoal}
+                  onClick={() => setRange(v)}
+                  className={cn("min-h-[32px] rounded-full px-2.5 text-[12px] disabled:opacity-40", effective === v ? "bg-ink font-bold text-white" : "text-muted")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-0.5">
                 <h2 className="m-0 text-[13px] font-semibold text-muted">Weight</h2>
@@ -118,7 +139,7 @@ export function ProgressScreen() {
             )}
             <p className="m-0 text-[12px] text-muted">
               {wd.trend.length > 1
-                ? "Green line is your trend, dots are weigh-ins, dashed line is your plan."
+                ? "The line is your trend, dots are weigh-ins, dashed line is your plan."
                 : "Dashed line is your plan. Weigh in weekly and your real trend draws over it."}
             </p>
           </>
@@ -198,83 +219,6 @@ export function ProgressScreen() {
         )}
       </section>
 
-      {/* Calories this week */}
-      <CaloriesWeek data={calories.data} error={calories.error?.message} loading={calories.loading} week={week} today={today} />
     </div>
-  )
-}
-
-function CaloriesWeek({
-  data,
-  error,
-  loading,
-  week,
-  today,
-}: {
-  data: ProgressCaloriesResponse | undefined
-  error?: string
-  loading: boolean
-  week: string[]
-  today: string
-}) {
-  const byDate = new Map((data?.days ?? []).map((d) => [d.date, d]))
-  const target = data?.days.find((d) => d.target_kcal > 0)?.target_kcal ?? 0
-  const maxVal = Math.max(target * 1.2, ...(data?.days ?? []).map((d) => d.kcal), 1)
-  const H = 84
-  const targetY = target > 0 ? H - (target / maxVal) * H : 0
-  const logged = (data?.days ?? []).filter((d) => d.kcal > 0)
-  const summary =
-    logged.length === 0
-      ? "Nothing logged this week yet"
-      : logged.map((d) => `${weekdayLetter(d.date)} ${kcal(d.kcal)} kcal`).join(", ")
-
-  return (
-    <section aria-label="Calories this week" className="flex flex-col gap-2.5 rounded-card bg-white p-4">
-      <div className="flex items-baseline justify-between">
-        <h2 className="m-0 text-[13px] font-semibold text-muted">Calories this week</h2>
-        {target ? <span className="text-[12px] text-muted">Target {kcal(target)}</span> : null}
-      </div>
-      {loading ? (
-        <Skeleton className="h-[84px]" />
-      ) : error ? (
-        <p className="m-0 text-[14px] text-danger">{error}</p>
-      ) : (
-        <>
-          <div role="img" aria-label={summary} className="relative grid grid-cols-7 items-end gap-2" style={{ height: H }}>
-            {target ? (
-              <span aria-hidden="true" className="absolute inset-x-0 border-t border-dashed border-dash" style={{ top: targetY }} />
-            ) : null}
-            {week.map((d) => {
-              const v = byDate.get(d)?.kcal ?? 0
-              const h = v > 0 ? Math.max(6, (v / maxVal) * H) : 4
-              const isToday = d === today
-              return (
-                <span
-                  key={d}
-                  className={cn(
-                    "box-border",
-                    v <= 0
-                      ? "rounded-sm bg-line-soft"
-                      : isToday
-                        ? "hatch-pink rounded-md border-[1.5px] border-ink"
-                        : target && v > target * 1.1
-                          ? "rounded-md bg-fat"
-                          : "rounded-md bg-pink"
-                  )}
-                  style={{ height: h }}
-                />
-              )
-            })}
-          </div>
-          <div aria-hidden="true" className="grid grid-cols-7 gap-2 text-center text-[11px] text-muted">
-            {week.map((d) => (
-              <span key={d} className={d === today ? "font-bold text-ink" : undefined}>
-                {weekdayLetter(d)}
-              </span>
-            ))}
-          </div>
-        </>
-      )}
-    </section>
   )
 }

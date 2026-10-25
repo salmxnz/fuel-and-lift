@@ -98,6 +98,8 @@ export type SheetProps = {
   /** Sheet surface: #FFF8FA (default, over light screens) or ground. */
   surface?: "sheet" | "ground"
   showClose?: boolean
+  /** Buttons next to the close button (e.g. who can see it). */
+  actions?: ReactNode
   className?: string
 }
 
@@ -111,6 +113,7 @@ export function Sheet({
   children,
   surface = "sheet",
   showClose = true,
+  actions,
   className,
 }: SheetProps) {
   const mounted = useMounted()
@@ -160,7 +163,12 @@ export function Sheet({
               <h2 id={titleId} className="m-0 text-[24px] font-extrabold tracking-[-0.02em]">
                 {title}
               </h2>
-              {showClose && !hideTitle ? <CloseButton onClick={onClose} /> : null}
+              {(showClose || actions) && !hideTitle ? (
+                <div className="flex flex-none items-center gap-1.5">
+                  {actions}
+                  {showClose ? <CloseButton onClick={onClose} /> : null}
+                </div>
+              ) : null}
             </div>
             {description ? (
               <p id={descId} className="m-0 -mt-1.5 text-[15px] leading-[1.45] text-muted">

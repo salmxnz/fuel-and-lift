@@ -32,7 +32,8 @@ export function EstimateScreen({ mode }: { mode: "photo" | "text" }) {
   const [photos, setPhotos] = useState<(PreparedImage & { key: string })[]>([])
   const [focus, setFocus] = useState<string | null>(null)
   const [preparing, setPreparing] = useState(false)
-  const [note, setNote] = useState("")
+  // ?text= prefills the description ("Join them" from a friend's meal).
+  const [note, setNote] = useState(() => params.get("text")?.trim().slice(0, 300) ?? "")
   const cameraInput = useRef<HTMLInputElement>(null)
   const libraryInput = useRef<HTMLInputElement>(null)
   const reduce = useReducedMotion()

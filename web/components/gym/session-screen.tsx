@@ -5,9 +5,12 @@ import { motion, useReducedMotion, type PanInfo } from "motion/react"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { ErrorCard, LoadingBlock, PageHeader, Spinner } from "@/components/ui/primitives"
-import { CheckIcon } from "@/components/ui/icons"
+import { CheckIcon, MinusIcon, PlusIcon } from "@/components/ui/icons"
+import { BackButton } from "@/components/ui/back-button"
+import { Sky } from "@/components/ui/sky"
+import { PartnerStrip } from "@/components/friends/live-training"
 import { api, errorMessage, seg } from "@/lib/api/client"
-import type { Session, SessionBlock, SessionResponse, SessionSet, TemplateDetailResponse } from "@/lib/api/types"
+import type { PartnersResponse, Session, SessionBlock, SessionResponse, SessionSet, TemplateDetailResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
 import { weekdayName } from "@/lib/dates"
@@ -27,6 +30,17 @@ export function SessionScreen({ id }: { id: string }) {
   const session = useApi<SessionResponse>(`sessions/${seg(id)}`)
   const s = session.data?.session
   const tpl = useApi<TemplateDetailResponse>(s?.template_id ? `templates/${seg(s.template_id)}` : null)
+  const partners = useApi<PartnersResponse>(`sessions/${seg(id)}/partners`)
+  const live = s?.status === "active"
+  const reloadPartners = partners.reload
+  const hasPartners = (partners.data?.partners.length ?? 0) > 0
+  // Training together: keep the partner strip fresh.
+  useEffect(() => {
+    if (!live || !hasPartners) return
+    const t = window.setInterval(() => void reloadPartners(), 20_000)
+    return () => window.clearInterval(t)
+  }, [live, hasPartners, reloadPartners])
+  const elapsed = useElapsed(s?.started_at, s?.finished_at ?? null)
   const timer = useRestTimer()
   const reduce = useReducedMotion()
 
@@ -201,19 +215,23 @@ export function SessionScreen({ id }: { id: string }) {
 
   return (
     <main className="app-column flex min-h-dvh flex-col gap-3" style={{ paddingBottom: "calc(var(--safe-bottom) + 110px)" }}>
-      <PageHeader
-        back="/gym"
-        backLabel="Back to Gym"
-        eyebrow={weekdayName(s.date)}
-        title={
-          <>
-            {s.template_name ?? "Workout"}{" "}
-            {s.template_version ? (
-              <span className="align-middle text-[13px] font-semibold text-muted">v{s.template_version}</span>
-            ) : null}
-          </>
-        }
-      />
+      <Sky className="pb-14">
+        <div className="flex items-center gap-1.5">
+          <BackButton href="/gym" label="Back to Gym" />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[13px] font-semibold text-protein">
+              {finished ? `${weekdayName(s.date)} · done` : `${weekdayName(s.date)} · ${elapsed}`}
+            </span>
+            <h1 className="m-0 truncate text-[clamp(24px,7.5vw,30px)] font-black leading-[1.05] tracking-[-0.045em]">
+              {s.template_name ?? "Workout"}
+              {s.template_version ? <span className="ml-1.5 align-middle text-[13px] font-semibold text-muted">v{s.template_version}</span> : null}
+            </h1>
+          </div>
+        </div>
+        <SessionStats blocks={blocks} />
+      </Sky>
+
+      <PartnerStrip partners={partners.data?.partners ?? []} />
 
       {finished ? (
         <div role="status" className="flex items-center justify-between gap-2 rounded-[12px] bg-mint px-3 py-2 text-[13px]">
@@ -371,12 +389,7 @@ export function SessionScreen({ id }: { id: string }) {
         {timer.running ? (
           <RestTimerPill endAt={timer.endAt!} total={timer.total} onAdd={() => timer.add(15)} onStop={timer.stop} onDone={timer.finish} />
         ) : null}
-        <Link
-          href={`/gym/session/${s.id}/review`}
-          className="glass-dark flex min-h-14 items-center justify-center rounded-btn text-[16px] font-bold text-white no-underline"
-        >
-          {finished ? "See review" : "Finish workout"}
-        </Link>
+        <FinishButton href={`/gym/session/${s.id}/review`} finished={finished} blocks={blocks} />
       </div>
     </main>
   )
@@ -418,6 +431,17 @@ function CurrentBlock({
         </div>
       </div>
 
+      {!block.cardio ? (
+        <ActiveSet
+          sets={sets}
+          numbers={numbers}
+          draftFor={draftFor}
+          setDraft={setDraft}
+          pending={pending}
+          onToggle={onToggle}
+        />
+      ) : null}
+
       {block.cardio ? (
         <button
           type="button"
@@ -445,8 +469,14 @@ function CurrentBlock({
             const d = draftFor(set)
             const busy = !!pending[`set-${set.id}`]
             return (
-              <div key={set.id} className="grid grid-cols-[58px_1fr_1fr_44px] items-center gap-2">
-                <span className={cn("text-[13px]", set.warmup ? "text-muted" : "font-bold")}>{label}</span>
+              <div
+                key={set.id}
+                className={cn(
+                  "grid grid-cols-[58px_1fr_1fr_44px] items-center gap-2 rounded-[12px] transition-colors duration-300",
+                  set.done && "set-done bg-pink-soft/60"
+                )}
+              >
+                <span className={cn("pl-1.5 text-[13px]", set.warmup ? "text-muted" : "font-bold")}>{label}</span>
                 <label className="block">
                   <span className="sr-only">{name} weight in kg</span>
                   <input
@@ -523,5 +553,188 @@ function CurrentBlock({
         />
       ) : null}
     </section>
+  )
+}
+
+/** "12:04" since the session started, ticking every second (frozen once finished). */
+function useElapsed(start: string | undefined, end: string | null) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (end) return
+    const t = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(t)
+  }, [end])
+  if (!start) return ""
+  const secs = Math.max(0, Math.floor(((end ? new Date(end).getTime() : now) - new Date(start).getTime()) / 1000))
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const sec = secs % 60
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`
+}
+
+function progressOf(blocks: SessionBlock[]) {
+  const live = blocks.filter((b) => !b.skipped)
+  const done = live.filter((b) => blockDone(b)).length
+  let sets = 0
+  let volume = 0
+  for (const b of live) {
+    for (const x of b.sets) {
+      if (!x.done || x.warmup) continue
+      sets++
+      if (x.actual_kg != null && x.actual_reps != null) volume += x.actual_kg * x.actual_reps
+    }
+  }
+  return { done, total: live.length, sets, volume }
+}
+
+/** Ring of exercises done, sets and volume lifted, in the sky. */
+function SessionStats({ blocks }: { blocks: SessionBlock[] }) {
+  const p = progressOf(blocks)
+  const share = p.total > 0 ? p.done / p.total : 0
+  return (
+    <div className="mt-4 flex items-center gap-4 rounded-[20px] border border-white/85 bg-white/70 p-3 shadow-[inset_0_1px_0_#fff] backdrop-blur-md">
+      <svg viewBox="0 0 64 64" className="h-16 w-16 flex-none -rotate-90" role="img" aria-label={`${p.done} of ${p.total} exercises done`}>
+        <circle cx="32" cy="32" r="26" fill="none" stroke="var(--color-pink-soft)" strokeWidth="8" />
+        <circle
+          cx="32"
+          cy="32"
+          r="26"
+          fill="none"
+          stroke="var(--color-protein)"
+          strokeWidth="8"
+          strokeLinecap="round"
+          pathLength={100}
+          strokeDasharray="100"
+          style={{ strokeDashoffset: 100 - share * 100, transition: "stroke-dashoffset 600ms var(--ease-in-out)" }}
+        />
+      </svg>
+      <dl className="m-0 grid flex-1 grid-cols-3 gap-2">
+        {[
+          ["Exercises", `${p.done}/${p.total}`],
+          ["Sets", String(p.sets)],
+          ["Volume", p.volume >= 1000 ? `${num1(p.volume / 1000)}t` : `${Math.round(p.volume)} kg`],
+        ].map(([k, v]) => (
+          <div key={k} className="flex min-w-0 flex-col">
+            <dt className="text-[11.5px] font-semibold text-muted">{k}</dt>
+            <dd className="m-0 truncate text-[19px] font-black tracking-[-0.03em]">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
+/** The finish bar fills as you go; at 100% it says so. */
+function FinishButton({ href, finished, blocks }: { href: string; finished: boolean; blocks: SessionBlock[] }) {
+  const p = progressOf(blocks)
+  const share = p.total > 0 ? p.done / p.total : 0
+  const all = !finished && p.total > 0 && p.done === p.total
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "glass-dark relative flex min-h-14 items-center justify-center overflow-hidden rounded-btn text-[16px] font-bold text-white no-underline",
+        all && "finish-ready"
+      )}
+    >
+      {!finished ? (
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 w-full origin-left bg-protein/70 transition-transform duration-500 ease-in-out"
+          style={{ transform: `scaleX(${share})` }}
+        />
+      ) : null}
+      <span className="relative">
+        {finished ? "See review" : all ? "That's a wrap. Finish workout 💪" : `Finish workout · ${p.done}/${p.total}`}
+      </span>
+    </Link>
+  )
+}
+
+/** Big steppers for the next set, so you're not typing between sets. */
+function ActiveSet({
+  sets,
+  numbers,
+  draftFor,
+  setDraft,
+  pending,
+  onToggle,
+}: {
+  sets: SessionSet[]
+  numbers: number[]
+  draftFor: (s: SessionSet) => { kg: string; reps: string }
+  setDraft: (setId: string, d: { kg: string; reps: string }) => void
+  pending: Record<string, boolean>
+  onToggle: (s: SessionSet) => void
+}) {
+  const i = sets.findIndex((x) => !x.done)
+  if (i < 0) return null
+  const set = sets[i]
+  const d = draftFor(set)
+  const kg = parseDecimal(d.kg) ?? set.target_kg ?? 0
+  const reps = parseDecimal(d.reps) ?? set.target_reps ?? (set.warmup ? 10 : 8)
+  const name = set.warmup ? "Warm-up" : `Set ${numbers[i]}`
+  const busy = !!pending[`set-${set.id}`]
+  const step = (v: number, by: number, min = 0) => Math.max(min, Math.round((v + by) * 10) / 10)
+  return (
+    <div className="flex flex-col gap-2.5 rounded-[18px] bg-ink p-3 text-white">
+      <span className="text-[12.5px] font-bold text-pink">
+        Up next: {name}
+        {set.to_failure ? " · to failure" : ""}
+      </span>
+      <div className="grid grid-cols-2 gap-2">
+        <Stepper
+          label="kg"
+          value={num1(kg)}
+          onMinus={() => setDraft(set.id, { ...d, kg: String(step(kg, -2.5)) })}
+          onPlus={() => setDraft(set.id, { ...d, kg: String(step(kg, 2.5)) })}
+        />
+        <Stepper
+          label="reps"
+          value={String(Math.round(reps))}
+          onMinus={() => setDraft(set.id, { ...d, reps: String(step(reps, -1, 1)) })}
+          onPlus={() => setDraft(set.id, { ...d, reps: String(step(reps, 1)) })}
+        />
+      </div>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          // Lock in what the steppers show, then tick it.
+          setDraft(set.id, { kg: String(kg), reps: String(Math.round(reps)) })
+          onToggle(set)
+        }}
+        className="flex min-h-[52px] items-center justify-center gap-2 rounded-[14px] bg-pink text-[16px] font-extrabold text-ink transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-60"
+      >
+        {busy ? <Spinner size={18} /> : <CheckIcon size={20} />} Done: {num1(kg)} kg × {Math.round(reps)}
+      </button>
+    </div>
+  )
+}
+
+function Stepper({ label, value, onMinus, onPlus }: { label: string; value: string; onMinus: () => void; onPlus: () => void }) {
+  return (
+    <div className="flex items-center justify-between rounded-[14px] bg-night-2 p-1">
+      <button
+        type="button"
+        aria-label={`Less ${label}`}
+        onClick={onMinus}
+        className="flex h-11 w-11 items-center justify-center rounded-[11px] text-white transition-transform duration-150 ease-out active:scale-[0.92]"
+      >
+        <MinusIcon size={20} />
+      </button>
+      <span className="flex flex-col items-center leading-none" aria-live="polite">
+        <span className="text-[22px] font-black tracking-[-0.03em] tabular-nums">{value}</span>
+        <span className="mt-0.5 text-[11px] font-semibold text-night-muted">{label}</span>
+      </span>
+      <button
+        type="button"
+        aria-label={`More ${label}`}
+        onClick={onPlus}
+        className="flex h-11 w-11 items-center justify-center rounded-[11px] text-white transition-transform duration-150 ease-out active:scale-[0.92]"
+      >
+        <PlusIcon size={20} />
+      </button>
+    </div>
   )
 }

@@ -554,7 +554,14 @@ export type Sharing = {
   food_streaks: boolean
   /** Friends see your week: days on target and streak, never calories. */
   weekly_summary: boolean
+  /** Friends see what you log (names and times, never calories). */
+  meals: boolean
+  /** Friends see when you're at the gym, and can join you. */
+  training_now: boolean
+  /** What new saved meals, workouts and routines start as. */
+  default_visibility: Visibility
 }
+export type SharingPutResponse = SharingResponse & { opened?: { templates: number; meals: number; routines: number } }
 export type SharingResponse = { sharing: Sharing }
 
 export type Friend = {
@@ -623,7 +630,7 @@ export type ShareHistoryItem = {
 export type ShareHistoryResponse = { items: ShareHistoryItem[] }
 export type ShareEntryResponse = { entry: Entry; day: Day; shared_with: number }
 
-export type FeedKind = "workout_finished" | "record" | "weight_milestone" | "streak"
+export type FeedKind = "workout_finished" | "record" | "weight_milestone" | "streak" | "workout_started" | "shared_item"
 export type FeedItem = {
   id: string
   actor: { id: string; name: string; avatar_url: string | null }
@@ -648,6 +655,10 @@ export type NotificationPrefs = {
   weekly_checkin: boolean
   streak_risk: boolean
   friend_goals: boolean
+  /** A friend shared a workout, meal or routine. */
+  friend_shares: boolean
+  /** A friend is at the gym, or joined your workout. */
+  friend_training: boolean
   quiet_from: string | null
   quiet_to: string | null
 }
@@ -720,6 +731,14 @@ export type PersonViewResponse = {
   meals: ShopItem[]
   /** Their week, for yourself and for friends who share it. */
   summary: WeekSummary | null
+  /** The workout they have going now (when they share it). Absent for strangers. */
+  training?: LiveSession | null
+  /** What they logged on their today, when they share meals; null otherwise. */
+  meals_today?: FriendMeal[] | null
+  /** Their recent feed items you can see. */
+  activity?: FeedItem[]
+  /** Friends only: you get a push when they train. */
+  notify_workouts?: boolean
 }
 
 export type ReportGroup = {
@@ -735,3 +754,32 @@ export type ReportGroup = {
   first_reported_at: string
 }
 export type ReportsResponse = { reports: ReportGroup[] }
+
+// ---------------------------------------------------------------- Live training and friends' meals
+
+export type LiveSet = { exercise: string; kg: number | null; reps: number | null; at: string }
+/** A workout someone has going (or just finished), as a friend sees it. */
+export type LiveSession = {
+  id: string
+  person: Person
+  template_name: string | null
+  started_at: string
+  finished_at: string | null
+  exercises_total: number
+  exercises_done: number
+  sets_done: number
+  current: string | null
+  last_set: LiveSet | null
+}
+export type PartnersResponse = { partners: LiveSession[] }
+
+/** What a friend logged: what and when, never how much. */
+export type FriendMeal = { person: Person; entry_id: string; name: string; meal_name: string; icon: string | null; logged_at: string }
+
+export type SuggestionsResponse = {
+  again: Entry[]
+  again_date: string | null
+  usual: Entry[]
+  gap: { nutrient: "protein" | "kcal"; left: number; picks: Entry[] } | null
+  friends: FriendMeal[]
+}

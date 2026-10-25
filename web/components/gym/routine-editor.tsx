@@ -5,7 +5,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { Button, ErrorCard, Field, LoadingBlock, PageHeader, TextInput } from "@/components/ui/primitives"
 import { ShareIcon } from "@/components/ui/icons"
-import { VisibilitySelect } from "@/components/community/visibility-select"
+import { VisibilityButton } from "@/components/community/visibility-select"
 import { ShareRoutineSheet } from "@/components/share/share-routine-sheet"
 import { api, errorMessage, seg } from "@/lib/api/client"
 import type { Routine, RoutineRequest, RoutineResponse, Template, TemplatesResponse, WeeklyPlan } from "@/lib/api/types"
@@ -146,14 +146,24 @@ function Editor({ routine, templates, onSaved }: { routine: Routine; templates: 
           </label>
         }
         right={
-          <button
-            type="button"
-            aria-label={`Share ${routine.name} with a friend`}
-            onClick={() => setShareOpen(true)}
-            className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-white text-ink transition-transform duration-[160ms] ease-out active:scale-[0.97]"
-          >
-            <ShareIcon size={20} />
-          </button>
+          <div className="flex flex-none items-center gap-1.5">
+            <VisibilityButton
+              value={visibility}
+              onChange={setVisibility}
+              path={`routines/${seg(routine.id)}/visibility`}
+              hidden={routine.hidden}
+              note="Its workouts are shown with it."
+              name={routine.name}
+            />
+            <button
+              type="button"
+              aria-label={`Send ${routine.name} to a friend`}
+              onClick={() => setShareOpen(true)}
+              className="flex h-11 w-11 flex-none items-center justify-center rounded-[14px] bg-white text-ink transition-transform duration-[160ms] ease-out active:scale-[0.97]"
+            >
+              <ShareIcon size={20} />
+            </button>
+          </div>
         }
       />
 
@@ -208,16 +218,6 @@ function Editor({ routine, templates, onSaved }: { routine: Routine; templates: 
           }}
         />
       </Field>
-
-      <section aria-label="Sharing" className="rounded-card bg-white p-3.5">
-        <VisibilitySelect
-          value={visibility}
-          onChange={setVisibility}
-          path={`routines/${seg(routine.id)}/visibility`}
-          hidden={routine.hidden}
-          note="Its workouts are shown with it."
-        />
-      </section>
 
       {onWeek ? (
         <p className="m-0 rounded-tile bg-pink px-3.5 py-3 text-[14px] font-semibold">This is your week right now.</p>

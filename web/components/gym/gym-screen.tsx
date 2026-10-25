@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
-import { Button, ErrorCard, Field, Skeleton, TextInput } from "@/components/ui/primitives"
+import { Avatar, Button, ErrorCard, Field, Skeleton, TextInput } from "@/components/ui/primitives"
 import { ChevronRightIcon, DumbbellIcon, PlusIcon } from "@/components/ui/icons"
 import { Sheet } from "@/components/ui/sheet"
 import { api, errorMessage } from "@/lib/api/client"
@@ -23,6 +23,10 @@ import { GymWeek } from "./gym-week"
 import { IncomingRoutines, IncomingTemplates } from "@/components/share/incoming-shares"
 import { VisibilityBadge } from "@/components/community/visibility-select"
 import { ShopLink } from "@/components/community/shop-link"
+import { Sky, SkyTitle, SKY_ICON } from "@/components/ui/sky"
+import { Dumbbell } from "@/components/landing/art"
+import { useMe } from "@/components/me-context"
+import type { FeedResponse } from "@/lib/api/types"
 import { RoutinesSection } from "./routines-section"
 
 const DAY_NAMES: Record<WeekdayKey, string> = {
@@ -88,10 +92,12 @@ export function GymScreen() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <header className="flex items-end justify-between">
-        <h1 className="m-0 text-[30px] font-extrabold tracking-[-0.02em]">Gym</h1>
-        <ShopLink kind="routine" />
-      </header>
+      <Sky className="pb-12">
+        <SkyTitle title="Gym">
+          <ShopLink kind="routine" className={SKY_ICON} />
+        </SkyTitle>
+        <FriendsAtTheGym />
+      </Sky>
 
       <IncomingRoutines
         onAdded={(r) => {
@@ -279,5 +285,47 @@ function NewTemplateSheet({ open, onClose }: { open: boolean; onClose: () => voi
         </Button>
       </form>
     </Sheet>
+  )
+}
+
+/** Friends training right now (tap to train together), else a floating dumbbell. */
+function FriendsAtTheGym() {
+  const me = useMe()
+  const feed = useApi<FeedResponse>("feed")
+  const live = (feed.data?.items ?? []).filter(
+    (it, i, a) => it.kind === "workout_started" && it.actor.id !== me.user.id && a.findIndex((x) => x.kind === it.kind && x.actor.id === it.actor.id) === i
+  )
+  if (live.length === 0) {
+    return (
+      <div aria-hidden="true" className="relative mt-1 h-[64px]">
+        <div className="app-float absolute right-6 top-0 w-[112px]" style={{ "--r": "-16deg", "--t": "6s" } as React.CSSProperties}>
+          <Dumbbell className="w-full drop-shadow-[0_10px_18px_rgba(46,26,36,0.22)]" />
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      <span className="flex items-center gap-2 text-[13px] font-bold text-protein">
+        <span aria-hidden="true" className="live-dot h-2.5 w-2.5 rounded-full bg-protein" />
+        Your crew is training
+      </span>
+      <ul className="no-scrollbar -mx-4 m-0 flex list-none gap-2 overflow-x-auto px-4 pb-1">
+        {live.map((t) => (
+          <li key={t.id} className="flex-none">
+            <Link
+              href={`/people/${t.actor.id}`}
+              className="flex min-h-[56px] items-center gap-2.5 rounded-[18px] border border-white/85 bg-white/70 py-2 pl-2 pr-3.5 text-ink no-underline backdrop-blur-md"
+            >
+              <Avatar name={t.actor.name} url={t.actor.avatar_url} size={36} tone="lilac" />
+              <span className="flex flex-col">
+                <span className="text-[14px] font-extrabold">{t.actor.name}</span>
+                <span className="text-[12px] text-muted">{typeof t.data.template === "string" ? t.data.template : "Training"} · join</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

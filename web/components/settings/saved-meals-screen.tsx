@@ -19,7 +19,7 @@ import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
 import { kcal, parseDecimal } from "@/lib/format"
 import { targetBody, targetFromParams } from "@/lib/meal-target"
-import { VisibilityBadge, VisibilitySelect } from "@/components/community/visibility-select"
+import { VisibilityBadge, VisibilityButton, VisibilitySelect } from "@/components/community/visibility-select"
 import { ShopLink } from "@/components/community/shop-link"
 import type { Visibility } from "@/lib/api/types"
 
@@ -117,7 +117,27 @@ export function SavedMealsScreen() {
         <PlusIcon size={18} /> New saved meal
       </button>
 
-      <Sheet open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "New saved meal" : "Edit saved meal"}>
+      <Sheet
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        title={editing === "new" ? "New saved meal" : "Edit saved meal"}
+        actions={
+          editing && editing !== "new" ? (
+            <VisibilityButton
+              value={editing.visibility}
+              hidden={editing.hidden}
+              name={editing.name}
+              path={`saved-meals/${seg(editing.id)}/visibility`}
+              onChange={(v) => {
+                setEditing({ ...editing, visibility: v })
+                saved.setData((prev) => ({
+                  saved_meals: (prev?.saved_meals ?? []).map((x) => (x.id === editing.id ? { ...x, visibility: v } : x)),
+                }))
+              }}
+            />
+          ) : null
+        }
+      >
         {editing !== null ? (
           <SavedMealForm
             key={editing === "new" ? "new" : editing.id}
@@ -133,11 +153,6 @@ export function SavedMealsScreen() {
               saved.setData((prev) => ({ saved_meals: (prev?.saved_meals ?? []).filter((x) => x.id !== id) }))
               setEditing(null)
             }}
-            onVisibility={(id, v) =>
-              saved.setData((prev) => ({
-                saved_meals: (prev?.saved_meals ?? []).map((x) => (x.id === id ? { ...x, visibility: v } : x)),
-              }))
-            }
           />
         ) : null}
       </Sheet>
@@ -248,12 +263,10 @@ function SavedMealForm({
   meal,
   onSaved,
   onDeleted,
-  onVisibility,
 }: {
   meal: SavedMeal | null
   onSaved: (m: SavedMeal, isNew: boolean) => void
   onDeleted: (id: string) => void
-  onVisibility: (id: string, v: Visibility) => void
 }) {
   const [visibility, setVisibility] = useState<Visibility>(meal?.visibility ?? "private")
   const slots = useApi<MealSlotsResponse>("meal-slots")
@@ -419,18 +432,13 @@ function SavedMealForm({
         </button>
       </div>
 
-      <div className="rounded-tile bg-white p-3">
-        <VisibilitySelect
-          value={visibility}
-          onChange={(v) => {
-            setVisibility(v)
-            if (meal) onVisibility(meal.id, v)
-          }}
-          path={meal ? `saved-meals/${seg(meal.id)}/visibility` : undefined}
-          hidden={meal?.hidden}
-        />
-        {meal?.copied_from ? <p className="m-0 mt-2 text-[12px] text-muted">Added from {meal.copied_from.name}&apos;s meal.</p> : null}
-      </div>
+      {/* An existing meal's who-can-see-it lives on the sheet's top-right button. */}
+      {meal ? null : (
+        <div className="rounded-tile bg-white p-3">
+          <VisibilitySelect value={visibility} onChange={setVisibility} />
+        </div>
+      )}
+      {meal?.copied_from ? <p className="m-0 text-[12px] text-muted">Added from {meal.copied_from.name}&apos;s meal.</p> : null}
 
       {error ? (
         <p role="alert" className="m-0 text-[14px] font-semibold text-danger">

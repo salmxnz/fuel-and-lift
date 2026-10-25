@@ -304,6 +304,92 @@ input[type="number"]::-webkit-inner-spin-button {
   animation: sun-spin 80s linear infinite;
 }
 
+@keyframes vis-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+}
+.vis-pop {
+  transform-origin: top right;
+  animation: vis-pop 160ms var(--ease-out) both;
+}
+
+/* Gentle bob for the drawings in the sky. */
+@keyframes app-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translateY(-8px) rotate(calc(var(--r, 0deg) + 4deg));
+  }
+}
+.app-float {
+  animation: app-float var(--t, 6s) ease-in-out infinite;
+}
+
+/* A live "training now" dot. */
+@keyframes live-ping {
+  0% {
+    box-shadow: 0 0 0 0 rgba(246, 184, 202, 0.7);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 8px rgba(246, 184, 202, 0);
+  }
+}
+.live-dot {
+  animation: live-ping 1.8s ease-out infinite;
+}
+
+/* A set ticks off with a little pop; the finish bar glows when it's all done. */
+@keyframes set-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.025);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.set-done {
+  animation: set-pop 300ms var(--ease-out);
+}
+@keyframes finish-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(246, 184, 202, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(246, 184, 202, 0);
+  }
+}
+.finish-ready {
+  animation: finish-glow 1.8s ease-out infinite;
+}
+
+/* Ticket notches, like the recap email's tiles. */
+.ticket {
+  -webkit-mask:
+    radial-gradient(circle 12px at 0 62%, #0000 97%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 12px at 100% 62%, #0000 97%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle 12px at 0 62%, #0000 97%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 12px at 100% 62%, #0000 97%, #000) right / 51% 100% no-repeat;
+}
+/* Bars rise from the baseline when a chart appears. */
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+.bar-grow {
+  animation: bar-grow 500ms var(--ease-out) both;
+}
+
 /* ------------------------------------------------------------ Bits */
 
 .hatch-pink {
