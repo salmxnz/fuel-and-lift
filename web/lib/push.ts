@@ -4,6 +4,13 @@
 import { api } from "./api/client"
 import type { VapidKeyResponse } from "./api/types"
 
+/** Fired on window when this device subscribes or unsubscribes. */
+export const PUSH_CHANGED_EVENT = "fl:push-changed"
+
+function pushChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PUSH_CHANGED_EVENT))
+}
+
 export type PushSupport =
   | { ok: true }
   | { ok: false; reason: "unsupported" | "ios-not-installed" | "denied" }
@@ -98,6 +105,7 @@ export async function enablePush(): Promise<PushSubscription> {
     keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
     user_agent: navigator.userAgent.slice(0, 250),
   })
+  pushChanged()
   return sub
 }
 
@@ -108,6 +116,28 @@ export async function disablePush(): Promise<void> {
     await api.del("push/subscriptions", { endpoint: sub.endpoint })
   } finally {
     await sub.unsubscribe().catch(() => undefined)
+    pushChanged()
+  }
+}
+
+// The first time adebite is opened from the Home Screen, the push popup comes
+// up straight away: that's the moment it can finally work on an iPhone.
+const ASKED_IN_APP_KEY = "fl:push-asked-in-app"
+
+/** Opened as an installed app and not offered push in it yet. */
+export function firstAppLaunch(): boolean {
+  try {
+    return isStandalone() && !localStorage.getItem(ASKED_IN_APP_KEY)
+  } catch {
+    return false
+  }
+}
+
+export function markAskedInApp() {
+  try {
+    localStorage.setItem(ASKED_IN_APP_KEY, "1")
+  } catch {
+    /* private mode */
   }
 }
 

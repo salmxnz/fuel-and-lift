@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import { Button, Spinner } from "@/components/ui/primitives"
 import { BackButton } from "@/components/ui/back-button"
-import { CheckIcon } from "@/components/ui/icons"
+import { BellIcon, CheckIcon } from "@/components/ui/icons"
 import { IOSInstallSteps } from "@/components/settings/notifications-screen"
 import { ApiError, api, errorMessage } from "@/lib/api/client"
 import type { ActivityLevel, Mode, OnboardingRequest, Pace, PlanPreviewRequest, Sex, Split, SplitsResponse } from "@/lib/api/types"
@@ -87,6 +87,8 @@ function stepsFor(a: Answers): string[] {
   s.push("summary", "split", "gym", "install", "done")
   return s
 }
+
+const MIN_AGE = 16
 
 function ageFrom(dob: string): number | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) return null
@@ -362,9 +364,10 @@ function SexStep({ a, set }: StepProps) {
 function DobStep({ a, set }: StepProps) {
   const [v, setV] = useState(a.dob)
   const age = ageFrom(v)
-  const ok = age != null && age >= 13 && age <= 100
+  // The API refuses under-16s (api/internal/nutrition/plan.go): same limit here.
+  const ok = age != null && age >= MIN_AGE && age <= 100
   const today = todayISO()
-  const max = `${Number(today.slice(0, 4)) - 13}${today.slice(4)}`
+  const max = `${Number(today.slice(0, 4)) - MIN_AGE}${today.slice(4)}`
   return (
     <>
       <Title sub="Your age changes how much energy you burn.">When were you born?</Title>
@@ -372,7 +375,7 @@ function DobStep({ a, set }: StepProps) {
         Date of birth
       </label>
       <BigInput id="ob-dob" type="date" value={v} min="1920-01-01" max={max} onChange={(e) => setV(e.target.value)} className="text-[22px]" />
-      {v && !ok ? <p className="m-0 text-[14px] font-semibold text-danger">adebite is for people aged 13 and over.</p> : null}
+      {v && !ok ? <p className="m-0 text-[14px] font-semibold text-danger">adebite is for people aged {MIN_AGE} and over.</p> : null}
       {ok ? <p className="m-0 text-[15px] text-muted">{age} years old</p> : null}
       <Footer onContinue={() => set({ dob: v, step: "height" })} disabled={!ok} />
     </>
@@ -783,8 +786,14 @@ function InstallStep({ next }: { next: () => void }) {
       </Title>
       {ios ? (
         <section className="rounded-card bg-white p-4">
-          <IOSInstallSteps />
-          <p className="m-0 mt-3 text-[13px] text-muted">Then turn on notifications from the app, in Me → Notifications.</p>
+          <IOSInstallSteps compact />
+          <div className="mt-3 flex items-start gap-2.5 rounded-tile bg-pink-soft p-3">
+            <BellIcon size={18} className="mt-0.5 flex-none text-protein" />
+            <p className="m-0 text-[14px] leading-[1.45] text-ink">
+              <strong>On iPhone, notifications only work from the Home Screen app.</strong> Open adebite from the new icon (sign
+              in again if it asks) and it offers to turn them on right away, for meal reminders and your friends&apos; updates.
+            </p>
+          </div>
         </section>
       ) : (
         <section className="flex flex-col gap-3 rounded-card bg-white p-4">

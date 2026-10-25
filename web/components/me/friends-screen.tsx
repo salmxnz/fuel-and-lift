@@ -9,6 +9,7 @@ import { useState, type CSSProperties } from "react"
 import { toast } from "sonner"
 import { displayName, useMe } from "@/components/me-context"
 import { WeekCard } from "@/components/friends/week-card"
+import { PushBanner } from "@/components/pwa/push-banner"
 import { FeedRow } from "@/components/friends/feed-row"
 import { GymNowCard } from "@/components/friends/gym-now-card"
 import { Coin, Heart, Peach, Strawberry } from "@/components/landing/art"
@@ -98,6 +99,8 @@ export function FriendsScreen() {
           <Strawberry face className="absolute bottom-[30px] right-[22%] w-[88px]" />
         </div>
       </Sky>
+
+      <PushBanner />
 
       <GymNowCard items={all} />
 

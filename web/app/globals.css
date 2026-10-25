@@ -136,6 +136,24 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0;
 }
 
+/* iOS Safari gives native date/time inputs their own minimum width (they
+   ignore width: 100% and run off the screen) and centres the value. Dropping
+   the native appearance makes them size like any other field; tapping still
+   opens the system picker. */
+input[type="date"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  margin: 0;
+  text-align: left;
+}
+
 /* Focus rings: pink with an ink halo so they show on light and dark. */
 :where(a, button, input, select, textarea, [tabindex], summary):focus-visible {
   outline: 2px solid var(--color-ink);

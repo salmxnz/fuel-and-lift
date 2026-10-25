@@ -4,7 +4,9 @@
 // said no thanks in onboarding, or tried while the server couldn't send push
 // yet. It only shows when turning them on would work right now (supported
 // here, not blocked, the server has its keys) and this device isn't
-// subscribed. "Not now" hides it for two weeks.
+// subscribed. "Not now" hides it for two weeks. The first time adebite is
+// opened from the Home Screen it comes up at once instead of after a delay.
+// It stays off the Friends tab, which has its own banner.
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import Link from "next/link"
@@ -17,7 +19,16 @@ import { Button } from "@/components/ui/primitives"
 import { api, errorMessage } from "@/lib/api/client"
 import type { VapidKeyResponse } from "@/lib/api/types"
 import { installPlatform } from "@/lib/install"
-import { currentSubscription, enablePush, pushPromptSnoozed, pushSupport, snoozePushPrompt } from "@/lib/push"
+import {
+  PUSH_CHANGED_EVENT,
+  currentSubscription,
+  enablePush,
+  firstAppLaunch,
+  markAskedInApp,
+  pushPromptSnoozed,
+  pushSupport,
+  snoozePushPrompt,
+} from "@/lib/push"
 import { snoozed as installSnoozed } from "./install-popup"
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const
@@ -58,15 +69,33 @@ export function PushPopup({
       const res = await api.get<VapidKeyResponse>("push/vapid-public-key").catch(() => null)
       if (!cancelled && res?.key) setEligible(true)
     })()
+    // Turned on somewhere else (the Friends banner, Settings).
+    const onChange = () => {
+      void currentSubscription().then((sub) => {
+        if (!cancelled && sub) {
+          setEligible(false)
+          setOpen(false)
+        }
+      })
+    }
+    window.addEventListener(PUSH_CHANGED_EVENT, onChange)
     return () => {
       cancelled = true
+      window.removeEventListener(PUSH_CHANGED_EVENT, onChange)
     }
   }, [])
 
-  const hidden = held || tour.active || (pathname?.startsWith("/gym/session") ?? false)
+  const hidden =
+    held || tour.active || (pathname?.startsWith("/gym/session") ?? false) || pathname === "/friends"
   useEffect(() => {
     if (!eligible || hidden) return
-    const timer = window.setTimeout(() => setOpen(true), delayMs)
+    const timer = window.setTimeout(
+      () => {
+        markAskedInApp()
+        setOpen(true)
+      },
+      firstAppLaunch() ? 600 : delayMs
+    )
     return () => window.clearTimeout(timer)
   }, [eligible, hidden, delayMs])
 
@@ -120,7 +149,7 @@ export function PushPopup({
                   Turn on notifications
                 </h2>
                 <p id="push-popup-body" className="m-0 text-[14px] leading-[1.4] text-muted">
-                  Know when a friend shares a meal or cheers your workout, and get the reminders you want.
+                  Get reminders for your meals, hear when friends hit their goal or cheer your workout, and keep your streak alive.
                 </p>
               </div>
               <button
