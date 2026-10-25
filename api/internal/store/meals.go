@@ -154,12 +154,16 @@ type Entry struct {
 const entryCols = `id::text, date, meal_slot_id::text, meal_name, name, origin, saved_meal_id::text, ai_estimate_id::text,
 	items, kcal::float8, protein_g::float8, carbs_g::float8, fat_g::float8, logged_at, icon`
 
-func scanEntry(r pgx.CollectableRow) (Entry, error) {
+func scanEntry(r pgx.CollectableRow) (Entry, error) { return scanEntryWith(r) }
+
+// scanEntryWith scans entryCols followed by extra columns.
+func scanEntryWith(r pgx.CollectableRow, extra ...any) (Entry, error) {
 	var e Entry
 	var d time.Time
 	var items []byte
-	err := r.Scan(&e.ID, &d, &e.MealSlotID, &e.MealName, &e.Name, &e.Origin, &e.SavedMealID, &e.AIEstimateID,
-		&items, &e.Kcal, &e.ProteinG, &e.CarbsG, &e.FatG, &e.LoggedAt, &e.Icon)
+	dst := append([]any{&e.ID, &d, &e.MealSlotID, &e.MealName, &e.Name, &e.Origin, &e.SavedMealID, &e.AIEstimateID,
+		&items, &e.Kcal, &e.ProteinG, &e.CarbsG, &e.FatG, &e.LoggedAt, &e.Icon}, extra...)
+	err := r.Scan(dst...)
 	if err != nil {
 		return e, err
 	}

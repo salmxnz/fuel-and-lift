@@ -333,16 +333,25 @@ type Sharing struct {
 	WeightTrend    bool `json:"weight_trend"`
 	FoodStreaks    bool `json:"food_streaks"`
 	WeeklySummary  bool `json:"weekly_summary"`
+	// Meals: friends see what you log (names and times, never calories).
+	Meals bool `json:"meals"`
+	// TrainingNow: friends see when you're at the gym and can join you.
+	TrainingNow bool `json:"training_now"`
+	// DefaultVisibility: what new saved meals, workouts and routines start as.
+	DefaultVisibility string `json:"default_visibility"`
 }
 
 // DefaultSharing is used until the user changes anything.
-var DefaultSharing = Sharing{Workouts: true, Records: true, FoodStreaks: true, WeeklySummary: true}
+var DefaultSharing = Sharing{Workouts: true, Records: true, FoodStreaks: true, WeeklySummary: true, TrainingNow: true,
+	DefaultVisibility: "private"}
 
 // GetSharing returns the user's sharing settings.
 func (s *Store) GetSharing(ctx context.Context, userID string) (Sharing, error) {
 	sh := DefaultSharing
-	err := s.Pool.QueryRow(ctx, `select workouts, workout_details, records, weight_trend, food_streaks, weekly_summary from sharing_settings where user_id = $1::uuid`, userID).
-		Scan(&sh.Workouts, &sh.WorkoutDetails, &sh.Records, &sh.WeightTrend, &sh.FoodStreaks, &sh.WeeklySummary)
+	err := s.Pool.QueryRow(ctx, `select workouts, workout_details, records, weight_trend, food_streaks, weekly_summary,
+		meals, training_now, default_visibility from sharing_settings where user_id = $1::uuid`, userID).
+		Scan(&sh.Workouts, &sh.WorkoutDetails, &sh.Records, &sh.WeightTrend, &sh.FoodStreaks, &sh.WeeklySummary,
+			&sh.Meals, &sh.TrainingNow, &sh.DefaultVisibility)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return DefaultSharing, nil
 	}
@@ -352,12 +361,56 @@ func (s *Store) GetSharing(ctx context.Context, userID string) (Sharing, error) 
 // PutSharing saves sharing settings.
 func (s *Store) PutSharing(ctx context.Context, userID string, sh Sharing) error {
 	_, err := s.Pool.Exec(ctx, `
-		insert into sharing_settings (user_id, workouts, workout_details, records, weight_trend, food_streaks, weekly_summary)
-		values ($1::uuid, $2, $3, $4, $5, $6, $7)
+		insert into sharing_settings (user_id, workouts, workout_details, records, weight_trend, food_streaks, weekly_summary,
+		  meals, training_now, default_visibility)
+		values ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		on conflict (user_id) do update set workouts = $2, workout_details = $3, records = $4,
-		  weight_trend = $5, food_streaks = $6, weekly_summary = $7, updated_at = now()`,
-		userID, sh.Workouts, sh.WorkoutDetails, sh.Records, sh.WeightTrend, sh.FoodStreaks, sh.WeeklySummary)
+		  weight_trend = $5, food_streaks = $6, weekly_summary = $7, meals = $8, training_now = $9,
+		  default_visibility = $10, updated_at = now()`,
+		userID, sh.Workouts, sh.WorkoutDetails, sh.Records, sh.WeightTrend, sh.FoodStreaks, sh.WeeklySummary,
+		sh.Meals, sh.TrainingNow, sh.DefaultVisibility)
 	return err
+}
+
+// DefaultVisibility is what the user's new saved meals, workouts and routines start as.
+func (s *Store) DefaultVisibility(ctx context.Context, userID string) string {
+	sh, err := s.GetSharing(ctx, userID)
+	if err != nil || !Visibilities[sh.DefaultVisibility] {
+		return "private"
+	}
+	return sh.DefaultVisibility
+}
+
+// Opened counts what OpenUpPrivate changed.
+type Opened struct {
+	Templates int `json:"templates"`
+	Meals     int `json:"meals"`
+	Routines  int `json:"routines"`
+}
+
+// OpenUpPrivate sets every private saved meal, workout and routine of the
+// user's to vis (friends or public). Public ones stay public; archived ones
+// are left alone.
+func (s *Store) OpenUpPrivate(ctx context.Context, userID, vis string) (Opened, error) {
+	var o Opened
+	if vis == "private" || !Visibilities[vis] {
+		return o, nil
+	}
+	err := s.tx(ctx, func(tx pgx.Tx) error {
+		for _, t := range []struct {
+			table string
+			n     *int
+		}{{"templates", &o.Templates}, {"saved_meals", &o.Meals}, {"routines", &o.Routines}} {
+			ct, err := tx.Exec(ctx, `update `+t.table+` set visibility = $2, published_at = coalesce(published_at, now())
+				where user_id = $1::uuid and visibility = 'private' and archived_at is null`, userID, vis)
+			if err != nil {
+				return err
+			}
+			*t.n = int(ct.RowsAffected())
+		}
+		return nil
+	})
+	return o, err
 }
 
 // --- activity feed -----------------------------------------------------------
@@ -404,7 +457,11 @@ const feedSelect = `
 	        when 'record'           then coalesce(sh.records, true)
 	        when 'weight_milestone' then coalesce(sh.weight_trend, false)
 	        when 'streak'           then coalesce(sh.food_streaks, true)
-	        else false end)`
+	        when 'workout_started'  then coalesce(sh.training_now, true)
+	        when 'shared_item'      then true
+	        else false end)
+	  -- "Training now" only while it's plausibly true.
+	  and (a.kind <> 'workout_started' or a.created_at > now() - interval '4 hours')`
 
 func scanFeed(r pgx.CollectableRow) (FeedItem, error) {
 	var f FeedItem

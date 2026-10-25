@@ -16,6 +16,7 @@ const (
 	workoutDayAt = "09:00"
 	weeklyAt     = "19:00" // Sundays: the recap and friends' goals
 	streakRiskAt = "20:00"
+	friendDayAt  = "20:30" // a friend hit their target today and you haven't yet
 )
 
 // reminderWindow is how long after its time a reminder may still go out, so a
@@ -152,6 +153,12 @@ func (h *Handler) remindUser(ctx context.Context, u store.ReminderUser, now time
 		}
 	}
 
+	if u.Prefs.FriendGoals && due(local, friendDayAt) {
+		if err := h.friendDay(ctx, u.ID, today); err != nil {
+			return err
+		}
+	}
+
 	if u.Prefs.WorkoutDay && due(local, workoutDayAt) {
 		planned, done, err := h.Store.PlannedWorkout(ctx, u.ID, today)
 		if err != nil {
@@ -257,4 +264,59 @@ func (h *Handler) weekly(ctx context.Context, u store.ReminderUser, today store.
 		}
 	}
 	return nil
+}
+
+// friendDay nudges once a day when friends who share their week are on
+// target today and the user still has a fair bit to eat.
+func (h *Handler) friendDay(ctx context.Context, userID string, today store.Date) error {
+	// Checked once a day, whatever the answer, so the minute loop stays cheap.
+	if ok, err := h.Store.ClaimNotification(ctx, userID, "friend_day_check", today.String()); err != nil || !ok {
+		return err
+	}
+	day, err := h.day(ctx, userID, today)
+	if err != nil {
+		return err
+	}
+	left := day.Target.Kcal - day.Totals.Kcal
+	if left < 250 {
+		return nil
+	}
+	friends, err := h.Store.ListFriends(ctx, userID)
+	if err != nil {
+		return err
+	}
+	var hit []string
+	for _, f := range friends {
+		sh, err := h.Store.GetSharing(ctx, f.ID)
+		if err != nil {
+			return err
+		}
+		if !sh.WeeklySummary {
+			continue
+		}
+		theirToday := h.today(ctx, f.ID)
+		wk, err := h.Store.WeekSummary(ctx, f.ID, theirToday, h.Store.Target(ctx, f.ID), false)
+		if err != nil {
+			return err
+		}
+		for _, d := range wk.Days {
+			if d.Date.String() == theirToday.String() && d.OnTarget {
+				hit = append(hit, f.Name)
+			}
+		}
+	}
+	if len(hit) == 0 {
+		return nil
+	}
+	who := hit[0]
+	if len(hit) == 2 {
+		who += " and " + hit[1]
+	} else if len(hit) > 2 {
+		who += fmt.Sprintf(" and %d others", len(hit)-1)
+	}
+	return h.remind(ctx, userID, "friend_day", today.String(), push.Message{
+		Title: who + " smashed their target today 🎯",
+		Body:  fmt.Sprintf("You've got %d kcal to go. Dinner's calling.", int(left)),
+		URL:   "/today", Tag: "friend-day",
+	})
 }

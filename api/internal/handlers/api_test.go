@@ -584,10 +584,10 @@ func TestAPI(t *testing.T) {
 	outsider, _ := e.signIn("friend0@x.test", false, "")
 	e.must(outsider, 404, "POST", "/v1/feed/"+workout["id"].(string)+"/cheer", nil)
 
-	e.must(me, 200, "PUT", "/v1/sharing", obj{"workouts": false, "records": false})
+	e.must(me, 200, "PUT", "/v1/sharing", obj{"workouts": false, "records": false, "food_streaks": false})
 	for _, it := range get(e.must(ravi, 200, "GET", "/v1/feed", nil), "items").([]any) {
 		if get(it, "actor", "name") == "Bhavish" {
-			t.Fatal("workout still visible after sharing was switched off")
+			t.Fatalf("workout still visible after sharing was switched off: %v", it)
 		}
 	}
 	e.must(ravi, 200, "PATCH", "/v1/friends/"+me.id, obj{"notify_workouts": false})

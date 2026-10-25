@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -98,10 +99,14 @@ func (h *Handler) SaveRoutine(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, msg)
 		return
 	}
+	userID := auth.UserID(r)
 	if id != "" {
 		body.Visibility = nil
+	} else if body.Visibility == nil {
+		d := h.Store.DefaultVisibility(r.Context(), userID) // left out: the user's default
+		body.Visibility = &d
 	}
-	rt, err := h.Store.SaveRoutine(r.Context(), auth.UserID(r), id, body)
+	rt, err := h.Store.SaveRoutine(r.Context(), userID, id, body)
 	if err != nil {
 		h.storeError(w, r, err)
 		return
@@ -109,6 +114,9 @@ func (h *Handler) SaveRoutine(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusOK
 	if id == "" {
 		status = http.StatusCreated
+		if *body.Visibility != "private" {
+			h.announceItem(context.WithoutCancel(r.Context()), userID, "routine", rt.ID, rt.Name)
+		}
 	}
 	httpx.JSON(w, status, map[string]any{"routine": rt})
 }

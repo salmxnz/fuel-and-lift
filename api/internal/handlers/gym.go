@@ -142,10 +142,18 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
-	if in.Visibility != nil && *in.Visibility != "private" {
-		if t.Community, err = h.Store.SetVisibility(r.Context(), userID, "template", t.ID, *in.Visibility); err != nil {
+	vis := h.Store.DefaultVisibility(r.Context(), userID) // left out: the user's default
+	if in.Visibility != nil {
+		vis = *in.Visibility
+	}
+	if vis != "private" {
+		var ch store.VisibilityChange
+		if t.Community, ch, err = h.Store.SetVisibilityFirst(r.Context(), userID, "template", t.ID, vis); err != nil {
 			h.storeError(w, r, err)
 			return
+		}
+		if ch.First {
+			h.announceItem(context.WithoutCancel(r.Context()), userID, "template", t.ID, t.Name)
 		}
 	}
 	httpx.JSON(w, http.StatusCreated, map[string]any{"template": t})
@@ -317,6 +325,9 @@ func (h *Handler) StartSession(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
+	if d == h.today(r.Context(), userID) {
+		h.announceTraining(context.WithoutCancel(r.Context()), userID, s)
+	}
 	httpx.JSON(w, http.StatusCreated, map[string]any{"session": s})
 }
 
@@ -480,6 +491,9 @@ func (h *Handler) FinishSession(w http.ResponseWriter, r *http.Request) {
 	}
 	if recs == nil {
 		recs = []store.Record{}
+	}
+	if err := h.Store.ClearTraining(r.Context(), id); err != nil {
+		h.Log.Error("clear training", "err", err)
 	}
 	if before.Status != "finished" {
 		h.announceWorkout(context.WithoutCancel(r.Context()), userID, s, recs)

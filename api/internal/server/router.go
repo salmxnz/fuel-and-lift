@@ -93,6 +93,7 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"PATCH /v1/sessions/{id}/sets/{set_id}":         h.PatchSet,
 		"POST /v1/sessions/{id}/accept-all":             h.AcceptAll,
 		"POST /v1/sessions/{id}/finish":                 h.FinishSession,
+		"GET /v1/sessions/{id}/partners":                h.SessionPartners,
 		"POST /v1/sessions/{id}/apply":                  h.ApplyProposals,
 
 		// splits and routines
@@ -108,11 +109,14 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"PUT /v1/routines/{id}/visibility": h.SetVisibility("routine"),
 
 		// the Shop and people's profiles
-		"GET /v1/shop":                     h.Shop,
-		"GET /v1/shop/{kind}/{id}":         h.GetShopItem,
-		"POST /v1/shop/{kind}/{id}/add":    h.AddShopItem,
-		"POST /v1/shop/{kind}/{id}/report": h.ReportShopItem,
-		"GET /v1/people/{id}":              h.GetPerson,
+		"GET /v1/shop":                      h.Shop,
+		"GET /v1/shop/{kind}/{id}":          h.GetShopItem,
+		"POST /v1/shop/{kind}/{id}/add":     h.AddShopItem,
+		"POST /v1/shop/{kind}/{id}/report":  h.ReportShopItem,
+		"GET /v1/suggestions":               h.Suggestions,
+		"POST /v1/entries/{id}/again":       h.LogAgain,
+		"GET /v1/people/{id}":               h.GetPerson,
+		"POST /v1/people/{id}/join-workout": h.JoinWorkout,
 
 		// progress
 		"GET /v1/progress/weight":         h.WeightProgress,

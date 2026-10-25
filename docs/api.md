@@ -264,6 +264,23 @@ type SavedMeal = {
 ### `POST /v1/days/{date}/saved-meals/{id}` `{meal_slot_id?, meal_name?, addon_ids: []}`
 Logs the base items plus the chosen add-ons as one entry. `201 {"entry": Entry, "day": Day}`
 
+## Suggestions
+`GET /v1/suggestions?date=&meal_slot_id=` → `200`
+```ts
+{ again: Entry[],            // what you had in this meal the last time (within 2 weeks), usually yesterday
+  again_date: string | null,
+  usual: Entry[],            // logged twice or more here in 30 days, most often first (not repeating `again`)
+  gap: { nutrient: "protein" | "kcal", left: number,   // grams or kcal still to go today
+         picks: Entry[] } | null,   // your own past meals rich in it that fit what's left (protein only)
+  friends: FriendMeal[] }    // friends who share meals: what they logged that day, newest first (never calories)
+```
+`meal_slot_id` is optional; without it `again` and `usual` are empty. `gap` is null when you're
+within 120 kcal of your target or over.
+
+`POST /v1/entries/{id}/again` `{date?, meal_slot_id?, meal_name?}` → `201 {"entry": Entry, "day": Day}`:
+logs one of your entries again (items, macros, picture and origin; `shared` becomes `manual`).
+`date` defaults to today; the meal defaults to the original's.
+
 ## Foods
 
 ```ts
@@ -526,11 +543,16 @@ type Sharing = {
   weight_trend: boolean      // direction and milestones only, never the number
   food_streaks: boolean      // streak milestones: "is on a 7-day streak"
   weekly_summary: boolean    // their week on the Friends tab (WeekSummary), never calories
+  meals: boolean             // what you log (names and times, never calories): your profile and friends' suggestions
+  training_now: boolean      // "is at the gym" while a workout is going, and friends can join it
+  default_visibility: Visibility  // what new saved meals, workouts and routines start as
 }
 type Friend = { id: string, name: string, avatar_url: string | null, since: string,
                 last_workout_on: string | null, notify_workouts: boolean }
 type FeedItem = { id: string, actor: { id: string, name: string, avatar_url: string | null },
-                  kind: "workout_finished" | "record" | "weight_milestone" | "streak",
+                  kind: "workout_finished" | "record" | "weight_milestone" | "streak"
+                      | "workout_started"   // training now; gone once they finish, hidden after 4 h
+                      | "shared_item",      // put a workout, meal or routine out for friends (data.url)
                   text: string,              // "Upper-1 done: 4 exercises, 38 min"
                   data: Record<string, unknown>,
                   created_at: string, cheers: number, cheered_by_me: boolean }
@@ -553,7 +575,15 @@ type WeekSummary = {
   (`summary` is null when that friend turned `weekly_summary` off; goal hits first, then most days on target)
 - `DELETE /v1/friends/{user_id}` → `204`
 - `PATCH /v1/friends/{user_id}` `{notify_workouts}` → `200 {"friend": Friend}` (push me when this friend finishes a workout)
-- `GET /v1/sharing` / `PUT /v1/sharing` → `{"sharing": Sharing}` (what all my friends can see; defaults: workouts, records, streaks and weekly summary on, the rest off. `weekly_summary` keeps its value when left out of a PUT)
+- `GET /v1/sharing` / `PUT /v1/sharing` → `{"sharing": Sharing}` (what all my friends can see; defaults: workouts,
+  records, streaks, weekly summary and training now on, the rest off, `default_visibility` private).
+  A PUT changes only the fields it sends. With `"apply_to_existing": true` and a friends or public
+  `default_visibility`, everything still private (saved meals, workouts, routines) takes that
+  visibility too; public stays public. The response then has `"opened": {templates, meals, routines}`
+  (counts), and friends get one "shared …" feed item and push.
+- New saved meals, workouts and routines created without a `visibility` start as `default_visibility`.
+  The first time an item leaves private, friends get a `shared_item` feed item and a push
+  (`friend_shares`), once per item.
 - `GET /v1/feed?before=` → `200 {"items": FeedItem[]}` (friends' activity, newest first, 30 per page)
 - `POST /v1/feed/{id}/cheer` / `DELETE /v1/feed/{id}/cheer` → `200 {"item": FeedItem}` (a cheer pushes the actor)
 
@@ -690,6 +720,30 @@ type PersonView = {
 On your own id, it shows what you share (friends + public). `404` unless it's you,
 a friend, or someone with something public.
 
+For you and your friends, `PersonView` also has:
+```ts
+  training: LiveSession | null,      // their workout going now (when they share training_now)
+  meals_today: FriendMeal[] | null,  // what they logged on their today, when they share meals; null otherwise
+  activity: FeedItem[],              // their recent feed items you can see (12)
+  notify_workouts?: boolean          // friends only: you get a push when they train
+type LiveSession = { id: string, person: Person, template_name: string | null,
+  started_at: string, finished_at: string | null,
+  exercises_total: number, exercises_done: number, sets_done: number,
+  current: string | null,            // the exercise they're on
+  last_set: { exercise: string, kg: number | null, reps: number | null, at: string } | null }  // kg only with workout_details
+type FriendMeal = { person: Person, entry_id: string, name: string, meal_name: string, icon: string | null, logged_at: string }
+```
+
+### Training together
+- `POST /v1/people/{id}/join-workout` → `201 {"session": Session}`. Starts your own copy of the workout
+  that friend has going (their template is copied once, `copied_from` them, and reused next time) and
+  links the two sessions. `404` code `not_training` when they aren't training or don't share it;
+  `409` code `in_workout` when you already have one going. They get a push (`friend_training`).
+- `GET /v1/sessions/{id}/partners` → `200 {"partners": LiveSession[]}`: who you're training with in
+  that session of yours (both sides see each other). Weights only when that person shares workout details.
+- Starting a session for today posts `workout_started` and pushes friends who have `friend_training`
+  on and haven't muted that friend's workouts: "Ravi is at the gym 🏋️". Finishing removes it.
+
 ### Moderation (admins only; others get `403`)
 ```ts
 type ReportGroup = {
@@ -766,7 +820,11 @@ type NotificationPrefs = {
   quiet_from: string | null, quiet_to: string | null   // "22:00", "07:00"
 }
 ```
-`streak_risk` and `friend_goals` default to on and keep their value when left out of a PUT.
+`streak_risk`, `friend_goals`, `friend_shares` and `friend_training` default to on. A PUT changes only the fields it sends.
+```ts
+  friend_shares: boolean,    // a friend shared a workout, meal or routine
+  friend_training: boolean,  // a friend is at the gym, or joined your workout
+```
 - `GET /v1/push/vapid-public-key` → `200 {"key": "B..."}` (no auth)
 - `POST /v1/push/subscriptions` `{endpoint, keys: {p256dh, auth}, user_agent?}` → `201`
 - `DELETE /v1/push/subscriptions` `{endpoint}` → `204`
@@ -782,6 +840,7 @@ quiet hours:
 | Streak at risk | `streak_risk` | 20:00 | streak of 2+ days and nothing logged or trained today |
 | Weekly recap | `weekly_checkin` | Sunday 19:00 | something logged this week |
 | A friend hit their goal | `friend_goals` | the friend's Sunday 19:00 | they hit the goal and share their weekly summary |
+| Friends on target today | `friend_goals` | 20:30 | a friend who shares their week is on target today and you have 250+ kcal to go (checked once a day) |
 | Weigh-in | `weigh_in` | 08:00 | due by `weigh_in_cadence` (Mon/Wed/Fri, Mondays, the 1st, or the 1st of each quarter) and no weigh-in today |
 | Workout day | `workout_day` | 09:00 | the weekly plan has a workout today and none is finished |
 

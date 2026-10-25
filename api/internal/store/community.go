@@ -46,18 +46,36 @@ func sharedWith(a string) string {
 // set the first time it leaves private and kept after, so switching back and
 // forth doesn't put it back at the top of "newest".
 func (s *Store) SetVisibility(ctx context.Context, userID, kind, id, vis string) (Community, error) {
+	c, _, err := s.SetVisibilityFirst(ctx, userID, kind, id, vis)
+	return c, err
+}
+
+// VisibilityChange says what SetVisibilityFirst did.
+type VisibilityChange struct {
+	Name  string
+	First bool // it left private for the first time
+}
+
+// SetVisibilityFirst is SetVisibility, also saying whether the item just left
+// private for the first time (so friends hear about it once).
+func (s *Store) SetVisibilityFirst(ctx context.Context, userID, kind, id, vis string) (Community, VisibilityChange, error) {
 	table, ok := kindTables[kind]
 	if !ok || !Visibilities[vis] {
-		return Community{}, ErrNotFound
+		return Community{}, VisibilityChange{}, ErrNotFound
 	}
 	var c Community
+	var ch VisibilityChange
+	var wasUnpublished bool
 	err := s.Pool.QueryRow(ctx, `
+		with old as (select published_at from `+table+` where id = $1::uuid and user_id = $2::uuid)
 		update `+table+` set visibility = $3,
 		       published_at = case when $3 <> 'private' then coalesce(published_at, now()) else published_at end
 		where id = $1::uuid and user_id = $2::uuid and archived_at is null
-		returning visibility, published_at, add_count, hidden_at is not null`, id, userID, vis).
-		Scan(&c.Visibility, &c.PublishedAt, &c.AddCount, &c.Hidden)
-	return c, notFound(err)
+		returning visibility, published_at, add_count, hidden_at is not null, name,
+		          coalesce((select published_at is null from old), false)`, id, userID, vis).
+		Scan(&c.Visibility, &c.PublishedAt, &c.AddCount, &c.Hidden, &ch.Name, &wasUnpublished)
+	ch.First = wasUnpublished && vis != "private"
+	return c, ch, notFound(err)
 }
 
 // --- the Shop ----------------------------------------------------------------------
@@ -444,6 +462,14 @@ type PersonView struct {
 	Meals        []ShopItem `json:"meals"`
 	// Summary is their week so far, for themselves and for friends they share it with.
 	Summary *WeekSummary `json:"summary"`
+	// Training is the workout they have going now (if they share it); null otherwise.
+	Training *LiveSession `json:"training"`
+	// MealsToday is what they've logged on their today, when they share meals; null otherwise.
+	MealsToday []FriendMeal `json:"meals_today"`
+	// Activity is their recent feed items you can see, newest first.
+	Activity []FeedItem `json:"activity"`
+	// NotifyWorkouts: you get a push when this friend trains (friends only).
+	NotifyWorkouts *bool `json:"notify_workouts,omitempty"`
 }
 
 // GetPerson returns someone's profile and the items the viewer may see. It's

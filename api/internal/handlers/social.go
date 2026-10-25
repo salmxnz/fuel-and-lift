@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -347,33 +348,70 @@ func (h *Handler) GetSharing(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{"sharing": s})
 }
 
-// PutSharing handles PUT /v1/sharing. weekly_summary keeps its value when
-// left out, so an older app doesn't turn it off.
+// PutSharing handles PUT /v1/sharing. Fields left out keep their value (an
+// older app never turns a newer switch off). With "apply_to_existing": true
+// and a friends or public default_visibility, everything still private opens
+// up too.
 func (h *Handler) PutSharing(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		store.Sharing
-		WeeklySummary *bool `json:"weekly_summary"`
+	userID := auth.UserID(r)
+	cur, err := h.Store.GetSharing(r.Context(), userID)
+	if err != nil {
+		h.storeError(w, r, err)
+		return
 	}
+	body := struct {
+		store.Sharing
+		ApplyToExisting bool `json:"apply_to_existing"`
+	}{Sharing: cur}
 	if !decode(w, r, &body) {
 		return
 	}
-	userID := auth.UserID(r)
 	in := body.Sharing
-	if body.WeeklySummary != nil {
-		in.WeeklySummary = *body.WeeklySummary
-	} else {
-		cur, err := h.Store.GetSharing(r.Context(), userID)
-		if err != nil {
-			h.storeError(w, r, err)
-			return
-		}
-		in.WeeklySummary = cur.WeeklySummary
+	if !store.Visibilities[in.DefaultVisibility] {
+		badRequest(w, "default_visibility must be private, friends or public")
+		return
 	}
 	if err := h.Store.PutSharing(r.Context(), userID, in); err != nil {
 		h.storeError(w, r, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"sharing": in})
+	out := map[string]any{"sharing": in}
+	if body.ApplyToExisting && in.DefaultVisibility != "private" {
+		opened, err := h.Store.OpenUpPrivate(r.Context(), userID, in.DefaultVisibility)
+		if err != nil {
+			h.storeError(w, r, err)
+			return
+		}
+		out["opened"] = opened
+		if n := opened.Templates + opened.Meals + opened.Routines; n > 0 {
+			h.announceShared(r.Context(), userID, sharedSummary(opened), "/people/"+userID, "shared-all-"+userID)
+		}
+	}
+	httpx.JSON(w, http.StatusOK, out)
+}
+
+// sharedSummary is "3 workouts, 2 meals and a routine".
+func sharedSummary(o store.Opened) string {
+	var parts []string
+	add := func(n int, one, many string) {
+		switch {
+		case n == 1:
+			parts = append(parts, one)
+		case n > 1:
+			parts = append(parts, strconv.Itoa(n)+" "+many)
+		}
+	}
+	add(o.Templates, "a workout", "workouts")
+	add(o.Meals, "a meal", "meals")
+	add(o.Routines, "a routine", "routines")
+	switch len(parts) {
+	case 0:
+		return ""
+	case 1:
+		return parts[0]
+	default:
+		return strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
+	}
 }
 
 // --- feed --------------------------------------------------------------------------
@@ -504,28 +542,14 @@ func validClock(s *string) bool {
 // PutNotificationPrefs handles PUT /v1/notification-prefs. streak_risk and
 // friend_goals keep their value when left out (older apps don't send them).
 func (h *Handler) PutNotificationPrefs(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		store.NotificationPrefs
-		StreakRisk  *bool `json:"streak_risk"`
-		FriendGoals *bool `json:"friend_goals"`
-	}
-	if !decode(w, r, &body) {
+	// Fields left out keep their value, so an older app never turns a newer switch off.
+	in, err := h.Store.GetNotificationPrefs(r.Context(), auth.UserID(r))
+	if err != nil {
+		h.storeError(w, r, err)
 		return
 	}
-	in := body.NotificationPrefs
-	if body.StreakRisk == nil || body.FriendGoals == nil {
-		cur, err := h.Store.GetNotificationPrefs(r.Context(), auth.UserID(r))
-		if err != nil {
-			h.storeError(w, r, err)
-			return
-		}
-		in.StreakRisk, in.FriendGoals = cur.StreakRisk, cur.FriendGoals
-	}
-	if body.StreakRisk != nil {
-		in.StreakRisk = *body.StreakRisk
-	}
-	if body.FriendGoals != nil {
-		in.FriendGoals = *body.FriendGoals
+	if !decode(w, r, &in) {
+		return
 	}
 	if !validClock(in.QuietFrom) || !validClock(in.QuietTo) {
 		badRequest(w, `quiet_from and quiet_to are times like "22:00"`)

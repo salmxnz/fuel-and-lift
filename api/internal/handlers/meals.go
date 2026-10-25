@@ -470,7 +470,13 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 		}
 		items[i] = store.SavedItem{ID: itemID, EntryItem: it, IsAddon: in.Items[i].IsAddon}
 	}
-	m, err := h.Store.SaveMeal(r.Context(), auth.UserID(r), id, name, in.DefaultMealSlotID, items, in.Visibility, icon)
+	userID := auth.UserID(r)
+	vis := in.Visibility
+	if id == "" && vis == nil {
+		d := h.Store.DefaultVisibility(r.Context(), userID) // left out: the user's default
+		vis = &d
+	}
+	m, err := h.Store.SaveMeal(r.Context(), userID, id, name, in.DefaultMealSlotID, items, vis, icon)
 	if err != nil {
 		h.storeError(w, r, err)
 		return
@@ -478,6 +484,9 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusOK
 	if id == "" {
 		status = http.StatusCreated
+		if *vis != "private" {
+			h.announceItem(context.WithoutCancel(r.Context()), userID, "meal", m.ID, m.Name)
+		}
 	}
 	httpx.JSON(w, status, map[string]any{"saved_meal": m})
 }

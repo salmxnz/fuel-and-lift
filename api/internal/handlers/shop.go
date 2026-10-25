@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -55,10 +56,14 @@ func (h *Handler) SetVisibility(kind string) http.HandlerFunc {
 		if !validVisibility(w, &in.Visibility) {
 			return
 		}
-		c, err := h.Store.SetVisibility(r.Context(), auth.UserID(r), kind, id, in.Visibility)
+		userID := auth.UserID(r)
+		c, ch, err := h.Store.SetVisibilityFirst(r.Context(), userID, kind, id, in.Visibility)
 		if err != nil {
 			h.storeError(w, r, err)
 			return
+		}
+		if ch.First {
+			h.announceItem(context.WithoutCancel(r.Context()), userID, kind, id, ch.Name)
 		}
 		httpx.JSON(w, http.StatusOK, map[string]any{"visibility": c.Visibility, "published_at": c.PublishedAt, "hidden": c.Hidden})
 	}
@@ -218,6 +223,12 @@ func (h *Handler) GetPerson(w http.ResponseWriter, r *http.Request) {
 		v.Summary = &wk
 	case v.IsFriend:
 		if v.Summary, err = h.sharedWeek(r.Context(), id); err != nil {
+			h.storeError(w, r, err)
+			return
+		}
+	}
+	if v.IsMe || v.IsFriend {
+		if err := h.personLive(r.Context(), auth.UserID(r), &v); err != nil {
 			h.storeError(w, r, err)
 			return
 		}

@@ -26,19 +26,19 @@ func (s *Store) ReminderCandidates(ctx context.Context) ([]ReminderUser, error) 
 		select u.id::text, coalesce(p.display_name, u.name), p.timezone, p.weigh_in_cadence,
 		       exists(select 1 from push_subscriptions ps where ps.user_id = u.id),
 		       coalesce(np.meal_nudges, $1), coalesce(np.workout_day, $2), coalesce(np.weigh_in, $3),
-		       coalesce(np.weekly_checkin, $4), coalesce(np.streak_risk, $5)
+		       coalesce(np.weekly_checkin, $4), coalesce(np.streak_risk, $5), coalesce(np.friend_goals, $6)
 		from users u
 		join profiles p on p.user_id = u.id and p.onboarded_at is not null
 		left join notification_prefs np on np.user_id = u.id
 		where u.suspended_at is null`,
-		d.MealNudges, d.WorkoutDay, d.WeighIn, d.WeeklyCheckin, d.StreakRisk)
+		d.MealNudges, d.WorkoutDay, d.WeighIn, d.WeeklyCheckin, d.StreakRisk, d.FriendGoals)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (ReminderUser, error) {
 		var u ReminderUser
 		err := r.Scan(&u.ID, &u.Name, &u.Timezone, &u.WeighInCadence, &u.HasPush,
-			&u.Prefs.MealNudges, &u.Prefs.WorkoutDay, &u.Prefs.WeighIn, &u.Prefs.WeeklyCheckin, &u.Prefs.StreakRisk)
+			&u.Prefs.MealNudges, &u.Prefs.WorkoutDay, &u.Prefs.WeighIn, &u.Prefs.WeeklyCheckin, &u.Prefs.StreakRisk, &u.Prefs.FriendGoals)
 		if u.Timezone == "" {
 			u.Timezone = "UTC"
 		}
