@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import Link from "next/link"
+import { toast } from "sonner"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -11,7 +12,8 @@ import { Avatar, Button, ErrorCard, Skeleton, TextInput } from "@/components/ui/
 import { displayName, useMe } from "@/components/me-context"
 import { Sheet } from "@/components/ui/sheet"
 import { DayDot, WeekPager } from "@/components/ui/week-pager"
-import type { DayResponse, Entry, MealSlotsResponse, ProgressCaloriesResponse, SavedMealsResponse } from "@/lib/api/types"
+import type { Day, DayResponse, Entry, MealSlotsResponse, ProgressCaloriesResponse, SavedMealsResponse, SuggestionsResponse } from "@/lib/api/types"
+import { api } from "@/lib/api/client"
 import { useApi } from "@/lib/api/use-api"
 import { addDays, dayTitle, isISODate, startOfWeek, todayISO } from "@/lib/dates"
 import { Sky, SkyTitle, SKY_ICON } from "@/components/ui/sky"
@@ -90,6 +92,9 @@ export function TodayScreen() {
       if (d <= maxDate) void queryClient.prefetchQuery({ queryKey: [`days/${d}`] })
     }
   }, [dayLoaded, date, maxDate, queryClient])
+
+  // A meal you just logged: offer to split it with whoever you ate with.
+  useAteWithPrompt(day.data?.day ?? null, setSharing)
 
   // New food from the + menu goes to the day on screen.
   useEffect(() => {
@@ -313,4 +318,51 @@ function OneOffMealSheet({
       </form>
     </Sheet>
   )
+}
+
+/** Ate-with prompts already shown, so each meal is asked about once. */
+const ASKED_KEY = "fl:ate-with-asked"
+
+/**
+ * When a meal shows up that was logged in the last two minutes, ask whether
+ * you ate it with someone, naming a friend who logged something similar.
+ */
+function useAteWithPrompt(day: Day | null, onSplit: (e: Entry) => void) {
+  const seen = useRef<{ date: string; ids: Set<string> } | null>(null)
+  useEffect(() => {
+    if (!day) return
+    const entries = day.meals.flatMap((m) => m.entries)
+    const prev = seen.current
+    seen.current = { date: day.date, ids: new Set(entries.map((e) => e.id)) }
+    let asked: string[] = []
+    try {
+      asked = JSON.parse(sessionStorage.getItem(ASKED_KEY) ?? "[]") as string[]
+    } catch {
+      /* private mode */
+    }
+    const fresh = entries
+      .filter((e) => (prev && prev.date === day.date ? !prev.ids.has(e.id) : true))
+      .filter((e) => Date.now() - new Date(e.logged_at).getTime() < 120_000)
+      .filter((e) => !asked.includes(e.id) && e.split_ways == null && e.shared_with.length === 0 && e.kcal >= 250 && e.origin !== "shared")
+      .sort((a, b) => (a.logged_at < b.logged_at ? 1 : -1))[0]
+    if (!fresh) return
+    try {
+      sessionStorage.setItem(ASKED_KEY, JSON.stringify([...asked, fresh.id].slice(-30)))
+    } catch {
+      /* private mode */
+    }
+    const words = (s: string) => new Set(s.toLowerCase().split(/[^a-z\u00c0-\u024f]+/).filter((w) => w.length >= 4))
+    const mine = words(fresh.name)
+    void api
+      .get<SuggestionsResponse>("suggestions", { date: day.date })
+      .catch(() => null)
+      .then((sug) => {
+        const match = sug?.friends.find((f) => f.entry_id !== fresh.id && [...words(f.name)].some((w) => mine.has(w)))
+        toast(match ? `${match.person.name} had ${match.name} too. Eat together?` : "Ate that with anyone?", {
+          description: "Split it and they get their share in one tap.",
+          duration: 7000,
+          action: { label: "Split it", onClick: () => onSplit(fresh) },
+        })
+      })
+  }, [day, onSplit])
 }

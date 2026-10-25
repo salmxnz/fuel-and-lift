@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { MealSuggestions } from "./suggestions"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Sheet } from "@/components/ui/sheet"
@@ -175,6 +176,21 @@ function AddFoodBody({
         </form>
       ) : null}
 
+      {mealTarget ? (
+        <MealSuggestions
+          key={`${mealTarget.mealSlotId ?? mealTarget.mealName}-${date}`}
+          date={date}
+          slotId={mealTarget.mealSlotId}
+          mealLabel={mealTarget.label}
+          describeHref={(text) => `/log/describe${q}${q ? "&" : "?"}text=${encodeURIComponent(text)}`}
+          onLogged={(day) => {
+            onLogged(day)
+            onClose()
+          }}
+          onNavigate={onClose}
+        />
+      ) : null}
+
       <Link
         href={`/log/photo${q}`}
         aria-disabled={disabled}
@@ -214,7 +230,7 @@ function AddFoodBody({
         </div>
       ) : recents.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <h3 className="m-0 text-[13px] font-semibold text-muted">Again</h3>
+          <h3 className="m-0 text-[13px] font-semibold text-muted">Saved meals</h3>
           <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
             {recents.map((m) => (
               <button
