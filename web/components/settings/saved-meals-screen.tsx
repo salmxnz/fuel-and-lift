@@ -9,6 +9,7 @@ import { Sheet } from "@/components/ui/sheet"
 import { api, errorMessage, seg } from "@/lib/api/client"
 import type {
   EntryDayResponse,
+  MealCategory,
   MealSlotsResponse,
   SavedMeal,
   SavedMealItemInput,
@@ -22,6 +23,9 @@ import { targetBody, targetFromParams } from "@/lib/meal-target"
 import { VisibilityBadge, VisibilityButton, VisibilitySelect } from "@/components/community/visibility-select"
 import { ShopLink } from "@/components/community/shop-link"
 import type { Visibility } from "@/lib/api/types"
+import { CategoryChips, CategoryPill } from "@/components/food/category-chips"
+import { categoryLabel } from "@/lib/meal-categories"
+import { RecentMeals } from "./recent-meals"
 
 export function SavedMealsScreen() {
   const params = useSearchParams()
@@ -31,8 +35,11 @@ export function SavedMealsScreen() {
   const saved = useApi<SavedMealsResponse>("saved-meals")
   const [editing, setEditing] = useState<SavedMeal | "new" | null>(null)
   const [picking, setPicking] = useState<SavedMeal | null>(null)
+  const [filter, setFilter] = useState<MealCategory | null>(null)
 
-  const meals = saved.data?.saved_meals ?? []
+  const all = useMemo(() => saved.data?.saved_meals ?? [], [saved.data])
+  const meals = filter ? all.filter((m) => m.category === filter) : all
+  const savedNames = useMemo(() => new Set(all.map((m) => m.name.trim().toLowerCase())), [all])
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -44,10 +51,14 @@ export function SavedMealsScreen() {
         right={pickMode ? undefined : <ShopLink kind="meal" />}
       />
       <p className="m-0 text-[14px] leading-[1.45] text-muted">
-        {pickMode
-          ? "Tap a meal to log it. Pick any add-ons you had with it."
-          : "Meals you eat often, logged in one tap. Add-ons are extras you sometimes have, like a banana."}
+        {pickMode ? "Tap a meal to log it." : "Meals you eat often, logged in one tap."}
       </p>
+
+      {pickMode ? (
+        <RecentMeals mode="log" target={target} savedNames={savedNames} onLogged={() => router.push(`/today?date=${target.date}`)} />
+      ) : null}
+
+      {all.length > 0 ? <CategoryChips value={filter} onChange={setFilter} label="Show only" wrap={false} /> : null}
 
       {saved.error && !saved.data ? (
         <ErrorCard message={saved.error.message} onRetry={() => void saved.reload()} />
@@ -55,6 +66,10 @@ export function SavedMealsScreen() {
         <div className="flex flex-col gap-2">
           <Skeleton className="h-[76px] rounded-card" />
           <Skeleton className="h-[76px] rounded-card" />
+        </div>
+      ) : meals.length === 0 && filter ? (
+        <div className="rounded-card border-[1.5px] border-dashed border-dash p-4 text-[15px] text-muted">
+          No {categoryLabel(filter)?.toLowerCase()} meals saved yet. Give a meal this category when you edit it.
         </div>
       ) : meals.length === 0 ? (
         <div className="rounded-card border-[1.5px] border-dashed border-dash p-4 text-[15px] text-muted">
@@ -83,9 +98,10 @@ export function SavedMealsScreen() {
                     {base.map((i) => i.name).join(", ") || "No items"}
                     {addons.length > 0 ? ` · ${addons.length} add-on${addons.length === 1 ? "" : "s"}` : ""}
                   </span>
-                  {m.visibility !== "private" || m.hidden ? (
-                    <span className="flex">
-                      <VisibilityBadge visibility={m.visibility} hidden={m.hidden} />
+                  {m.category || m.visibility !== "private" || m.hidden ? (
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <CategoryPill category={m.category} />
+                      {m.visibility !== "private" || m.hidden ? <VisibilityBadge visibility={m.visibility} hidden={m.hidden} /> : null}
                     </span>
                   ) : null}
                 </button>
@@ -116,6 +132,14 @@ export function SavedMealsScreen() {
       >
         <PlusIcon size={18} /> New saved meal
       </button>
+
+      {pickMode ? null : (
+        <RecentMeals
+          mode="save"
+          savedNames={savedNames}
+          onSaved={(m) => saved.setData((prev) => ({ saved_meals: [m, ...(prev?.saved_meals ?? [])] }))}
+        />
+      )}
 
       <Sheet
         open={editing !== null}
@@ -272,6 +296,7 @@ function SavedMealForm({
   const slots = useApi<MealSlotsResponse>("meal-slots")
   const [name, setName] = useState(meal?.name ?? "")
   const [slotId, setSlotId] = useState<string>(meal?.default_meal_slot_id ?? "")
+  const [category, setCategory] = useState<MealCategory | null>(meal?.category ?? null)
   const [items, setItems] = useState<ItemDraft[]>(() =>
     (meal?.items ?? []).map((i) => ({
       key: nextKey(),
@@ -317,7 +342,7 @@ function SavedMealForm({
     setBusy("save")
     setError(null)
     try {
-      const body = { name: n, default_meal_slot_id: slotId || null, items: out, ...(meal ? {} : { visibility }) }
+      const body = { name: n, default_meal_slot_id: slotId || null, items: out, category: category ?? "none", ...(meal ? {} : { visibility }) }
       const res = meal
         ? await api.put<SavedMealResponse>(`saved-meals/${seg(meal.id)}`, body)
         : await api.post<SavedMealResponse>("saved-meals", body)
@@ -364,6 +389,11 @@ function SavedMealForm({
           ))}
         </select>
       </Field>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[13px] font-semibold text-muted">What kind of meal</span>
+        <CategoryChips value={category} onChange={setCategory} label="What kind of meal" />
+      </div>
 
       <div className="flex flex-col gap-2">
         <span className="text-[13px] font-semibold text-muted">Items</span>

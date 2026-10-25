@@ -16,21 +16,32 @@ import type { ShopKind, ShopResponse, ShopSort } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { KIND_LABEL, ShopCard } from "./shop-card"
 
+type Tab = ShopKind | "all"
 const KINDS: ShopKind[] = ["routine", "template", "meal"]
-const KIND_ICON: Record<ShopKind, React.ReactNode> = {
+const TABS: Tab[] = ["all", ...KINDS]
+const TAB_LABEL: Record<Tab, string> = { all: "All", ...KIND_LABEL }
+const TAB_ICON: Record<Tab, React.ReactNode> = {
+  all: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <rect x="4" y="4" width="7" height="7" rx="2" />
+      <rect x="13" y="4" width="7" height="7" rx="2" />
+      <rect x="4" y="13" width="7" height="7" rx="2" />
+      <rect x="13" y="13" width="7" height="7" rx="2" />
+    </svg>
+  ),
   routine: <ListIcon size={18} />,
   template: <DumbbellIcon size={18} />,
   meal: <BowlIcon size={18} />,
 }
 
 const EMPTY: Record<ShopKind, string> = {
-  routine: "Nobody's put a routine out yet. Be the first: open one of yours in Gym, tap the lock and pick Everyone.",
-  template: "No workouts out here yet. Open one of yours, tap the lock and pick Everyone to be first.",
-  meal: "No meals out here yet. Open a saved meal, tap the lock and pick Everyone to be first.",
+  routine: "No routines yet.",
+  template: "No workouts yet.",
+  meal: "No meals yet.",
 }
 
-function parseKind(v: string | null): ShopKind {
-  return KINDS.includes(v as ShopKind) ? (v as ShopKind) : "routine"
+function parseTab(v: string | null): Tab {
+  return TABS.includes(v as Tab) ? (v as Tab) : "all"
 }
 
 /** The community Shop: what people share publicly, plus friends' friends-only things. */
@@ -40,14 +51,15 @@ export function ShopScreen() {
   const pathname = usePathname()
   const me = useMe()
   const searchId = useId()
-  const kind = parseKind(params.get("kind"))
+  const kind = parseTab(params.get("kind"))
   const sort: ShopSort = params.get("sort") === "popular" ? "popular" : "new"
   const q = params.get("q") ?? ""
   const [text, setText] = useState(q)
 
-  function go(next: { kind?: ShopKind; sort?: ShopSort; q?: string }) {
+  function go(next: { kind?: Tab; sort?: ShopSort; q?: string }) {
     const sp = new URLSearchParams()
-    sp.set("kind", next.kind ?? kind)
+    const k = next.kind ?? kind
+    if (k !== "all") sp.set("kind", k)
     if ((next.sort ?? sort) === "popular") sp.set("sort", "popular")
     const nq = (next.q ?? q).trim()
     if (nq) sp.set("q", nq)
@@ -62,7 +74,8 @@ export function ShopScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- go reads the current params
   }, [text])
 
-  const query = `kind=${kind}&sort=${sort}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ""}`
+  const rest = `sort=${sort}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ""}`
+  const searching = !!q.trim()
 
   return (
     <main className="app-column pb-safe flex min-h-dvh flex-col gap-3.5">
@@ -75,16 +88,13 @@ export function ShopScreen() {
             </Link>
           ) : null}
         </div>
-        <div className="mt-1 flex items-end justify-between gap-2">
-          <div className="flex min-w-0 flex-col pb-3">
-            <h1 className="m-0 text-[clamp(32px,10vw,40px)] font-black leading-[0.95] tracking-[-0.05em]">Shop</h1>
-            <p className="m-0 mt-1.5 max-w-[22ch] text-[14px] leading-[1.35] text-ink-soft">Routines, workouts and meals your crew and everyone else share. All free.</p>
-          </div>
+        <div className="-mb-2 mt-1 flex items-end justify-between gap-2">
+          <h1 className="m-0 pb-4 text-[clamp(32px,10vw,40px)] font-black leading-[0.95] tracking-[-0.05em]">Shop</h1>
           <BiteMascot className="-mr-1 flex-none" />
         </div>
 
-        <div role="radiogroup" aria-label="Category" className="mt-3 grid grid-cols-3 gap-1 rounded-[18px] border border-white/85 bg-white/65 p-1 backdrop-blur-md">
-          {KINDS.map((k) => (
+        <div role="radiogroup" aria-label="Category" className="mt-3 grid grid-cols-4 gap-1 rounded-[18px] border border-white/85 bg-white/65 p-1 backdrop-blur-md">
+          {TABS.map((k) => (
             <button
               key={k}
               type="button"
@@ -96,22 +106,22 @@ export function ShopScreen() {
                 k === kind ? "bg-ink text-white" : "text-ink-soft"
               )}
             >
-              <span aria-hidden="true">{KIND_ICON[k]}</span>
-              {KIND_LABEL[k]}
+              <span aria-hidden="true">{TAB_ICON[k]}</span>
+              {TAB_LABEL[k]}
             </button>
           ))}
         </div>
 
         <div className="mt-2 flex items-center gap-2">
           <label htmlFor={searchId} className="relative flex flex-1 items-center">
-            <span className="sr-only">Search {KIND_LABEL[kind].toLowerCase()}</span>
+            <span className="sr-only">{kind === "all" ? "Search the Shop" : `Search ${KIND_LABEL[kind].toLowerCase()}`}</span>
             <SearchIcon size={18} className="pointer-events-none absolute left-3.5 text-muted" />
             <input
               id={searchId}
               type="search"
               value={text}
               maxLength={60}
-              placeholder={`Search ${KIND_LABEL[kind].toLowerCase()}`}
+              placeholder="Search"
               onChange={(e) => setText(e.target.value)}
               className="min-h-[48px] w-full min-w-0 rounded-[14px] border border-white/85 bg-white/80 pl-10 pr-3.5 text-[15px] placeholder:text-muted/80"
             />
@@ -131,11 +141,74 @@ export function ShopScreen() {
         </div>
       </Sky>
 
-      {kind !== "meal" && !q.trim() ? <StarterPicks /> : null}
+      {kind !== "meal" && !searching ? <StarterPicks /> : null}
 
-      <h2 className="m-0 text-[20px] font-black tracking-[-0.03em]">{q.trim() ? "Results" : "From the community"}</h2>
-      <Results key={query} query={query} kind={kind} searching={!!q.trim()} />
+      {kind === "all" ? (
+        <AllKinds key={rest} rest={rest} searching={searching} onSeeAll={(k) => go({ kind: k })} />
+      ) : (
+        <>
+          <h2 className="m-0 text-[20px] font-black tracking-[-0.03em]">{searching ? "Results" : "From the community"}</h2>
+          <Results key={`${kind}-${rest}`} query={`kind=${kind}&${rest}`} kind={kind} searching={searching} />
+        </>
+      )}
     </main>
+  )
+}
+
+/** The All tab: a few of each kind, with a way into that kind's tab. */
+function AllKinds({ rest, searching, onSeeAll }: { rest: string; searching: boolean; onSeeAll: (k: ShopKind) => void }) {
+  const routine = useApi<ShopResponse>(`shop?kind=routine&${rest}`)
+  const template = useApi<ShopResponse>(`shop?kind=template&${rest}`)
+  const meal = useApi<ShopResponse>(`shop?kind=meal&${rest}`)
+  const res: Record<ShopKind, typeof routine> = { routine, template, meal }
+  const loaded = KINDS.every((k) => res[k].data || res[k].error)
+  const empty = loaded && KINDS.every((k) => (res[k].data?.items.length ?? 0) === 0)
+  if (empty) {
+    return (
+      <div className="rounded-card border-[1.5px] border-dashed border-dash p-4 text-[15px] text-muted">
+        {searching ? "Nothing matches that." : "Nothing shared yet."}
+      </div>
+    )
+  }
+  return (
+    <>
+      {KINDS.map((k) => {
+        const r = res[k]
+        const items = r.data?.items ?? []
+        if (r.data && items.length === 0) return null
+        return (
+          <section key={k} aria-labelledby={`all-${k}`} className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <h2 id={`all-${k}`} className="m-0 text-[20px] font-black tracking-[-0.03em]">
+                {KIND_LABEL[k]}
+              </h2>
+              {items.length > 3 || r.data?.next_offset != null ? (
+                <button
+                  type="button"
+                  onClick={() => onSeeAll(k)}
+                  className="-mr-2 flex min-h-11 items-center px-2 text-[14px] font-bold text-protein transition-transform duration-150 ease-out active:scale-[0.97]"
+                >
+                  See all
+                </button>
+              ) : null}
+            </div>
+            {r.error && !r.data ? (
+              <ErrorCard message={r.error.message} onRetry={() => void r.reload()} />
+            ) : !r.data ? (
+              <Skeleton className="h-[96px] rounded-card" />
+            ) : (
+              <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                {items.slice(0, 3).map((it) => (
+                  <li key={it.id}>
+                    <ShopCard item={it} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )
+      })}
+    </>
   )
 }
 
@@ -214,9 +287,11 @@ function StarterPicks() {
   return (
     <section aria-labelledby="starter" className="flex flex-col gap-2">
       <h2 id="starter" className="m-0 text-[20px] font-black tracking-[-0.03em]">
-        Starter picks <span className="text-[13px] font-semibold text-muted">by adebite</span>
+        Starter picks
       </h2>
-      <ul className="no-scrollbar -mx-4 m-0 flex list-none snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1">
+      {/* scroll-padding keeps the first card off the edge: snapping aligns to the
+          scroller's edge, not its padding. */}
+      <ul className="no-scrollbar -mx-4 m-0 flex list-none snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1">
         {list.map((sp, i) => (
           <li key={sp.key} className="snap-start">
             <button

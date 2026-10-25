@@ -105,6 +105,6 @@ func (s *Store) LogAgain(ctx context.Context, userID, entryID string, d Date, sl
 	}
 	return s.AddEntry(ctx, userID, d, NewEntry{
 		MealSlotID: slotID, MealName: mealName, Name: src.Name, Origin: origin,
-		SavedMealID: src.SavedMealID, Items: src.Items, Macros: src.Macros, Icon: src.Icon,
+		SavedMealID: src.SavedMealID, Items: src.Items, Macros: src.Macros, Icon: src.Icon, Category: src.Category,
 	})
 }

@@ -21,6 +21,7 @@ import { cn } from "@/lib/cn"
 import { PAGE_SLIDE, pageVariants, swipeDirection } from "@/lib/motion"
 import { CalorieSun } from "./calorie-sun"
 import { MacroCard } from "./macro-card"
+import { EatNext } from "./eat-next"
 import { EntrySheet } from "./entry-sheet"
 import { MealList } from "./meal-list"
 import { IncomingMeals } from "@/components/share/incoming-shares"
@@ -223,6 +224,8 @@ export function TodayScreen() {
             <>
               <MacroCard day={day.data.day} />
 
+              {isToday ? <EatNext day={day.data.day} slots={slots.data?.meal_slots ?? []} onLogged={(d) => day.setData({ day: d })} /> : null}
+
               <div className="mt-2 flex items-center justify-between gap-2">
                 <h2 className="m-0 text-[24px] font-black tracking-[-0.035em]">Meals</h2>
                 <button
@@ -266,6 +269,7 @@ export function TodayScreen() {
           setEditing(null)
           setSharing(e)
         }}
+        onLoggedToday={() => goTo(today)}
       />
 
       <ShareMealSheet entry={sharing} onClose={() => setSharing(null)} onDayChange={(d) => day.setData({ day: d })} />

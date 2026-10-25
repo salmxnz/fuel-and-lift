@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -142,7 +143,8 @@ type Entry struct {
 	Items        []EntryItem `json:"items"`
 	Macros
 	LoggedAt time.Time `json:"logged_at"`
-	Icon     *string   `json:"icon"` // a foodicon key, or null
+	Icon     *string   `json:"icon"`     // a foodicon key, or null
+	Category *string   `json:"category"` // one of MealCategories, or null
 	// Photos are filled in by the API handler (with signed links).
 	Photos []MealPhoto `json:"photos"`
 	// SharedWith and SplitWays are filled in by the API handler too: the
@@ -152,7 +154,7 @@ type Entry struct {
 }
 
 const entryCols = `id::text, date, meal_slot_id::text, meal_name, name, origin, saved_meal_id::text, ai_estimate_id::text,
-	items, kcal::float8, protein_g::float8, carbs_g::float8, fat_g::float8, logged_at, icon`
+	items, kcal::float8, protein_g::float8, carbs_g::float8, fat_g::float8, logged_at, icon, category`
 
 func scanEntry(r pgx.CollectableRow) (Entry, error) { return scanEntryWith(r) }
 
@@ -162,7 +164,7 @@ func scanEntryWith(r pgx.CollectableRow, extra ...any) (Entry, error) {
 	var d time.Time
 	var items []byte
 	dst := append([]any{&e.ID, &d, &e.MealSlotID, &e.MealName, &e.Name, &e.Origin, &e.SavedMealID, &e.AIEstimateID,
-		&items, &e.Kcal, &e.ProteinG, &e.CarbsG, &e.FatG, &e.LoggedAt, &e.Icon}, extra...)
+		&items, &e.Kcal, &e.ProteinG, &e.CarbsG, &e.FatG, &e.LoggedAt, &e.Icon, &e.Category}, extra...)
 	err := r.Scan(dst...)
 	if err != nil {
 		return e, err
@@ -189,6 +191,20 @@ type NewEntry struct {
 	Items        []EntryItem
 	Macros       Macros  // used when Items is empty
 	Icon         *string // a foodicon key; nil = none
+	Category     *string // one of MealCategories; nil = none
+}
+
+// MealCategories are the categories a logged or saved meal can have.
+var MealCategories = []string{"home", "takeaway", "eating_out", "snack", "sweet", "drink", "protein"}
+
+// IsMealCategory reports whether c is one of MealCategories.
+func IsMealCategory(c string) bool {
+	for _, k := range MealCategories {
+		if k == c {
+			return true
+		}
+	}
+	return false
 }
 
 // resolveMeal returns the meal name for a slot the user owns, or the one-off name.
@@ -247,10 +263,10 @@ func addEntry(ctx context.Context, tx pgx.Tx, userID string, d Date, in NewEntry
 	}
 	items, _ := json.Marshal(in.Items)
 	rows, err := tx.Query(ctx, `
-		insert into log_entries (user_id, date, meal_slot_id, meal_name, name, origin, saved_meal_id, ai_estimate_id, items, kcal, protein_g, carbs_g, fat_g, icon)
-		values ($1::uuid, $2, $3::uuid, $4, $5, $6, $7::uuid, $8::uuid, $9, $10, $11, $12, $13, $14)
+		insert into log_entries (user_id, date, meal_slot_id, meal_name, name, origin, saved_meal_id, ai_estimate_id, items, kcal, protein_g, carbs_g, fat_g, icon, category)
+		values ($1::uuid, $2, $3::uuid, $4, $5, $6, $7::uuid, $8::uuid, $9, $10, $11, $12, $13, $14, $15)
 		returning `+entryCols,
-		userID, d.Time, slotID, meal, in.Name, in.Origin, in.SavedMealID, in.AIEstimateID, items, m.Kcal, m.ProteinG, m.CarbsG, m.FatG, in.Icon)
+		userID, d.Time, slotID, meal, in.Name, in.Origin, in.SavedMealID, in.AIEstimateID, items, m.Kcal, m.ProteinG, m.CarbsG, m.FatG, in.Icon, in.Category)
 	if err != nil {
 		return Entry{}, err
 	}
@@ -264,6 +280,7 @@ type EntryPatch struct {
 	MealName   *string
 	Items      *[]EntryItem
 	Icon       *string // a foodicon key, or "" to remove it; nil keeps it
+	Category   *string // one of MealCategories, or "" to remove it; nil keeps it
 }
 
 // UpdateEntry edits one of the user's entries.
@@ -305,12 +322,18 @@ func (s *Store) UpdateEntry(ctx context.Context, userID, id string, p EntryPatch
 				e.Icon = nil
 			}
 		}
+		if p.Category != nil {
+			e.Category = p.Category
+			if *p.Category == "" {
+				e.Category = nil
+			}
+		}
 		items, _ := json.Marshal(e.Items)
 		rows, err = tx.Query(ctx, `
 			update log_entries set name = $3, meal_slot_id = $4::uuid, meal_name = $5, items = $6,
-			       kcal = $7, protein_g = $8, carbs_g = $9, fat_g = $10, icon = $11
+			       kcal = $7, protein_g = $8, carbs_g = $9, fat_g = $10, icon = $11, category = $12
 			where id = $1::uuid and user_id = $2::uuid returning `+entryCols,
-			id, userID, e.Name, e.MealSlotID, e.MealName, items, m.Kcal, m.ProteinG, m.CarbsG, m.FatG, e.Icon)
+			id, userID, e.Name, e.MealSlotID, e.MealName, items, m.Kcal, m.ProteinG, m.CarbsG, m.FatG, e.Icon, e.Category)
 		if err != nil {
 			return err
 		}
@@ -461,13 +484,14 @@ type SavedMeal struct {
 	Items             []SavedItem `json:"items"`
 	Base              Macros      `json:"base"`
 	LastUsedAt        *time.Time  `json:"last_used_at"`
-	Icon              *string     `json:"icon"` // a foodicon key, or null
+	Icon              *string     `json:"icon"`     // a foodicon key, or null
+	Category          *string     `json:"category"` // one of MealCategories, or null
 	Community
 	ownerID string
 }
 
 const savedCols = `sm.id::text, sm.name, sm.default_meal_slot_id::text, sm.items, sm.last_used_at, sm.user_id::text,
-	sm.visibility, sm.published_at, sm.add_count, sm.hidden_at is not null, sm.icon, ` + copiedFromCols
+	sm.visibility, sm.published_at, sm.add_count, sm.hidden_at is not null, sm.icon, sm.category, ` + copiedFromCols
 
 var savedFrom = ` from saved_meals sm ` + copiedFromJoin("sm")
 
@@ -476,7 +500,7 @@ func scanSaved(r pgx.CollectableRow) (SavedMeal, error) {
 	var raw []byte
 	var cf copiedFrom
 	if err := r.Scan(&m.ID, &m.Name, &m.DefaultMealSlotID, &raw, &m.LastUsedAt, &m.ownerID,
-		&m.Visibility, &m.PublishedAt, &m.AddCount, &m.Hidden, &m.Icon, &cf.id, &cf.name, &cf.avatar); err != nil {
+		&m.Visibility, &m.PublishedAt, &m.AddCount, &m.Hidden, &m.Icon, &m.Category, &cf.id, &cf.name, &cf.avatar); err != nil {
 		return m, err
 	}
 	m.CopiedFrom = cf.person()
@@ -521,9 +545,10 @@ func (s *Store) GetSavedMeal(ctx context.Context, userID, id string) (SavedMeal,
 }
 
 // SaveMeal creates (id == "") or replaces a saved meal. visibility only
-// applies when creating (nil = private); see SetVisibility. icon is a
-// foodicon key or "" for none; nil keeps the current one.
-func (s *Store) SaveMeal(ctx context.Context, userID, id, name string, slotID *string, items []SavedItem, visibility, icon *string) (SavedMeal, error) {
+// applies when creating (nil = private); see SetVisibility. icon and
+// category are a foodicon key / one of MealCategories, or "" for none; nil
+// keeps the current one.
+func (s *Store) SaveMeal(ctx context.Context, userID, id, name string, slotID *string, items []SavedItem, visibility, icon, category *string) (SavedMeal, error) {
 	if slotID != nil {
 		var ok bool
 		if err := s.Pool.QueryRow(ctx, `select exists(select 1 from meal_slots where id = $1::uuid and user_id = $2::uuid)`, *slotID, userID).Scan(&ok); err != nil {
@@ -540,14 +565,15 @@ func (s *Store) SaveMeal(ctx context.Context, userID, id, name string, slotID *s
 		if visibility != nil {
 			vis = *visibility
 		}
-		err = s.Pool.QueryRow(ctx, `insert into saved_meals (user_id, name, default_meal_slot_id, items, visibility, published_at, icon)
-			values ($1::uuid, $2, $3::uuid, $4, $5, case when $5 <> 'private' then now() end, nullif($6, '')) returning id::text`,
-			userID, name, slotID, raw, vis, icon).Scan(&id)
+		err = s.Pool.QueryRow(ctx, `insert into saved_meals (user_id, name, default_meal_slot_id, items, visibility, published_at, icon, category)
+			values ($1::uuid, $2, $3::uuid, $4, $5, case when $5 <> 'private' then now() end, nullif($6, ''), nullif($7, '')) returning id::text`,
+			userID, name, slotID, raw, vis, icon, category).Scan(&id)
 	} else {
 		var got string
 		err = s.Pool.QueryRow(ctx, `update saved_meals set name = $3, default_meal_slot_id = $4::uuid, items = $5, updated_at = now(),
-			icon = case when $6::text is null then icon else nullif($6, '') end
-			where id = $1::uuid and user_id = $2::uuid and archived_at is null returning id::text`, id, userID, name, slotID, raw, icon).Scan(&got)
+			icon = case when $6::text is null then icon else nullif($6, '') end,
+			category = case when $7::text is null then category else nullif($7, '') end
+			where id = $1::uuid and user_id = $2::uuid and archived_at is null returning id::text`, id, userID, name, slotID, raw, icon, category).Scan(&got)
 	}
 	if err != nil {
 		return SavedMeal{}, notFound(err)
@@ -584,11 +610,58 @@ func (s *Store) LogSavedMeal(ctx context.Context, userID string, d Date, id stri
 		slotID = m.DefaultMealSlotID
 	}
 	e, err := s.AddEntry(ctx, userID, d, NewEntry{
-		MealSlotID: slotID, MealName: mealName, Name: m.Name, Origin: "saved", SavedMealID: &m.ID, Items: items, Icon: m.Icon,
+		MealSlotID: slotID, MealName: mealName, Name: m.Name, Origin: "saved", SavedMealID: &m.ID, Items: items, Icon: m.Icon, Category: m.Category,
 	})
 	if err != nil {
 		return e, err
 	}
 	_, err = s.Pool.Exec(ctx, `update saved_meals set last_used_at = now() where id = $1::uuid`, m.ID)
 	return e, err
+}
+
+// SaveEntryAsMeal saves one of the user's logged entries (from any day) as a
+// saved meal and links the entry to it. Its items become the meal's items; an
+// entry logged as totals becomes one item. name and category are optional
+// (nil = the entry's); visibility is as for SaveMeal.
+func (s *Store) SaveEntryAsMeal(ctx context.Context, userID, entryID string, name, category, visibility *string) (SavedMeal, Entry, error) {
+	rows, err := s.Pool.Query(ctx, `select `+entryCols+` from log_entries where id = $1::uuid and user_id = $2::uuid`, entryID, userID)
+	if err != nil {
+		return SavedMeal{}, Entry{}, err
+	}
+	e, err := pgx.CollectExactlyOneRow(rows, scanEntry)
+	if err != nil {
+		return SavedMeal{}, Entry{}, notFound(err)
+	}
+	items := make([]SavedItem, 0, len(e.Items))
+	for i, it := range e.Items {
+		items = append(items, SavedItem{ID: fmt.Sprintf("i%d", i+1), EntryItem: it})
+	}
+	if len(items) == 0 {
+		items = append(items, SavedItem{ID: "i1", EntryItem: EntryItem{
+			Name: e.Name, Kcal: e.Kcal, ProteinG: e.ProteinG, CarbsG: e.CarbsG, FatG: e.FatG, Source: "user",
+		}})
+	}
+	n := e.Name
+	if name != nil && *name != "" {
+		n = *name
+	}
+	cat := e.Category
+	if category != nil {
+		cat = category
+	}
+	icon := ""
+	if e.Icon != nil {
+		icon = *e.Icon
+	}
+	m, err := s.SaveMeal(ctx, userID, "", n, e.MealSlotID, items, visibility, &icon, cat)
+	if err != nil {
+		return SavedMeal{}, Entry{}, err
+	}
+	rows, err = s.Pool.Query(ctx, `update log_entries set saved_meal_id = $3::uuid, category = coalesce(category, $4)
+		where id = $1::uuid and user_id = $2::uuid returning `+entryCols, entryID, userID, m.ID, m.Category)
+	if err != nil {
+		return m, e, err
+	}
+	e, err = pgx.CollectExactlyOneRow(rows, scanEntry)
+	return m, e, err
 }

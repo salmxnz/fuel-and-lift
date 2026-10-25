@@ -230,8 +230,36 @@ func newIcon(w http.ResponseWriter, icon *string) (*string, bool) {
 	return k, ok
 }
 
+// checkCategory reads an optional meal category: nil stays nil (unchanged),
+// "none" or "" becomes "" (no category), a known one stays. Anything else
+// writes a 400.
+func checkCategory(w http.ResponseWriter, c *string) (*string, bool) {
+	if c == nil {
+		return nil, true
+	}
+	k := strings.TrimSpace(*c)
+	if k == "none" {
+		k = ""
+	}
+	if k != "" && !store.IsMealCategory(k) {
+		badRequest(w, "category must be one of "+strings.Join(store.MealCategories, ", ")+" or none")
+		return nil, false
+	}
+	return &k, true
+}
+
+// newCategory is checkCategory for something new: no category is nil.
+func newCategory(w http.ResponseWriter, c *string) (*string, bool) {
+	k, ok := checkCategory(w, c)
+	if k != nil && *k == "" {
+		k = nil
+	}
+	return k, ok
+}
+
 type entryBody struct {
 	Icon         *string           `json:"icon"`
+	Category     *string           `json:"category"`
 	MealSlotID   *string           `json:"meal_slot_id"`
 	MealName     *string           `json:"meal_name"`
 	Name         string            `json:"name"`
@@ -295,10 +323,14 @@ func (h *Handler) AddEntry(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	category, ok := newCategory(w, in.Category)
+	if !ok {
+		return
+	}
 	userID := auth.UserID(r)
 	e, err := h.Store.AddEntry(r.Context(), userID, d, store.NewEntry{
 		MealSlotID: in.MealSlotID, MealName: in.MealName, Name: name, Origin: in.Origin,
-		AIEstimateID: in.AIEstimateID, Items: items, Macros: m, Icon: icon,
+		AIEstimateID: in.AIEstimateID, Items: items, Macros: m, Icon: icon, Category: category,
 	})
 	if err != nil {
 		h.storeError(w, r, err)
@@ -331,12 +363,17 @@ func (h *Handler) UpdateEntry(w http.ResponseWriter, r *http.Request) {
 		MealSlotID *string            `json:"meal_slot_id"`
 		MealName   *string            `json:"meal_name"`
 		Items      *[]store.EntryItem `json:"items"`
-		Icon       *string            `json:"icon"` // "none" removes it
+		Icon       *string            `json:"icon"`     // "none" removes it
+		Category   *string            `json:"category"` // "none" removes it
 	}
 	if !decode(w, r, &in) {
 		return
 	}
 	icon, ok := checkIcon(w, in.Icon)
+	if !ok {
+		return
+	}
+	category, ok := checkCategory(w, in.Category)
 	if !ok {
 		return
 	}
@@ -361,7 +398,9 @@ func (h *Handler) UpdateEntry(w http.ResponseWriter, r *http.Request) {
 		in.Items = &items
 	}
 	userID := auth.UserID(r)
-	e, err := h.Store.UpdateEntry(r.Context(), userID, id, store.EntryPatch{Name: in.Name, MealSlotID: in.MealSlotID, MealName: in.MealName, Items: in.Items, Icon: icon})
+	e, err := h.Store.UpdateEntry(r.Context(), userID, id, store.EntryPatch{
+		Name: in.Name, MealSlotID: in.MealSlotID, MealName: in.MealName, Items: in.Items, Icon: icon, Category: category,
+	})
 	if err != nil {
 		h.storeError(w, r, err)
 		return
@@ -429,11 +468,16 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 		} `json:"items"`
 		Visibility *string `json:"visibility"` // creating only; see PUT …/visibility
 		Icon       *string `json:"icon"`       // left out keeps it; "none" removes it
+		Category   *string `json:"category"`   // left out keeps it; "none" removes it
 	}
 	if !decode(w, r, &in) {
 		return
 	}
 	icon, ok := checkIcon(w, in.Icon)
+	if !ok {
+		return
+	}
+	category, ok := checkCategory(w, in.Category)
 	if !ok {
 		return
 	}
@@ -476,7 +520,7 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 		d := h.Store.DefaultVisibility(r.Context(), userID) // left out: the user's default
 		vis = &d
 	}
-	m, err := h.Store.SaveMeal(r.Context(), userID, id, name, in.DefaultMealSlotID, items, vis, icon)
+	m, err := h.Store.SaveMeal(r.Context(), userID, id, name, in.DefaultMealSlotID, items, vis, icon, category)
 	if err != nil {
 		h.storeError(w, r, err)
 		return
@@ -489,6 +533,54 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	httpx.JSON(w, status, map[string]any{"saved_meal": m})
+}
+
+// SaveEntry handles POST /v1/entries/{id}/save {name?, category?}: save a
+// logged meal, from any day, to the user's saved meals.
+func (h *Handler) SaveEntry(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		Name     *string `json:"name"`
+		Category *string `json:"category"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if in.Name != nil {
+		n, ok := cleanName(*in.Name, 60)
+		if !ok {
+			badRequest(w, "name must be 1 to 60 characters")
+			return
+		}
+		in.Name = &n
+	}
+	category, ok := checkCategory(w, in.Category)
+	if !ok {
+		return
+	}
+	if category != nil && *category == "" {
+		category = nil
+	}
+	userID := auth.UserID(r)
+	vis := h.Store.DefaultVisibility(r.Context(), userID)
+	m, e, err := h.Store.SaveEntryAsMeal(r.Context(), userID, id, in.Name, category, &vis)
+	if err != nil {
+		h.storeError(w, r, err)
+		return
+	}
+	if vis != "private" {
+		h.announceItem(context.WithoutCancel(r.Context()), userID, "meal", m.ID, m.Name)
+	}
+	h.withExtras(r.Context(), userID, &e)
+	day, err := h.day(r.Context(), userID, e.Date)
+	if err != nil {
+		h.storeError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, map[string]any{"saved_meal": m, "entry": e, "day": day})
 }
 
 // DeleteSavedMeal handles DELETE /v1/saved-meals/{id}.

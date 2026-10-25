@@ -8,10 +8,14 @@ import { StatusPill, firstName } from "@/components/share/friend-picker"
 import { ItemsEditor, TotalsRow } from "@/components/food/items-editor"
 import { PhotoCarousel } from "@/components/food/photo-carousel"
 import { api, errorMessage, seg } from "@/lib/api/client"
-import type { Day, DayResponse, Entry, EntryDayResponse, MealSlot } from "@/lib/api/types"
+import type { Day, DayResponse, Entry, EntryDayResponse, MealCategory, MealSlot, SaveEntryResponse } from "@/lib/api/types"
 import { fromEntryItem, toEntryItems, type EditableItem } from "@/lib/items"
 import { parseDecimal } from "@/lib/format"
-import { ShareIcon } from "@/components/ui/icons"
+import { BookmarkIcon, CheckIcon, PlusIcon, ShareIcon } from "@/components/ui/icons"
+import { CategoryChips } from "@/components/food/category-chips"
+import Link from "next/link"
+import { cn } from "@/lib/cn"
+import { todayISO } from "@/lib/dates"
 import { IconChooser, useIconChoice } from "@/components/food/icon-picker"
 import { iconFor } from "@/lib/food-icons"
 
@@ -21,6 +25,7 @@ export function EntrySheet({
   onClose,
   onDayChange,
   onShare,
+  onLoggedToday,
 }: {
   entry: Entry | null
   slots: MealSlot[]
@@ -28,11 +33,21 @@ export function EntrySheet({
   onDayChange: (day: Day) => void
   /** Share or split this meal with friends. */
   onShare: (entry: Entry) => void
+  /** An older meal was logged again today: show today. */
+  onLoggedToday: (day: Day) => void
 }) {
   return (
     <Sheet open={!!entry} onClose={onClose} title="Edit entry">
       {entry ? (
-        <EntryForm key={entry.id} entry={entry} slots={slots} onClose={onClose} onDayChange={onDayChange} onShare={onShare} />
+        <EntryForm
+          key={entry.id}
+          entry={entry}
+          slots={slots}
+          onClose={onClose}
+          onDayChange={onDayChange}
+          onShare={onShare}
+          onLoggedToday={onLoggedToday}
+        />
       ) : null}
     </Sheet>
   )
@@ -46,14 +61,21 @@ function EntryForm({
   onClose,
   onDayChange,
   onShare,
+  onLoggedToday,
 }: {
   entry: Entry
   slots: MealSlot[]
   onClose: () => void
   onDayChange: (day: Day) => void
   onShare: (entry: Entry) => void
+  onLoggedToday: (day: Day) => void
 }) {
+  const today = todayISO()
   const [name, setName] = useState(entry.name)
+  const [category, setCategory] = useState<MealCategory | null>(entry.category)
+  const [savedId, setSavedId] = useState(entry.saved_meal_id)
+  const [savingMeal, setSavingMeal] = useState(false)
+  const [loggingAgain, setLoggingAgain] = useState(false)
   const [meal, setMeal] = useState<string>(entry.meal_slot_id ?? ONE_OFF)
   const [oneOffName, setOneOffName] = useState(entry.meal_slot_id ? "" : entry.meal_name)
   const hasItems = entry.items.length > 0
@@ -88,11 +110,45 @@ function EntryForm({
     }
   }
 
+  // Save this meal (from any day) to the user's saved meals.
+  async function saveToMeals() {
+    setSavingMeal(true)
+    try {
+      const res = await api.post<SaveEntryResponse>(`entries/${seg(entry.id)}/save`, {
+        name: (name.trim() || entry.name).slice(0, 60),
+        ...(category ? { category } : {}),
+      })
+      setSavedId(res.saved_meal.id)
+      onDayChange(res.day)
+      toast.success(`${res.saved_meal.name} is in your meals now. One tap next time.`)
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setSavingMeal(false)
+    }
+  }
+
+  // Log an older meal again, today, in the same meal.
+  async function logAgainToday() {
+    setLoggingAgain(true)
+    try {
+      const res = await api.post<EntryDayResponse>(`entries/${seg(entry.id)}/again`, { date: today })
+      toast.success(`${entry.name}, logged today. Easy.`)
+      onClose()
+      onLoggedToday(res.day)
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setLoggingAgain(false)
+    }
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     const body: Record<string, unknown> = { name: name.trim() || entry.name }
     if (pic.icon !== entry.icon) body.icon = pic.icon ?? "none"
+    if (category !== entry.category) body.category = category ?? "none"
     if (meal === ONE_OFF) {
       body.meal_slot_id = null
       body.meal_name = oneOffName.trim() || entry.meal_name
@@ -188,6 +244,10 @@ function EntryForm({
           <option value={ONE_OFF}>Just for this day…</option>
         </select>
       </Field>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[13px] font-semibold text-muted">What kind of meal</span>
+        <CategoryChips value={category} onChange={setCategory} label="What kind of meal" />
+      </div>
       {meal === ONE_OFF ? (
         <Field label="Meal name" htmlFor="entry-oneoff">
           <TextInput
@@ -248,6 +308,25 @@ function EntryForm({
           </ul>
         </section>
       ) : null}
+      <div className={cn("grid gap-2", entry.date !== today ? "grid-cols-2" : "grid-cols-1")}>
+        {savedId ? (
+          <Link
+            href="/saved-meals"
+            className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-btn bg-pink-soft px-3 text-[15px] font-bold text-ink no-underline"
+          >
+            <CheckIcon size={18} className="text-protein" /> Saved
+          </Link>
+        ) : (
+          <Button variant="outline" size="md" onClick={() => void saveToMeals()} loading={savingMeal} disabled={saving || deleting}>
+            <BookmarkIcon size={18} /> {entry.date !== today ? "Save meal" : "Save to my meals"}
+          </Button>
+        )}
+        {entry.date !== today ? (
+          <Button variant="outline" size="md" onClick={() => void logAgainToday()} loading={loggingAgain} disabled={saving || deleting}>
+            <PlusIcon size={18} /> Log today
+          </Button>
+        ) : null}
+      </div>
       <Button variant="outline" size="md" onClick={() => onShare(entry)} disabled={saving || deleting}>
         <ShareIcon size={18} /> {entry.shared_with.length > 0 ? "Share with more friends" : "Share or split with a friend"}
       </Button>

@@ -188,6 +188,7 @@ type Entry = Macros & {
   logged_at: string
   photos: MealPhoto[]             // kept meal photos, in order ([] when none)
   icon: FoodIcon | null           // its picture; null = none (the app may guess one from the name)
+  category: MealCategory | null   // copied from the saved meal it was logged from, or when logged again
   // Friends you sent this meal to, oldest first, with each one's latest
   // answer ([] when never shared, and always [] on a meal a friend sent you).
   shared_with: (Person & { status: "pending" | "accepted" | "declined" })[]
@@ -203,6 +204,10 @@ type FoodIcon =
   | "apple" | "banana" | "watermelon" | "bell_pepper" | "chili" | "cabbage" | "mushroom"
   | "chips" | "popcorn" | "donut" | "cupcake" | "pie" | "sweet" | "lollipop" | "candy_cane"
   | "coffee" | "soda" | "beer" | "salt"
+
+// What kind of meal it was. Labels: Home-cooked, Takeaway, Eating out, Snack,
+// Sweet treat, Drink, High protein.
+type MealCategory = "home" | "takeaway" | "eating_out" | "snack" | "sweet" | "drink" | "protein"
 
 // url is a signed link to the private bucket, valid for PHOTO_URL_TTL (1h).
 type MealPhoto = { id: string, url: string, position: number, bytes: number, created_at: string }
@@ -228,13 +233,22 @@ type Day = {
 Give `meal_slot_id`, or `meal_name` for a one-off meal. Totals are computed from
 `items`; an entry without items may send `kcal`, `protein_g`, `carbs_g`, `fat_g`
 directly. Optional `icon`: a `FoodIcon` (`"none"` or left out = no picture; an
-unknown key is `400`). `201 {"entry": Entry, "day": Day, "photos_skipped": number}`.
+unknown key is `400`). Optional `category`: a `MealCategory` (`"none"` or left
+out = none; anything else is `400`). `201 {"entry": Entry, "day": Day, "photos_skipped": number}`.
 With `ai_estimate_id`, the estimate's photos are kept on the entry while the
 user has room (free: `FREE_PHOTOS_STORED`, 20; Pro unlimited); photos that don't
 fit are deleted and counted in `photos_skipped`.
 
-### `PATCH /v1/entries/{id}` `{name?, meal_slot_id?, meal_name?, items?, icon?}` → `200 {"entry": Entry, "day": Day}`
-`icon`: a `FoodIcon`, or `"none"` to remove it; left out keeps it.
+### `PATCH /v1/entries/{id}` `{name?, meal_slot_id?, meal_name?, items?, icon?, category?}` → `200 {"entry": Entry, "day": Day}`
+`icon`: a `FoodIcon`, or `"none"` to remove it; left out keeps it. `category`
+works the same way with a `MealCategory`.
+### `POST /v1/entries/{id}/save` `{name?, category?}` → `201 {"saved_meal": SavedMeal, "entry": Entry, "day": Day}`
+Saves one of your entries, from any day, as a saved meal: its items (an entry
+logged as plain totals becomes one item), picture, meal and category; `name` and
+`category` override the entry's. Visibility is the user's default, as for
+`POST /v1/saved-meals`. The entry's `saved_meal_id` then points at it, and it
+takes the category if it had none. `day` is the entry's day. Someone else's
+entry is `404`.
 ### `DELETE /v1/entries/{id}` → `200 {"day": Day}` (its photos are deleted too)
 
 ## Meal photos
@@ -253,12 +267,13 @@ type SavedMeal = {
   items: (EntryItem & { id: string, is_addon: boolean })[],
   base: Macros,                  // non-add-on items only
   last_used_at: string | null,
-  icon: FoodIcon | null          // copied to entries logged from it, and to Shop copies
+  icon: FoodIcon | null,         // copied to entries logged from it, and to Shop copies
+  category: MealCategory | null  // the same
 } & Community                    // see "The Shop"
 ```
 ### `GET /v1/saved-meals` → `200 {"saved_meals": SavedMeal[]}` (most recently used first)
-### `POST /v1/saved-meals` `{name, default_meal_slot_id?, items, visibility?, icon?}` → `201 {"saved_meal": SavedMeal}`
-### `PUT /v1/saved-meals/{id}` (same body; `visibility` is ignored; `icon` left out keeps it, `"none"` removes it) → `200 {"saved_meal": SavedMeal}`
+### `POST /v1/saved-meals` `{name, default_meal_slot_id?, items, visibility?, icon?, category?}` → `201 {"saved_meal": SavedMeal}`
+### `PUT /v1/saved-meals/{id}` (same body; `visibility` is ignored; `icon` and `category` left out keep theirs, `"none"` removes them) → `200 {"saved_meal": SavedMeal}`
 ### `PUT /v1/saved-meals/{id}/visibility` `{visibility}` → `200 {visibility, published_at, hidden}`
 ### `DELETE /v1/saved-meals/{id}` → `204`
 ### `POST /v1/days/{date}/saved-meals/{id}` `{meal_slot_id?, meal_name?, addon_ids: []}`
@@ -278,7 +293,7 @@ Logs the base items plus the chosen add-ons as one entry. `201 {"entry": Entry, 
 within 120 kcal of your target or over.
 
 `POST /v1/entries/{id}/again` `{date?, meal_slot_id?, meal_name?}` → `201 {"entry": Entry, "day": Day}`:
-logs one of your entries again (items, macros, picture and origin; `shared` becomes `manual`).
+logs one of your entries again (items, macros, picture, category and origin; `shared` becomes `manual`).
 `date` defaults to today; the meal defaults to the original's.
 
 ## Foods

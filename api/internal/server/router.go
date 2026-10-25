@@ -55,6 +55,7 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"PATCH /v1/entries/{id}":                h.UpdateEntry,
 		"DELETE /v1/entries/{id}":               h.DeleteEntry,
 		"POST /v1/entries/{id}/share":           h.ShareEntry,
+		"POST /v1/entries/{id}/save":            h.SaveEntry,
 		"GET /v1/saved-meals":                   h.ListSavedMeals,
 		"POST /v1/saved-meals":                  h.SaveMeal,
 		"PUT /v1/saved-meals/{id}":              h.SaveMeal,

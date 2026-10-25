@@ -121,6 +121,11 @@ export const TemplatesIcon = (p: IconProps) => (
     <path d="M8 9h8M8 13h8M8 17h5" />
   </Svg>
 )
+export const BookmarkIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z" />
+  </Svg>
+)
 export const StoreIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 10h16l-1.5-5h-13Z" />

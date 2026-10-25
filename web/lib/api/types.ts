@@ -142,6 +142,9 @@ export type EntryItem = Macros & {
   source: ItemSource
 }
 
+/** What kind of meal it was (lib/meal-categories.ts has the labels). */
+export type MealCategory = "home" | "takeaway" | "eating_out" | "snack" | "sweet" | "drink" | "protein"
+
 export type EntryOrigin = "saved" | "ai" | "manual" | "search" | "barcode" | "restaurant" | "shared"
 
 export type Entry = Macros & {
@@ -159,6 +162,7 @@ export type Entry = Macros & {
   photos: MealPhoto[]
   /** A food picture key (lib/food-icons.ts), or null. */
   icon: string | null
+  category: MealCategory | null
   /** Friends you sent this meal to, oldest first, with their latest answer. */
   shared_with: EntryShare[]
   /** Set once split: how many people it was divided between (you included). */
@@ -215,6 +219,7 @@ export type SavedMeal = {
   last_used_at: string | null
   /** A food picture key (lib/food-icons.ts), or null. */
   icon: string | null
+  category: MealCategory | null
 } & Community
 
 /** Items sent when creating/updating a saved meal: ids are server-assigned. */
@@ -228,9 +233,12 @@ export type SavedMealRequest = {
   visibility?: Visibility
   /** A food picture key; "none" removes it, left out keeps it. */
   icon?: string
+  /** "none" removes it, left out keeps it. */
+  category?: MealCategory | "none"
 }
 
 export type SavedMealsResponse = { saved_meals: SavedMeal[] }
+export type SaveEntryResponse = { saved_meal: SavedMeal; entry: Entry; day: Day }
 export type SavedMealResponse = { saved_meal: SavedMeal }
 
 export type LogSavedMealRequest = {

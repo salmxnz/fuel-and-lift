@@ -6,6 +6,7 @@ import type { Day, DayMeal, Entry, EntryDayResponse, EntryItem, SavedMeal } from
 import { api, errorMessage, seg } from "@/lib/api/client"
 import { timeHM } from "@/lib/dates"
 import { kcal } from "@/lib/format"
+import { CategoryPill } from "@/components/food/category-chips"
 import { cn } from "@/lib/cn"
 import { FoodIconTile } from "@/components/food/food-icon"
 import { iconFor } from "@/lib/food-icons"
@@ -181,6 +182,7 @@ function EntryRow({ entry, onEdit }: { entry: Entry; onEdit: () => void }) {
         ) : description && description !== entry.name ? (
           <span className="line-clamp-2 text-[13px] leading-[1.4] text-muted">{description}</span>
         ) : null}
+        {entry.category ? <CategoryPill category={entry.category} className="mt-0.5 self-start" /> : null}
         {shared ? <SharedLine entry={entry} text={shared} /> : null}
       </span>
       {tile ? (
