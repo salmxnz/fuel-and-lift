@@ -390,6 +390,114 @@ input[type="number"]::-webkit-inner-spin-button {
   animation: bar-grow 500ms var(--ease-out) both;
 }
 
+/* Bite, the Shop mascot. */
+@keyframes bite-hop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  8% {
+    transform: translateY(0) scale(1.06, 0.92);
+  }
+  30% {
+    transform: translateY(-14px) scale(0.96, 1.05);
+  }
+  52% {
+    transform: translateY(0) scale(1.05, 0.94);
+  }
+  62% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+.bite-hop {
+  transform-origin: 50% 100%;
+  animation: bite-hop 1.8s var(--ease-in-out) infinite;
+}
+@keyframes bite-jump {
+  0% {
+    transform: translateY(0) rotate(0) scale(1.08, 0.9);
+  }
+  35% {
+    transform: translateY(-30px) rotate(-10deg) scale(0.95, 1.06);
+  }
+  70% {
+    transform: translateY(0) rotate(4deg) scale(1.06, 0.94);
+  }
+  100% {
+    transform: translateY(0) rotate(0) scale(1);
+  }
+}
+.bite-jump {
+  transform-origin: 50% 100%;
+  animation:
+    bite-jump 620ms var(--ease-out),
+    bite-hop 1.8s var(--ease-in-out) 620ms infinite;
+}
+@keyframes bite-shadow {
+  0%,
+  8%,
+  52%,
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+  30% {
+    transform: translateX(-50%) scale(0.7);
+    opacity: 0.55;
+  }
+}
+.bite-shadow {
+  animation: bite-shadow 1.8s var(--ease-in-out) infinite;
+}
+@keyframes bite-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+.bite-blink {
+  animation: bite-blink 4.2s ease-in-out infinite;
+}
+@keyframes bite-bag {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(8deg);
+  }
+}
+.bite-bag {
+  animation: bite-bag 1.8s ease-in-out infinite;
+}
+@keyframes bite-heart {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--x)), -48px) scale(1.1);
+  }
+}
+.bite-heart {
+  animation: bite-heart 900ms var(--ease-out) var(--d, 0ms) both;
+}
+@keyframes bite-say {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+  }
+}
+.bite-say {
+  transform-origin: bottom right;
+  animation: bite-say 260ms var(--ease-out) both;
+}
+
 /* ------------------------------------------------------------ Bits */
 
 .hatch-pink {

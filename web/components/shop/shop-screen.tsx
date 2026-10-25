@@ -3,19 +3,30 @@
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useId, useState } from "react"
-import { Button, Chip, ErrorCard, PageHeader, Skeleton } from "@/components/ui/primitives"
-import { SearchIcon } from "@/components/ui/icons"
+import { Button, ErrorCard, Skeleton } from "@/components/ui/primitives"
+import { BowlIcon, DumbbellIcon, ListIcon, SearchIcon } from "@/components/ui/icons"
+import { BackButton } from "@/components/ui/back-button"
+import { Sky } from "@/components/ui/sky"
+import { SplitSheet } from "@/components/gym/split-sheet"
+import { cn } from "@/lib/cn"
+import type { SplitsResponse } from "@/lib/api/types"
+import { BiteMascot } from "./bite-mascot"
 import { useMe } from "@/components/me-context"
 import type { ShopKind, ShopResponse, ShopSort } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { KIND_LABEL, ShopCard } from "./shop-card"
 
 const KINDS: ShopKind[] = ["routine", "template", "meal"]
+const KIND_ICON: Record<ShopKind, React.ReactNode> = {
+  routine: <ListIcon size={18} />,
+  template: <DumbbellIcon size={18} />,
+  meal: <BowlIcon size={18} />,
+}
 
 const EMPTY: Record<ShopKind, string> = {
-  routine: "No routines yet. Make one of yours public from the Gym tab and it'll show up here.",
-  template: "No workouts yet. Set one of your workouts to Public to be the first.",
-  meal: "No meals yet. Set one of your saved meals to Public to be the first.",
+  routine: "Nobody's put a routine out yet. Be the first: open one of yours in Gym, tap the lock and pick Everyone.",
+  template: "No workouts out here yet. Open one of yours, tap the lock and pick Everyone to be first.",
+  meal: "No meals out here yet. Open a saved meal, tap the lock and pick Everyone to be first.",
 }
 
 function parseKind(v: string | null): ShopKind {
@@ -55,54 +66,74 @@ export function ShopScreen() {
 
   return (
     <main className="app-column pb-safe flex min-h-dvh flex-col gap-3.5">
-      <PageHeader
-        back="history"
-        eyebrow="Community"
-        title="Shop"
-        right={
-          me.user.role === "admin" ? (
-            <Link href="/shop/reports" className="flex min-h-[44px] items-center rounded-[12px] bg-white px-3 text-[14px] font-semibold no-underline">
+      <Sky className="pb-12">
+        <div className="flex items-center justify-between gap-2">
+          <BackButton href="history" label="Back" />
+          {me.user.role === "admin" ? (
+            <Link href="/shop/reports" className="flex min-h-11 items-center rounded-[14px] bg-white/70 px-3.5 text-[14px] font-bold text-ink no-underline backdrop-blur-md">
               Reports
             </Link>
-          ) : null
-        }
-      />
-      <div role="radiogroup" aria-label="Category" className="flex gap-1.5">
-        {KINDS.map((k) => (
-          <Chip key={k} selected={k === kind} onClick={() => go({ kind: k })}>
-            {KIND_LABEL[k]}
-          </Chip>
-        ))}
-      </div>
+          ) : null}
+        </div>
+        <div className="mt-1 flex items-end justify-between gap-2">
+          <div className="flex min-w-0 flex-col pb-3">
+            <h1 className="m-0 text-[clamp(32px,10vw,40px)] font-black leading-[0.95] tracking-[-0.05em]">Shop</h1>
+            <p className="m-0 mt-1.5 max-w-[22ch] text-[14px] leading-[1.35] text-ink-soft">Routines, workouts and meals your crew and everyone else share. All free.</p>
+          </div>
+          <BiteMascot className="-mr-1 flex-none" />
+        </div>
 
-      <div className="flex items-center gap-2">
-        <label htmlFor={searchId} className="relative flex flex-1 items-center">
-          <span className="sr-only">Search {KIND_LABEL[kind].toLowerCase()}</span>
-          <SearchIcon size={18} className="pointer-events-none absolute left-3.5 text-muted" />
-          <input
-            id={searchId}
-            type="search"
-            value={text}
-            maxLength={60}
-            placeholder={`Search ${KIND_LABEL[kind].toLowerCase()}`}
-            onChange={(e) => setText(e.target.value)}
-            className="min-h-[48px] w-full min-w-0 rounded-tile border border-line bg-white pl-10 pr-3.5 text-[15px] placeholder:text-muted/80"
-          />
-        </label>
-        <label className="sr-only" htmlFor={`${searchId}-sort`}>
-          Sort
-        </label>
-        <select
-          id={`${searchId}-sort`}
-          value={sort}
-          onChange={(e) => go({ sort: e.target.value as ShopSort })}
-          className="min-h-[48px] flex-none rounded-tile border border-line bg-white px-3 text-[14px] font-semibold"
-        >
-          <option value="new">Newest</option>
-          <option value="popular">Most added</option>
-        </select>
-      </div>
+        <div role="radiogroup" aria-label="Category" className="mt-3 grid grid-cols-3 gap-1 rounded-[18px] border border-white/85 bg-white/65 p-1 backdrop-blur-md">
+          {KINDS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={k === kind}
+              onClick={() => go({ kind: k })}
+              className={cn(
+                "flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-[14px] text-[13px] font-bold transition-[background-color,color] duration-200",
+                k === kind ? "bg-ink text-white" : "text-ink-soft"
+              )}
+            >
+              <span aria-hidden="true">{KIND_ICON[k]}</span>
+              {KIND_LABEL[k]}
+            </button>
+          ))}
+        </div>
 
+        <div className="mt-2 flex items-center gap-2">
+          <label htmlFor={searchId} className="relative flex flex-1 items-center">
+            <span className="sr-only">Search {KIND_LABEL[kind].toLowerCase()}</span>
+            <SearchIcon size={18} className="pointer-events-none absolute left-3.5 text-muted" />
+            <input
+              id={searchId}
+              type="search"
+              value={text}
+              maxLength={60}
+              placeholder={`Search ${KIND_LABEL[kind].toLowerCase()}`}
+              onChange={(e) => setText(e.target.value)}
+              className="min-h-[48px] w-full min-w-0 rounded-[14px] border border-white/85 bg-white/80 pl-10 pr-3.5 text-[15px] placeholder:text-muted/80"
+            />
+          </label>
+          <label className="sr-only" htmlFor={`${searchId}-sort`}>
+            Sort
+          </label>
+          <select
+            id={`${searchId}-sort`}
+            value={sort}
+            onChange={(e) => go({ sort: e.target.value as ShopSort })}
+            className="min-h-[48px] flex-none rounded-[14px] border border-white/85 bg-white/80 px-3 text-[14px] font-semibold"
+          >
+            <option value="new">Newest</option>
+            <option value="popular">Most added</option>
+          </select>
+        </div>
+      </Sky>
+
+      {kind !== "meal" && !q.trim() ? <StarterPicks /> : null}
+
+      <h2 className="m-0 text-[20px] font-black tracking-[-0.03em]">{q.trim() ? "Results" : "From the community"}</h2>
       <Results key={query} query={query} kind={kind} searching={!!q.trim()} />
     </main>
   )
@@ -169,5 +200,61 @@ function Page({
         </Button>
       ) : null}
     </>
+  )
+}
+
+/** adebite's own splits, so the Shop is never empty: tap one to set it up. */
+function StarterPicks() {
+  const router = useRouter()
+  const splits = useApi<SplitsResponse>("splits")
+  const [open, setOpen] = useState<string | null>(null)
+  const list = splits.data?.splits ?? []
+  if (splits.loading) return <Skeleton className="h-[176px] rounded-card" />
+  if (list.length === 0) return null
+  return (
+    <section aria-labelledby="starter" className="flex flex-col gap-2">
+      <h2 id="starter" className="m-0 text-[20px] font-black tracking-[-0.03em]">
+        Starter picks <span className="text-[13px] font-semibold text-muted">by adebite</span>
+      </h2>
+      <ul className="no-scrollbar -mx-4 m-0 flex list-none snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1">
+        {list.map((sp, i) => (
+          <li key={sp.key} className="snap-start">
+            <button
+              type="button"
+              onClick={() => setOpen(sp.key)}
+              className={cn(
+                "flex h-[176px] w-[230px] flex-col justify-between rounded-card p-4 text-left transition-transform duration-150 ease-out active:scale-[0.98]",
+                i % 3 === 0 ? "bg-ink text-white" : i % 3 === 1 ? "bg-pink text-ink" : "bg-white text-ink"
+              )}
+            >
+              <span className="flex flex-col gap-1">
+                <span className={cn("text-[12px] font-bold", i % 3 === 0 ? "text-pink" : "text-protein")}>
+                  {sp.min_days === sp.max_days ? `${sp.min_days} days` : `${sp.min_days}–${sp.max_days} days`} a week
+                </span>
+                <span className="text-[21px] font-black leading-[1.05] tracking-[-0.035em]">{sp.name}</span>
+                <span className={cn("line-clamp-2 text-[12.5px] leading-[1.35]", i % 3 === 0 ? "text-night-muted" : "text-ink-soft")}>{sp.description}</span>
+              </span>
+              <span className="flex items-center justify-between gap-2">
+                <span className={cn("truncate text-[12px]", i % 3 === 0 ? "text-night-muted" : "text-muted")}>
+                  {sp.workouts.map((w) => w.name).join(" · ")}
+                </span>
+                <span className={cn("flex-none rounded-full px-3 py-1.5 text-[13px] font-extrabold", i % 3 === 0 ? "bg-pink text-ink" : "bg-ink text-white")}>
+                  Use it
+                </span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <SplitSheet
+        open={open !== null}
+        initialKey={open ?? undefined}
+        onClose={() => setOpen(null)}
+        onApplied={() => {
+          setOpen(null)
+          router.push("/gym")
+        }}
+      />
+    </section>
   )
 }

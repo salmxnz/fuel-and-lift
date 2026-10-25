@@ -166,6 +166,12 @@ export function TodayScreen() {
           />
         </div>
 
+        {date > today ? (
+          <p className="m-0 mt-3 rounded-[14px] border border-white/85 bg-white/65 px-3 py-2 text-center text-[13px] font-semibold text-ink-soft backdrop-blur-md">
+            Planning ahead. These count on the day, not before.
+          </p>
+        ) : null}
+
         {day.data && day.data.day.date === date ? (
           <CalorieSun day={day.data.day} />
         ) : (

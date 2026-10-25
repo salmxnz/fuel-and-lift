@@ -19,22 +19,29 @@ export function SplitSheet({
   open,
   onClose,
   onApplied,
+  initialKey,
 }: {
   open: boolean
   onClose: () => void
   onApplied: (res: ApplySplitResponse) => void
+  /** Preselect this split (from the Shop's starter picks). */
+  initialKey?: string
 }) {
   return (
     <Sheet open={open} onClose={onClose} title="Start from a split" description="New workouts for each day, saved as a routine you can edit or share.">
-      {open ? <SplitForm onApplied={onApplied} /> : null}
+      {open ? <SplitForm onApplied={onApplied} initialKey={initialKey} /> : null}
     </Sheet>
   )
 }
 
-function SplitForm({ onApplied }: { onApplied: (res: ApplySplitResponse) => void }) {
+function SplitForm({ onApplied, initialKey }: { onApplied: (res: ApplySplitResponse) => void; initialKey?: string }) {
   const res = useApi<SplitsResponse>("splits")
-  const [split, setSplit] = useState<Split | null>(null)
-  const [days, setDays] = useState<Weekday[]>([])
+  const [picked, setSplit] = useState<Split | null>(null)
+  const [pickedDays, setDays] = useState<Weekday[] | null>(null)
+  // The preselected split until something else is picked.
+  const initial = initialKey ? (res.data?.splits.find((x) => x.key === initialKey) ?? null) : null
+  const split = picked ?? initial
+  const days = pickedDays ?? (picked ? [] : initial ? [...initial.default_days] : [])
   const [applyToWeek, setApplyToWeek] = useState(true)
   const [busy, setBusy] = useState(false)
 
