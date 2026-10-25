@@ -48,7 +48,7 @@ export default function PhotoLimit({ appUrl, assetsUrl, firstName, limit, month,
 }
 
 PhotoLimit.PreviewProps = {
-  appUrl: "https://adebite.app",
+  appUrl: "https://adebite.com",
   assetsUrl: "/static",
   firstName: "Amara",
   limit: "10",

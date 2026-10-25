@@ -86,7 +86,7 @@ export default function Welcome({ appUrl, assetsUrl, firstName, calories, protei
 }
 
 Welcome.PreviewProps = {
-  appUrl: "https://adebite.app",
+  appUrl: "https://adebite.com",
   assetsUrl: "/static",
   firstName: "Amara",
   calories: "2,150",

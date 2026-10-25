@@ -14,8 +14,8 @@ import (
 
 func testMailer() *Mailer {
 	return New(Config{
-		From: "hello@adebite.app", FromName: "adebite",
-		AppURL: "https://adebite.app", AssetsURL: "https://adebite.app",
+		From: "hello@adebite.com", FromName: "adebite",
+		AppURL: "https://adebite.com", AssetsURL: "https://adebite.com",
 	}, slog.New(slog.DiscardHandler))
 }
 
@@ -26,7 +26,7 @@ func TestRenderEveryTemplate(t *testing.T) {
 		want []string
 	}{
 		{&Welcome{FirstName: "Amara", Calories: "2,150", Protein: "160", Carbs: "215", Fat: "70", ReferralsForPro: 8},
-			[]string{"Hi Amara", "2,150", "https://adebite.app/email/hero-welcome.png", "https://adebite.app/today"}},
+			[]string{"Hi Amara", "2,150", "https://adebite.com/email/hero-welcome.png", "https://adebite.com/today"}},
 		{&FriendJoined{FirstName: "Amara", FriendName: "Jonah <b>", Referrals: 3, Needed: 8, Remaining: 5},
 			[]string{"Jonah &lt;b&gt; is on adebite now", "referrals-3.png", "3 of 8", "/friends/add"}},
 		{&ProUnlocked{FirstName: "Amara", Needed: 8}, []string{"You did it, Amara", "hero-pro.png"}},
@@ -37,7 +37,7 @@ func TestRenderEveryTemplate(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.msg.template(), func(t *testing.T) {
-			*c.msg.base() = Base{AppURL: "https://adebite.app", AssetsURL: "https://adebite.app"}
+			*c.msg.base() = Base{AppURL: "https://adebite.com", AssetsURL: "https://adebite.com"}
 			html, text, err := m.Render(c.msg)
 			if err != nil {
 				t.Fatal(err)
@@ -79,7 +79,7 @@ func TestSendBuildsMultipart(t *testing.T) {
 	if subj, _ := new(mime.WordDecoder).DecodeHeader(msg.Header.Get("Subject")); subj != "You've got Pro, for good" {
 		t.Errorf("subject = %q", subj)
 	}
-	if from := msg.Header.Get("From"); from != `"adebite" <hello@adebite.app>` {
+	if from := msg.Header.Get("From"); from != `"adebite" <hello@adebite.com>` {
 		t.Errorf("from = %q", from)
 	}
 	mt, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))

@@ -103,7 +103,7 @@ function Highlight({ children, className }: { children: ReactNode; className?: s
 function SafariBar() {
   return (
     <div className="w-full max-w-[250px] rounded-[20px] bg-white p-3 text-ink">
-      <div className="mb-3 rounded-[11px] bg-field py-2 text-center text-[13px] font-semibold text-muted">adebite.app</div>
+      <div className="mb-3 rounded-[11px] bg-field py-2 text-center text-[13px] font-semibold text-muted">adebite.com</div>
       <div className="flex items-center justify-between px-2">
         <BackIcon size={20} />
         <ChevronRightIcon size={20} className="opacity-30" />
@@ -119,7 +119,7 @@ function SafariBar() {
 function ChromeBar() {
   return (
     <div className="flex w-full max-w-[250px] items-center gap-2 rounded-[20px] bg-white p-3 text-ink">
-      <div className="flex-1 rounded-full bg-field px-3 py-2 text-[13px] font-semibold text-muted">adebite.app</div>
+      <div className="flex-1 rounded-full bg-field px-3 py-2 text-[13px] font-semibold text-muted">adebite.com</div>
       <Highlight className="h-10 w-10 text-[20px] font-extrabold leading-none">⋮</Highlight>
     </div>
   )

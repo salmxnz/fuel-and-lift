@@ -1,0 +1,28 @@
+{
+  "name": "adebite-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "adebite: Remotion promo videos",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "still:theme": "remotion still src/index.ts ThemeCheck check/theme-check.png --frame=60 --overwrite",
+    "render": "remotion render src/index.ts AdebitePromo out/adebite-promo.mp4 --codec h264 --crf 16 --overwrite",
+    "render:vertical": "remotion render src/index.ts AdebitePromoVertical out/adebite-promo-vertical.mp4 --codec h264 --crf 16 --overwrite",
+    "stills": "bash scripts/stills.sh",
+    "beats": "bash scripts/beats.sh public/music/song.mp3",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "dependencies": {
+    "@remotion/cli": "^4.0.505",
+    "@remotion/fonts": "^4.0.505",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "remotion": "^4.0.505"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^5.9.3"
+  }
+}

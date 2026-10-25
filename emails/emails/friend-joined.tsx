@@ -40,7 +40,7 @@ export default function FriendJoined({ appUrl, assetsUrl, firstName, friendName,
 }
 
 FriendJoined.PreviewProps = {
-  appUrl: "https://adebite.app",
+  appUrl: "https://adebite.com",
   assetsUrl: "/static",
   firstName: "Amara",
   friendName: "Jonah",

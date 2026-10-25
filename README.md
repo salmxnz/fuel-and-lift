@@ -12,6 +12,7 @@ watch weight, calories and lifts trend the right way.
 | Admin | Next.js back office: users, plans, what they share, suspensions | [`admin/`](admin) |
 | Docs | API contract, auth flow, designs | [`docs/`](docs) |
 | Emails | React Email templates, exported to Go templates the API embeds | [`emails/`](emails) |
+| Video | Remotion promo video (16:9 and 9:16), cut to music | [`video/`](video) |
 
 ## Run it locally
 

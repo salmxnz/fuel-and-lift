@@ -39,7 +39,7 @@ export default function ProUnlocked({ appUrl, assetsUrl, firstName, needed }: Pr
 }
 
 ProUnlocked.PreviewProps = {
-  appUrl: "https://adebite.app",
+  appUrl: "https://adebite.com",
   assetsUrl: "/static",
   firstName: "Amara",
   needed: "8",

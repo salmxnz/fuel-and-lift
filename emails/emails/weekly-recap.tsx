@@ -64,7 +64,7 @@ export default function WeeklyRecap({
 }
 
 WeeklyRecap.PreviewProps = {
-  appUrl: "https://adebite.app",
+  appUrl: "https://adebite.com",
   assetsUrl: "/static",
   firstName: "Amara",
   weekRange: "13–19 Oct",
