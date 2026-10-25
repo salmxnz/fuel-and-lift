@@ -143,6 +143,15 @@ input[type="number"]::-webkit-inner-spin-button {
   box-shadow: 0 0 0 4px var(--color-pink);
   border-radius: inherit;
 }
+/* iOS Safari zooms the page into any focused field under 16px and leaves it
+   zoomed after the keyboard closes. Touch screens get 16px fields. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+}
 /* Text fields: a plain ink outline, like the designs' 1.5px focused border. */
 :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
   outline: 1.5px solid var(--color-ink);
@@ -239,6 +248,60 @@ input[type="number"]::-webkit-inner-spin-button {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
+}
+
+/* ------------------------------------------------------------ Sky header
+
+   Full bleed inside .app-column: cancels the column's side and top padding,
+   then adds it back inside, so the sky runs under the status bar. */
+.sky {
+  position: relative;
+  isolation: isolate;
+  margin-left: calc(-1 * max(16px, var(--safe-left)));
+  margin-right: calc(-1 * max(16px, var(--safe-right)));
+  margin-top: calc(-1 * (var(--safe-top) + 28px));
+  padding: calc(var(--safe-top) + 28px) max(16px, var(--safe-right)) 56px max(16px, var(--safe-left));
+  background: linear-gradient(#fff 0%, #fdf0f4 36%, #f9d6e2 80%, #f6c6d6 100%);
+}
+@media (min-height: 760px) {
+  .sky {
+    margin-top: calc(-1 * (var(--safe-top) + 44px));
+    padding-top: calc(var(--safe-top) + 44px);
+  }
+}
+.sky-dusk {
+  background: linear-gradient(#f6b8ca 0%, #d98baa 40%, #8a4566 80%, #553646 100%);
+}
+@keyframes sky-twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.6);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.sky-spark {
+  animation: sky-twinkle 3.2s ease-in-out infinite;
+}
+@keyframes sky-drift {
+  to {
+    transform: translateX(16px);
+  }
+}
+.sky-drift {
+  animation: sky-drift 14s ease-in-out infinite alternate;
+}
+@keyframes sun-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.sun-ring {
+  transform-origin: 180px 194px;
+  animation: sun-spin 80s linear infinite;
 }
 
 /* ------------------------------------------------------------ Bits */

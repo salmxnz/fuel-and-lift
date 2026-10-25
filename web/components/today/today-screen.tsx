@@ -13,9 +13,12 @@ import { Sheet } from "@/components/ui/sheet"
 import { DayDot, WeekPager } from "@/components/ui/week-pager"
 import type { DayResponse, Entry, MealSlotsResponse, ProgressCaloriesResponse, SavedMealsResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
-import { addDays, formatLong, isISODate, parseISODate, startOfWeek, todayISO } from "@/lib/dates"
+import { addDays, dayTitle, isISODate, startOfWeek, todayISO } from "@/lib/dates"
+import { Sky, SkyTitle, SKY_ICON } from "@/components/ui/sky"
+import { cn } from "@/lib/cn"
 import { PAGE_SLIDE, pageVariants, swipeDirection } from "@/lib/motion"
-import { CalorieCard } from "./calorie-card"
+import { CalorieSun } from "./calorie-sun"
+import { MacroCard } from "./macro-card"
 import { EntrySheet } from "./entry-sheet"
 import { MealList } from "./meal-list"
 import { IncomingMeals } from "@/components/share/incoming-shares"
@@ -40,6 +43,8 @@ export function TodayScreen() {
   }
   const isToday = date === today
   const isPast = date < today
+  // Meals can be planned up to two weeks ahead.
+  const maxDate = addDays(today, 14)
 
   const day = useApi<DayResponse>(`days/${date}`)
   const slots = useApi<MealSlotsResponse>("meal-slots")
@@ -57,7 +62,7 @@ export function TodayScreen() {
   // Which way the day changed, so the new one slides in from that side.
   const [dir, setDir] = useState(0)
   function goTo(d: string) {
-    if (d === date || d > today) return
+    if (d === date || d > maxDate) return
     setDir(d > date ? 1 : -1)
     setShownDate(d)
     window.history.replaceState(null, "", d === today ? "/today" : `/today?date=${d}`)
@@ -82,9 +87,9 @@ export function TodayScreen() {
   useEffect(() => {
     if (!dayLoaded) return
     for (const d of [addDays(date, -1), addDays(date, 1)]) {
-      if (d <= today) void queryClient.prefetchQuery({ queryKey: [`days/${d}`] })
+      if (d <= maxDate) void queryClient.prefetchQuery({ queryKey: [`days/${d}`] })
     }
-  }, [dayLoaded, date, today, queryClient])
+  }, [dayLoaded, date, maxDate, queryClient])
 
   // New food from the + menu goes to the day on screen.
   useEffect(() => {
@@ -107,32 +112,17 @@ export function TodayScreen() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <header className="flex items-end justify-between gap-2">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate text-[14px] text-muted">{formatLong(date)}</span>
-          <h1 className="m-0 truncate text-[30px] font-extrabold tracking-[-0.02em]">
-            {isToday ? "Today" : parseISODate(date).toLocaleDateString("en-GB", { weekday: "long" })}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {!isToday ? (
-            <button
-              type="button"
-              onClick={() => goTo(today)}
-              className="flex min-h-[44px] items-center rounded-[12px] bg-white px-3 text-[14px] font-semibold text-ink transition-transform duration-150 ease-out active:scale-[0.97]"
-            >
-              Today
-            </button>
-          ) : null}
-          <ShopLink kind="meal" />
-          <label className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-[12px] bg-white text-ink">
+      <Sky className="pb-2">
+        <SkyTitle title={dayTitle(date, today)}>
+          <ShopLink kind="meal" className={SKY_ICON} />
+          <label className={cn(SKY_ICON, "relative cursor-pointer")}>
             <span className="sr-only">Pick a date</span>
             <CalendarIcon size={20} />
             <input
               ref={dateInput}
               type="date"
               value={date}
-              max={today}
+              max={maxDate}
               onChange={(e) => {
                 const v = e.target.value
                 if (isISODate(v)) goTo(v)
@@ -147,26 +137,36 @@ export function TodayScreen() {
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
           </label>
+          {/* A 44 px target that's always on screen: the title shrinks first. */}
           <Link
             href="/me"
             aria-label="Me: profile and settings"
             data-tour="me"
             className="flex h-11 w-11 flex-none items-center justify-center rounded-full transition-transform duration-[160ms] ease-out active:scale-[0.95]"
           >
-            <Avatar name={displayName(me)} url={me.user.avatar_url} size={44} tone="ink" />
+            <Avatar name={displayName(me)} url={me.user.avatar_url} size={42} tone="ink" />
           </Link>
-        </div>
-      </header>
+        </SkyTitle>
 
-      <WeekPager
-        selected={date}
-        onSelect={goTo}
-        maxDate={today}
-        label="Pick a day"
-        pillId="today-day"
-        onWeekChange={setVisibleWeek}
-        renderDay={renderDay}
-      />
+        <div className="mt-3">
+          <WeekPager
+            selected={date}
+            onSelect={goTo}
+            maxDate={maxDate}
+            dimAfter={today}
+            label="Pick a day"
+            pillId="today-day"
+            onWeekChange={setVisibleWeek}
+            renderDay={renderDay}
+          />
+        </div>
+
+        {day.data && day.data.day.date === date ? (
+          <CalorieSun day={day.data.day} />
+        ) : (
+          <div className="mx-auto mt-2 aspect-[360/200] w-full max-w-[360px]" aria-hidden="true" />
+        )}
+      </Sky>
 
       <IncomingMeals
         slots={slots.data?.meal_slots ?? []}
@@ -188,8 +188,8 @@ export function TodayScreen() {
           drag="x"
           dragDirectionLock
           dragConstraints={{ left: 0, right: 0 }}
-          // Rubber band past today: there's nothing to swipe to.
-          dragElastic={isToday ? { left: 0.06, right: 0.3 } : 0.3}
+          // Rubber band past the last day you can plan.
+          dragElastic={date >= maxDate ? { left: 0.06, right: 0.3 } : 0.3}
           onDragEnd={(_, info) => {
             const d = swipeDirection(info.offset.x, info.velocity.x, window.innerWidth)
             if (d !== 0) goTo(addDays(date, d))
@@ -201,14 +201,14 @@ export function TodayScreen() {
           ) : !day.data ? (
             <div role="status" className="flex flex-col gap-3.5">
               <span className="sr-only">Loading your day…</span>
-              <Skeleton className="h-[152px] rounded-card" />
+              <Skeleton className="h-[118px] rounded-card" />
               <Skeleton className="h-6 w-24" />
               <Skeleton className="h-[110px] rounded-card" />
               <Skeleton className="h-[86px] rounded-card" />
             </div>
           ) : (
             <>
-              <CalorieCard day={day.data.day} />
+              <MacroCard day={day.data.day} />
 
               <div className="-mb-1 mt-0.5 flex items-center justify-between">
                 <h2 className="m-0 text-[17px] font-extrabold">Meals</h2>

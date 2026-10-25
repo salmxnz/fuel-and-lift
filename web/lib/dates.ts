@@ -111,3 +111,16 @@ export function localTimeZone(): string {
     return "UTC"
   }
 }
+
+/**
+ * The one name a day gets as a screen title: Today, Yesterday, Tomorrow, the
+ * weekday within a week either side, else "Fri 9 Oct". Never the date twice.
+ */
+export function dayTitle(s: string, today: string = todayISO()): string {
+  const d = daysBetween(today, s)
+  if (d === 0) return "Today"
+  if (d === -1) return "Yesterday"
+  if (d === 1) return "Tomorrow"
+  if (Math.abs(d) < 7) return weekdayName(s)
+  return parseISODate(s).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+}
