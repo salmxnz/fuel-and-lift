@@ -65,9 +65,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             style: {
               fontFamily: "var(--font-sans)",
               borderRadius: 14,
-              background: "#2E1A24",
-              color: "#FFFFFF",
-              border: "none",
+              background: "#FFFFFF",
+              color: "#2E1A24",
+              border: "1px solid #ECD3DD",
+              boxShadow: "0 10px 30px -12px rgba(46, 26, 36, 0.28)",
             },
           }}
         />

@@ -617,6 +617,19 @@ body [data-sonner-toast] {
   transition-duration: 250ms;
   transition-timing-function: var(--ease-out);
 }
+/* Light toasts: muted description, pink action button. */
+body [data-sonner-toast] [data-description] {
+  color: var(--color-muted);
+}
+body [data-sonner-toast] [data-button] {
+  background: var(--color-pink);
+  color: var(--color-ink);
+  font-weight: 700;
+}
+body [data-sonner-toast] [data-cancel] {
+  background: var(--color-pink-soft);
+  color: var(--color-ink);
+}
 
 /* Reduced motion means less movement, not no feedback: keyframe animations
    (pulses, spinners, slides) stop, but small press and colour transitions

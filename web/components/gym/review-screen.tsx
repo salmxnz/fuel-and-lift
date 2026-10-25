@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
+  animate,
   AnimatePresence,
   motion,
   useMotionValue,
@@ -10,7 +11,7 @@ import {
   useTransform,
   type PanInfo,
 } from "motion/react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button, ErrorCard, Spinner, Switch } from "@/components/ui/primitives"
 import { CheckIcon, CloseIcon, PencilIcon, TrendIcon } from "@/components/ui/icons"
@@ -241,6 +242,7 @@ export function ReviewScreen({ id }: { id: string }) {
                 block={current}
                 templateName={name}
                 disabled={busy}
+                hint={idx === 0}
                 exitDir={exitDir}
                 onSwipe={(dir) => {
                   if (dir === "right") void markDone(current)
@@ -336,19 +338,36 @@ function SwipeCard({
   block,
   templateName,
   disabled,
+  hint,
   exitDir,
   onSwipe,
 }: {
   block: SessionBlock
   templateName: string
   disabled: boolean
+  /** Nudge the card right then left once, so the swipes are discoverable. */
+  hint: boolean
   exitDir: Dir
   onSwipe: (dir: Dir) => void
 }) {
   const reduce = useReducedMotion()
   const x = useMotionValue(0)
   const y = useMotionValue(0)
-  const rotate = useTransform(x, [-200, 0, 200], [-12, -2.5, 8])
+  // Straight at rest; it only tilts while dragged.
+  const rotate = useTransform(x, [-200, 0, 200], [-10, 0, 10])
+  const hinting = useRef<ReturnType<typeof animate> | null>(null)
+
+  // Right (the Done stamp shows), left (Edit shows), back: a beat after the card lands.
+  useEffect(() => {
+    if (!hint || reduce || disabled) return
+    const t = window.setTimeout(() => {
+      hinting.current = animate(x, [0, 72, 0, -48, 0], { duration: 1.5, ease: "easeInOut", times: [0, 0.28, 0.52, 0.76, 1] })
+    }, 700)
+    return () => {
+      window.clearTimeout(t)
+      hinting.current?.stop()
+    }
+  }, [hint, reduce, disabled, x])
   const doneOpacity = useTransform(x, [0, THRESHOLD], [0.35, 1])
   const editOpacity = useTransform(x, [-THRESHOLD, 0], [1, 0])
   const skipOpacity = useTransform(y, [-THRESHOLD, 0], [1, 0])
@@ -396,6 +415,7 @@ function SwipeCard({
       drag={disabled ? false : true}
       dragSnapToOrigin
       dragElastic={0.9}
+      onDragStart={() => hinting.current?.stop()}
       onDragEnd={onDragEnd}
       initial={reduce ? { opacity: 0 } : { scale: 0.94, opacity: 0, y: 14 }}
       animate={{ scale: 1, opacity: 1, y: 0 }}
