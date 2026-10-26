@@ -8,6 +8,7 @@ import { StatusPill, firstName } from "@/components/share/friend-picker"
 import { ItemsEditor, TotalsRow } from "@/components/food/items-editor"
 import { PhotoCarousel } from "@/components/food/photo-carousel"
 import { api, errorMessage, seg } from "@/lib/api/client"
+import { logAgain } from "@/components/food/offline-log"
 import type { Day, DayResponse, Entry, EntryDayResponse, MealCategory, MealSlot, SaveEntryResponse } from "@/lib/api/types"
 import { fromEntryItem, toEntryItems, type EditableItem } from "@/lib/items"
 import { parseDecimal } from "@/lib/format"
@@ -132,10 +133,10 @@ function EntryForm({
   async function logAgainToday() {
     setLoggingAgain(true)
     try {
-      const res = await api.post<EntryDayResponse>(`entries/${seg(entry.id)}/again`, { date: today })
+      const res = await logAgain({ date: today, source: entry })
       toast.success(`${entry.name}, logged today. Easy.`)
       onClose()
-      onLoggedToday(res.day)
+      if (res) onLoggedToday(res.day)
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {

@@ -58,8 +58,10 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
     })
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err
-    throw new ApiError(0, "You seem to be offline. Check your connection.", "network")
+    setNetworkDown(true)
+    throw new ApiError(0, "You're offline. This needs a connection.", "network")
   }
+  setNetworkDown(false)
 
   if (res.status === 204) return undefined as T
 
@@ -71,6 +73,23 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
     throw new ApiError(res.status, message, err?.code ?? null)
   }
   return json as T
+}
+
+// The phone can say it's online with one bar and no data: after a request
+// that never got through, the app counts as offline until one does
+// (lib/offline-queue.ts useOnline/offlineNow).
+let networkDown = false
+export const NETWORK_EVENT = "fl:network"
+
+function setNetworkDown(down: boolean) {
+  if (networkDown === down) return
+  networkDown = down
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(NETWORK_EVENT))
+}
+
+/** True when the last request failed to reach the server at all. */
+export function isNetworkDown(): boolean {
+  return networkDown
 }
 
 function capitalize(s: string): string {

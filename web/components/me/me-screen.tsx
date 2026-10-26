@@ -1,13 +1,14 @@
 "use client"
 
 import { clearCache } from "@/lib/api/query-client"
+import { dropOutbox, pendingOps } from "@/lib/offline-queue"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useRef, useState } from "react"
 import { toast } from "sonner"
 import { displayName, useMe } from "@/components/me-context"
 import { Avatar, Button, PageHeader, ReferralBar, Skeleton } from "@/components/ui/primitives"
-import { BellIcon, CameraIcon, ChevronRightIcon, GearIcon, GlobeIcon, ListIcon, PencilIcon, ScaleIcon, ShareIcon, ShopIcon, StarIcon, TargetIcon, TrashIcon } from "@/components/ui/icons"
+import { BellIcon, CameraIcon, ChatIcon, ChevronRightIcon, GearIcon, GlobeIcon, ListIcon, PencilIcon, ScaleIcon, ShareIcon, ShopIcon, StarIcon, TargetIcon, TrashIcon } from "@/components/ui/icons"
 import { Sheet } from "@/components/ui/sheet"
 import { api, errorMessage } from "@/lib/api/client"
 import type { BillingResponse, Goal, GoalResponse, SharingResponse, UserResponse } from "@/lib/api/types"
@@ -50,9 +51,19 @@ export function MeScreen() {
   const isPro = b?.plan === "pro"
 
   async function signOut() {
+    const waiting = pendingOps().length
+    if (
+      waiting > 0 &&
+      !window.confirm(
+        `${waiting} change${waiting === 1 ? " is" : "s are"} saved on this phone and not synced yet. Signing out deletes ${waiting === 1 ? "it" : "them"}. Sign out anyway?`
+      )
+    ) {
+      return
+    }
     setSigningOut(true)
     // Nothing of this account stays on the device.
     clearCache()
+    dropOutbox()
     try {
       await fetch("/api/auth/logout", { method: "POST", headers: { Accept: "application/json" } })
     } catch {
@@ -133,6 +144,7 @@ export function MeScreen() {
         <Row href="/settings/goal" icon={<TargetIcon size={20} />} title="Goal and targets" />
         <Row href="/weigh-in" icon={<ScaleIcon size={20} />} title="Weigh-in" />
         <Row href="/settings/notifications" icon={<BellIcon size={20} />} title="Notifications" />
+        <Row href="/feedback" icon={<ChatIcon size={20} />} title="Feedback" sub="Report a bug or suggest something" />
         <Row
           href="/settings/profile"
           icon={<GearIcon size={20} />}

@@ -4,8 +4,9 @@ import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persist
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client"
 import { useState } from "react"
 import { CACHE_KEY_PREFIX, getQueryClient } from "@/lib/api/query-client"
+import { setOutboxOwner } from "@/lib/offline-queue"
 
-const DAY = 24 * 60 * 60 * 1000
+const WEEK = 7 * 24 * 60 * 60 * 1000
 
 /** Bump when cached response shapes change in a way old data would break. */
 const CACHE_VERSION = "1"
@@ -26,6 +27,8 @@ export function QueryProvider({ userId, children }: { userId: string; children: 
     if (typeof window !== "undefined") {
       if (owner && owner !== userId) c.clear()
       owner = userId
+      // Changes saved offline are per user too.
+      setOutboxOwner(userId)
     }
     return c
   })
@@ -43,7 +46,7 @@ export function QueryProvider({ userId, children }: { userId: string; children: 
       client={client}
       persistOptions={{
         persister,
-        maxAge: DAY,
+        maxAge: WEEK,
         buster: CACHE_VERSION,
         dehydrateOptions: {
           shouldDehydrateQuery: (q) => {

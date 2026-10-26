@@ -7,8 +7,8 @@ import { Button, ErrorCard, Field, PageHeader, Skeleton, Switch, TextInput } fro
 import { ChevronRightIcon, CloseIcon, PencilIcon, PlusIcon } from "@/components/ui/icons"
 import { Sheet } from "@/components/ui/sheet"
 import { api, errorMessage, seg } from "@/lib/api/client"
+import { logSavedMeal } from "@/components/food/offline-log"
 import type {
-  EntryDayResponse,
   MealCategory,
   MealSlotsResponse,
   SavedMeal,
@@ -189,9 +189,13 @@ export function SavedMealsScreen() {
             label={target.label}
             onLog={async (addonIds) => {
               try {
-                await api.post<EntryDayResponse>(`days/${seg(target.date)}/saved-meals/${seg(picking.id)}`, {
-                  ...targetBody(target),
-                  addon_ids: addonIds,
+                await logSavedMeal({
+                  date: target.date,
+                  label: target.label,
+                  meal: picking,
+                  mealId: picking.id,
+                  target: targetBody(target),
+                  addonIds,
                 })
                 toast.success(`${picking.name} logged to ${target.label}. Sorted.`)
                 router.push(`/today?date=${target.date}`)

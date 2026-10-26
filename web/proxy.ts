@@ -70,6 +70,8 @@ export async function proxy(request: NextRequest) {
 
   // OAuth, logout and other auth plumbing manage cookies themselves.
   if (pathname.startsWith("/api/auth/")) return NextResponse.next()
+  // Stripe's webhooks carry no session; Go checks their signature.
+  if (pathname === "/api/stripe/webhook") return NextResponse.next()
 
   const isApi = pathname.startsWith("/api/")
   const auth = await resolveProxyAuth(request)

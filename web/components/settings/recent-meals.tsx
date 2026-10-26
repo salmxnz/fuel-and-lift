@@ -9,7 +9,8 @@ import { toast } from "sonner"
 import { FoodIconTile } from "@/components/food/food-icon"
 import { Skeleton } from "@/components/ui/primitives"
 import { api, errorMessage, seg } from "@/lib/api/client"
-import type { DayResponse, Entry, EntryDayResponse, SavedMeal, SaveEntryResponse } from "@/lib/api/types"
+import { logAgain } from "@/components/food/offline-log"
+import type { DayResponse, Entry, SavedMeal, SaveEntryResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { addDays, relativeDay, todayISO } from "@/lib/dates"
 import { iconFor } from "@/lib/food-icons"
@@ -64,7 +65,7 @@ export function RecentMeals({
         setDone((s) => new Set(s).add(e.id))
         onSaved?.(res.saved_meal)
       } else if (target) {
-        await api.post<EntryDayResponse>(`entries/${seg(e.id)}/again`, { date: target.date, ...targetBody(target) })
+        await logAgain({ date: target.date, label: target.label, source: e, target: targetBody(target) })
         toast.success(`${e.name}, logged to ${target.label}. Easy.`)
         onLogged?.()
       }

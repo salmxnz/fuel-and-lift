@@ -27,6 +27,7 @@ import (
 	"github.com/salmxnz/fuel-and-lift/api/internal/server"
 	"github.com/salmxnz/fuel-and-lift/api/internal/storage"
 	"github.com/salmxnz/fuel-and-lift/api/internal/store"
+	"github.com/salmxnz/fuel-and-lift/api/internal/stripe"
 )
 
 func main() {
@@ -118,6 +119,14 @@ func run(log *slog.Logger, args []string) error {
 		go h.CleanPendingPhotos(ctx)
 	} else {
 		log.Warn("R2 not configured: meal photos are not stored (set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)")
+	}
+	if cfg.PaymentsConfigured() {
+		h.Payments = stripe.New(cfg.StripeSecretKey)
+		if cfg.StripeWebhookSecret == "" {
+			log.Warn("STRIPE_WEBHOOK_SECRET not set: Stripe webhooks are refused, so paid Pro never starts")
+		}
+	} else {
+		log.Warn("Stripe not configured: paid Pro is off (set STRIPE_SECRET_KEY and STRIPE_PRICE_MONTHLY)")
 	}
 	go h.RunReminders(ctx)
 	go h.RunCleanup(ctx)

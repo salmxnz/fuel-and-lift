@@ -8,8 +8,9 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { FoodIconTile } from "@/components/food/food-icon"
 import { Avatar, Skeleton } from "@/components/ui/primitives"
-import { api, errorMessage, seg } from "@/lib/api/client"
-import type { Day, Entry, EntryDayResponse, SuggestionsResponse } from "@/lib/api/types"
+import { errorMessage } from "@/lib/api/client"
+import { logAgain } from "@/components/food/offline-log"
+import type { Day, Entry, SuggestionsResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { addDays } from "@/lib/dates"
 import { kcal, num1 } from "@/lib/format"
@@ -41,12 +42,14 @@ export function MealSuggestions({
   async function again(e: Entry) {
     setBusy(e.id)
     try {
-      const r = await api.post<EntryDayResponse>(`entries/${seg(e.id)}/again`, {
+      const r = await logAgain({
         date,
-        ...(slotId ? { meal_slot_id: slotId } : { meal_name: mealLabel }),
+        label: mealLabel,
+        source: e,
+        target: slotId ? { meal_slot_id: slotId } : { meal_name: mealLabel },
       })
       toast.success(`${e.name}, added. Easy.`)
-      onLogged(r.day)
+      if (r) onLogged(r.day)
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {

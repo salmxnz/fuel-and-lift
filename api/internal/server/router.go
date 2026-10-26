@@ -24,6 +24,8 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/push/vapid-public-key":        h.VAPIDPublicKey,
 		"GET /v1/avatars/{user_id}":            h.Avatar,
 		"GET /v1/exercise-photos/{id}":         h.ExercisePhoto,
+		// Stripe calls this; its signature is the auth.
+		"POST /v1/billing/webhook": h.StripeWebhook,
 	}
 	for p, f := range open {
 		mux.HandleFunc(p, f)
@@ -74,6 +76,7 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/ai/usage":          h.AIUsage,
 		"GET /v1/billing":           h.Billing,
 		"POST /v1/billing/checkout": h.Checkout,
+		"POST /v1/billing/portal":   h.BillingPortal,
 
 		// gym
 		"GET /v1/exercises":                             h.ListExercises,
@@ -147,6 +150,10 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/photos":         h.ListPhotos,
 		"DELETE /v1/photos/{id}": h.DeletePhoto,
 
+		// feedback
+		"POST /v1/feedback": h.SendFeedback,
+		"GET /v1/feedback":  h.ListMyFeedback,
+
 		// friends
 		"POST /v1/invite-links":        h.CreateInviteLink,
 		"GET /v1/invite-links":         h.ListInviteLinks,
@@ -199,11 +206,16 @@ func NewRouter(h *handlers.Handler) http.Handler {
 		"GET /v1/admin/users/{id}/sessions":              h.AdminUserSessions,
 		"GET /v1/admin/users/{id}/sessions/{session_id}": h.AdminUserSession,
 		"GET /v1/admin/users/{id}/friends":               h.AdminUserFriends,
+		"GET /v1/admin/users/{id}/billing":               h.AdminUserBilling,
+		"POST /v1/admin/users/{id}/billing/sync":         h.SyncAdminUserBilling,
 
 		// what the server sent and what it was asked
 		"GET /v1/admin/notifications":       h.ListSentNotifications,
 		"GET /v1/admin/notifications/stats": h.SentNotificationStats,
 		"GET /v1/admin/audit":               h.ListAudit,
+		"GET /v1/admin/feedback":            h.ListAdminFeedback,
+		"PATCH /v1/admin/feedback/{id}":     h.PatchAdminFeedback,
+		"GET /v1/admin/billing":             h.AdminBilling,
 	}
 	for p, f := range admin {
 		mux.HandleFunc(p, secure(auth.RequireAdmin(f)))

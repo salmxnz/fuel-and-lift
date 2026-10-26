@@ -92,6 +92,109 @@ export type Billing = {
   referrals: { joined: number; needed: number }
   photos_stored: number
   photos_limit: number | null
+  /** Their latest Stripe subscription, even an ended one; null when they never paid. */
+  subscription: Subscription | null
+}
+
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "unpaid"
+  | "paused"
+  | "canceled"
+  | "incomplete"
+  | "incomplete_expired"
+
+/** What the user sees of their latest subscription (Billing.subscription). */
+export type Subscription = {
+  status: SubscriptionStatus
+  current_period_end: string
+  /** Won't renew: ends at current_period_end. */
+  cancel_at_period_end: boolean
+  interval: "month" | "year" | null
+  /** Minor units: 249 = $2.49. */
+  amount: number | null
+  currency: string | null
+  started_at: string | null
+  /** When the cancellation was asked for. */
+  canceled_at: string | null
+  ended_at: string | null
+}
+
+// ---------------------------------------------------------------- Admin billing
+
+/** Everything stored about a subscription. */
+export type AdminSubscription = Subscription & {
+  id: string
+  customer_id: string
+  price_id: string | null
+  /** When a scheduled cancellation takes effect. */
+  cancel_at: string | null
+  /** Stripe's: cancellation_requested, payment_failed, payment_disputed. */
+  cancel_reason: string | null
+  /** The customer's, from the Customer Portal: too_expensive, missing_features, unused, other, ... */
+  cancel_feedback: string | null
+  cancel_comment: string | null
+  livemode: boolean
+  created_at: string
+  updated_at: string
+  /** On the billing list only. */
+  user?: { id: string; name: string; email: string; avatar_url: string | null }
+}
+
+export type StripeInfo =
+  | { configured: false; mode: null; dashboard_url: null }
+  | { configured: true; mode: "test" | "live"; dashboard_url: string }
+
+export type Money = { currency: string; amount: number }
+
+export type BillingSummary = {
+  active: number
+  cancelling: number
+  past_due: number
+  ended_30d: number
+  new_30d: number
+  monthly: number
+  yearly: number
+  /** Monthly recurring revenue per currency (yearly counted as a twelfth). */
+  mrr: Money[]
+}
+
+export type BillingStatusFilter = "" | "active" | "cancelling" | "past_due" | "ended"
+
+export type AdminBillingResponse = {
+  summary: BillingSummary
+  subscriptions: AdminSubscription[]
+  total: number
+  stripe: StripeInfo
+}
+
+/** A Stripe charge. */
+export type AdminPayment = {
+  id: string
+  amount: number
+  amount_refunded: number
+  currency: string
+  status: "succeeded" | "pending" | "failed"
+  refunded: boolean
+  disputed: boolean
+  created: string
+  description: string | null
+  failure_message: string | null
+  receipt_url: string | null
+  payment_intent: string | null
+}
+
+export type AdminUserBillingResponse = {
+  billing: Billing
+  customer_id: string | null
+  /** Newest first. */
+  subscriptions: AdminSubscription[]
+  /** null when Stripe couldn't be reached (see payments_error). */
+  payments: AdminPayment[] | null
+  payments_error: string | null
+  stripe: StripeInfo
 }
 
 // ---------------------------------------------------------------- Community
@@ -258,3 +361,30 @@ export type AuditEntry = {
   error: string | null
 }
 export type AuditResponse = { entries: AuditEntry[]; next_before: number | null }
+
+// ---------------------------------------------------------------- Feedback
+
+export const FEEDBACK_STATUSES = ["new", "seen", "done"] as const
+export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number]
+export type FeedbackKind = "bug" | "idea" | "other"
+
+/** From the PWA's Me → Feedback. Photo URLs are signed and expire in about an hour. */
+export type Feedback = {
+  id: number
+  user: Person
+  kind: FeedbackKind
+  message: string
+  page: string | null
+  user_agent: string | null
+  status: FeedbackStatus
+  admin_note: string | null
+  photos: { id: string; url: string; content_type: string }[]
+  created_at: string
+  updated_at: string
+}
+export type FeedbackListResponse = {
+  feedback: Feedback[]
+  next_before: number | null
+  counts: Record<FeedbackStatus, number>
+}
+export type FeedbackResponse = { feedback: Feedback }

@@ -127,10 +127,7 @@ func (s *Store) AddWeekExtras(ctx context.Context, userID, templateID string, we
 			return err
 		}
 		for _, b := range blocks {
-			sets, _ := json.Marshal(b.Sets)
-			if b.Sets == nil {
-				sets = []byte("[]")
-			}
+			sets, _ := json.Marshal(withoutIDs(b.Sets))
 			if _, err := tx.Exec(ctx, `insert into week_extras (user_id, week_start, template_id, exercise_id, sets)
 				values ($1::uuid, $2, $3::uuid, $4::uuid, $5)`, userID, weekStart.Time, templateID, b.ExerciseID, sets); err != nil {
 				return err
@@ -181,6 +178,17 @@ func (s *Store) DeleteWeekExtra(ctx context.Context, userID, id string) error {
 // appendWeekExtras adds the week's pending extras for a template to a new
 // session, after position, and marks them used.
 func appendWeekExtras(ctx context.Context, tx pgx.Tx, userID, sessionID, templateID string, d Date, position int) error {
+	return weekExtrasFor(ctx, tx, userID, sessionID, templateID, d, position, true)
+}
+
+// claimWeekExtras only marks the week's pending extras for a template used
+// by a session: one started with the client's own blocks, which already
+// include them.
+func claimWeekExtras(ctx context.Context, tx pgx.Tx, userID, sessionID, templateID string, d Date) error {
+	return weekExtrasFor(ctx, tx, userID, sessionID, templateID, d, 0, false)
+}
+
+func weekExtrasFor(ctx context.Context, tx pgx.Tx, userID, sessionID, templateID string, d Date, position int, insert bool) error {
 	rows, err := tx.Query(ctx, `
 		update week_extras set session_id = $4::uuid
 		where user_id = $1::uuid and template_id = $2::uuid and week_start = $3 and session_id is null
@@ -200,7 +208,7 @@ func appendWeekExtras(ctx context.Context, tx pgx.Tx, userID, sessionID, templat
 		_ = json.Unmarshal(raw, &x.sets)
 		return x, err
 	})
-	if err != nil {
+	if err != nil || !insert {
 		return err
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].at.Before(list[j].at) })

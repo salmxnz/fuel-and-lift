@@ -3,6 +3,7 @@ import { getMe, getSession } from "@/lib/auth/session"
 import { MeProvider } from "@/components/me-context"
 import { ApiDownScreen } from "@/components/api-down"
 import { QueryProvider } from "@/components/query-provider"
+import { OfflineSync } from "@/components/pwa/offline-sync"
 
 export const dynamic = "force-dynamic"
 
@@ -28,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* Keyed by user: another account never sees this one's cache. */}
       <QueryProvider key={me.user.id} userId={me.user.id}>
         {children}
+        <OfflineSync />
       </QueryProvider>
     </MeProvider>
   )

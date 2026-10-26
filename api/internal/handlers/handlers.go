@@ -40,8 +40,12 @@ type Handler struct {
 	Mail *email.Mailer
 	// Audit records every request for the admin app; nil records nothing.
 	Audit *audit.Recorder
+	// Payments sells Pro (Stripe); nil turns paid Pro off.
+	Payments Payments
 
-	rest restTimers // pending "rest's over" pushes
+	rest      restTimers     // pending "rest's over" pushes
+	prices    priceCache     // Stripe prices shown on the paywall
+	dashboard dashboardCache // the Stripe Dashboard's address, for admin links
 }
 
 // PhotoStorage is where meal photos live (storage.R2, or a fake in tests).
@@ -207,4 +211,71 @@ func (o *optional[T]) UnmarshalJSON(b []byte) error {
 	}
 	o.Value = &v
 	return nil
+}
+
+// --- offline replays ----------------------------------------------------------------
+//
+// The PWA queues creates made offline and replays them later, maybe more than
+// once when a response was lost. So creates take an optional client-made id
+// (a uuid) and the real time it happened; the same id again returns what's
+// already there.
+
+// clientIDs checks optional client-made ids, writing a 400 when one is
+// malformed.
+func clientIDs(w http.ResponseWriter, ids ...*string) bool {
+	for _, id := range ids {
+		if id != nil && !isUUID(*id) {
+			badRequest(w, "id is not valid")
+			return false
+		}
+	}
+	return true
+}
+
+// clampTime keeps an optional client time within [lo, hi]; nil stays nil.
+func clampTime(t *time.Time, lo, hi time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	v := *t
+	if v.Before(lo) {
+		v = lo
+	}
+	if v.After(hi) {
+		v = hi
+	}
+	return &v
+}
+
+// entryLogWindow is how far back an offline entry's logged_at may go.
+const entryLogWindow = 7 * 24 * time.Hour
+
+// replayedEntry answers a replayed entry create: when id is already one of
+// the user's entries it writes that entry and its day (200) like a normal
+// response and returns true, with nothing else done. Someone else's id is a
+// 404 (also true).
+func (h *Handler) replayedEntry(w http.ResponseWriter, r *http.Request, userID string, id *string, extra map[string]any) bool {
+	if id == nil {
+		return false
+	}
+	e, found, err := h.Store.ExistingEntry(r.Context(), userID, *id)
+	if err != nil {
+		h.storeError(w, r, err)
+		return true
+	}
+	if !found {
+		return false
+	}
+	h.withExtras(r.Context(), userID, &e)
+	day, err := h.day(r.Context(), userID, e.Date)
+	if err != nil {
+		h.storeError(w, r, err)
+		return true
+	}
+	out := map[string]any{"entry": e, "day": day}
+	for k, v := range extra {
+		out[k] = v
+	}
+	httpx.JSON(w, http.StatusOK, out)
+	return true
 }

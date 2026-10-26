@@ -30,6 +30,8 @@ import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
 import { num1, parseDecimal, signed } from "@/lib/format"
 import { cardioText, doneText, plannedText } from "./session-helpers"
+import { acceptOps, finishLater, mustQueue, sendSessionOps, useSessionId } from "./offline-session"
+import { isOffline, type NewOp } from "@/lib/offline-queue"
 
 const THRESHOLD = 100
 /** px/s: a flick this fast counts even when it's short. */
@@ -49,8 +51,9 @@ function useNightBody() {
   }, [])
 }
 
-export function ReviewScreen({ id }: { id: string }) {
+export function ReviewScreen({ id: rendered }: { id: string }) {
   useNightBody()
+  const id = useSessionId(rendered)
   const router = useRouter()
   const res = useApi<SessionResponse>(`sessions/${seg(id)}`)
   const session = res.data?.session
@@ -86,6 +89,11 @@ export function ReviewScreen({ id }: { id: string }) {
 
   async function finish(after?: Session) {
     setFinishing(true)
+    if (mustQueue(s.id)) {
+      finishLater(s)
+      router.push("/gym")
+      return
+    }
     try {
       const out = await api.post<FinishSessionResponse>(`sessions/${seg(s.id)}/finish`)
       setFinishedSession(out.session)
@@ -99,6 +107,11 @@ export function ReviewScreen({ id }: { id: string }) {
         router.push("/gym")
       }
     } catch (err) {
+      if (isOffline(err)) {
+        finishLater(s)
+        router.push("/gym")
+        return
+      }
       toast.error(errorMessage(err))
       if (after) res.setData({ session: after })
     } finally {
@@ -114,26 +127,10 @@ export function ReviewScreen({ id }: { id: string }) {
   async function markDone(block: SessionBlock) {
     setBusy(true)
     try {
-      let latest: Session = s
-      if (block.cardio) {
-        if (!block.cardio_done) {
-          latest = (await api.patch<SessionResponse>(`sessions/${seg(s.id)}/blocks/${seg(block.id)}`, { cardio_done: true })).session
-        }
-      } else {
-        for (const set of block.sets.filter((x) => !x.done)) {
-          latest = (
-            await api.patch<SessionResponse>(`sessions/${seg(s.id)}/sets/${seg(set.id)}`, {
-              done: true,
-              actual_kg: set.actual_kg ?? set.target_kg,
-              actual_reps: set.actual_reps ?? set.target_reps,
-            })
-          ).session
-        }
-      }
-      if (block.skipped) {
-        latest = (await api.patch<SessionResponse>(`sessions/${seg(s.id)}/blocks/${seg(block.id)}`, { skipped: false })).session
-      }
-      res.setData({ session: latest })
+      const ops = acceptOps(s.id, block)
+      if (block.skipped) ops.push({ kind: "block", sessionId: s.id, blockId: block.id, body: { skipped: false } })
+      const latest = await sendSessionOps(s.id, ops)
+      if (latest) res.setData({ session: latest })
       advance("right")
     } catch (err) {
       toast.error(errorMessage(err))
@@ -146,8 +143,8 @@ export function ReviewScreen({ id }: { id: string }) {
     setBusy(true)
     try {
       if (!block.skipped) {
-        const out = await api.patch<SessionResponse>(`sessions/${seg(s.id)}/blocks/${seg(block.id)}`, { skipped: true })
-        res.setData({ session: out.session })
+        const latest = await sendSessionOps(s.id, [{ kind: "block", sessionId: s.id, blockId: block.id, body: { skipped: true } }])
+        if (latest) res.setData({ session: latest })
       }
       advance("up")
     } catch (err) {
@@ -160,10 +157,15 @@ export function ReviewScreen({ id }: { id: string }) {
   async function acceptAll() {
     setBusy(true)
     try {
-      const out = await api.post<SessionResponse>(`sessions/${seg(s.id)}/accept-all`)
-      res.setData({ session: out.session })
+      let after: Session | undefined
+      if (mustQueue(s.id)) {
+        await sendSessionOps(s.id, s.blocks.filter((b) => !b.skipped).flatMap((b) => acceptOps(s.id, b)))
+      } else {
+        after = (await api.post<SessionResponse>(`sessions/${seg(s.id)}/accept-all`)).session
+        res.setData({ session: after })
+      }
       setIdx(total)
-      await finish(out.session)
+      await finish(after)
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {
@@ -288,7 +290,7 @@ export function ReviewScreen({ id }: { id: string }) {
         session={s}
         onClose={() => setEditing(null)}
         onSaved={(next) => {
-          res.setData({ session: next })
+          if (next) res.setData({ session: next })
           setEditing(null)
           advance("left")
         }}
@@ -494,7 +496,8 @@ function EditSheet({
   block: SessionBlock | null
   session: Session
   onClose: () => void
-  onSaved: (s: Session) => void
+  /** null: saved on the phone for later. */
+  onSaved: (s: Session | null) => void
 }) {
   return (
     <Sheet open={!!block} onClose={onClose} title={block ? `Edit ${block.exercise.name}` : "Edit"} surface="ground">
@@ -503,7 +506,7 @@ function EditSheet({
   )
 }
 
-function EditForm({ block, session, onSaved }: { block: SessionBlock; session: Session; onSaved: (s: Session) => void }) {
+function EditForm({ block, session, onSaved }: { block: SessionBlock; session: Session; onSaved: (s: Session | null) => void }) {
   const sets = [...block.sets].sort((a, b) => a.position - b.position)
   const numbers = sets.map((set, i) => sets.slice(0, i + 1).filter((z) => !z.warmup).length)
   const [rows, setRows] = useState(() =>
@@ -520,9 +523,10 @@ function EditForm({ block, session, onSaved }: { block: SessionBlock; session: S
   async function save() {
     setSaving(true)
     try {
-      let latest = session
+      const sid = session.id
+      const ops: NewOp[] = []
       if (block.cardio) {
-        latest = (await api.patch<SessionResponse>(`sessions/${seg(session.id)}/blocks/${seg(block.id)}`, { cardio_done: cardioDone })).session
+        ops.push({ kind: "block", sessionId: sid, blockId: block.id, body: { cardio_done: cardioDone } })
       } else {
         for (const r of rows) {
           const orig = sets.find((x) => x.id === r.id)
@@ -531,18 +535,16 @@ function EditForm({ block, session, onSaved }: { block: SessionBlock; session: S
           const reps = parseDecimal(r.reps)
           const changed = orig.done !== r.done || (r.done && (kg !== orig.actual_kg || reps !== orig.actual_reps))
           if (!changed) continue
-          latest = (
-            await api.patch<SessionResponse>(`sessions/${seg(session.id)}/sets/${seg(r.id)}`, {
-              done: r.done,
-              ...(r.done ? { actual_kg: kg, actual_reps: reps != null ? Math.round(reps) : null } : {}),
-            })
-          ).session
+          ops.push({
+            kind: "set",
+            sessionId: sid,
+            setId: r.id,
+            body: { done: r.done, ...(r.done ? { actual_kg: kg, actual_reps: reps != null ? Math.round(reps) : null } : {}) },
+          })
         }
       }
-      if (block.skipped) {
-        latest = (await api.patch<SessionResponse>(`sessions/${seg(session.id)}/blocks/${seg(block.id)}`, { skipped: false })).session
-      }
-      onSaved(latest)
+      if (block.skipped) ops.push({ kind: "block", sessionId: sid, blockId: block.id, body: { skipped: false } })
+      onSaved(await sendSessionOps(sid, ops))
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {

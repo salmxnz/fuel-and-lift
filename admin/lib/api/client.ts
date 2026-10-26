@@ -83,6 +83,7 @@ export const api = {
   get: <T>(path: string, query?: Query, signal?: AbortSignal) => request<T>("GET", path, { query, signal }),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, { body: body ?? {} }),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body: body ?? {} }),
+  patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body: body ?? {} }),
   del: <T = void>(path: string) => request<T>("DELETE", path),
 }
 

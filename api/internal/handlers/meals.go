@@ -270,9 +270,13 @@ type entryBody struct {
 	ProteinG     float64           `json:"protein_g"`
 	CarbsG       float64           `json:"carbs_g"`
 	FatG         float64           `json:"fat_g"`
+	// ID and LoggedAt come from an entry logged offline (see replayedEntry).
+	ID       *string    `json:"id"`
+	LoggedAt *time.Time `json:"logged_at"`
 }
 
-// AddEntry handles POST /v1/days/{date}/entries.
+// AddEntry handles POST /v1/days/{date}/entries. An id that is already the
+// user's entry (an offline replay) returns it with 200 and does nothing else.
 func (h *Handler) AddEntry(w http.ResponseWriter, r *http.Request) {
 	d, ok := pathDate(w, r)
 	if !ok {
@@ -327,10 +331,18 @@ func (h *Handler) AddEntry(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !clientIDs(w, in.ID) {
+		return
+	}
 	userID := auth.UserID(r)
+	if h.replayedEntry(w, r, userID, in.ID, map[string]any{"photos_skipped": 0}) {
+		return
+	}
+	now := h.now()
 	e, err := h.Store.AddEntry(r.Context(), userID, d, store.NewEntry{
 		MealSlotID: in.MealSlotID, MealName: in.MealName, Name: name, Origin: in.Origin,
 		AIEstimateID: in.AIEstimateID, Items: items, Macros: m, Icon: icon, Category: category,
+		ID: in.ID, LoggedAt: clampTime(in.LoggedAt, now.Add(-entryLogWindow), now),
 	})
 	if err != nil {
 		h.storeError(w, r, err)
@@ -596,7 +608,8 @@ func (h *Handler) DeleteSavedMeal(w http.ResponseWriter, r *http.Request) {
 	httpx.NoContent(w)
 }
 
-// LogSavedMeal handles POST /v1/days/{date}/saved-meals/{id}.
+// LogSavedMeal handles POST /v1/days/{date}/saved-meals/{id}. An id that is
+// already the user's entry (an offline replay) returns it with 200.
 func (h *Handler) LogSavedMeal(w http.ResponseWriter, r *http.Request) {
 	d, ok := pathDate(w, r)
 	if !ok {
@@ -607,9 +620,11 @@ func (h *Handler) LogSavedMeal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		MealSlotID *string  `json:"meal_slot_id"`
-		MealName   *string  `json:"meal_name"`
-		AddonIDs   []string `json:"addon_ids"`
+		MealSlotID *string    `json:"meal_slot_id"`
+		MealName   *string    `json:"meal_name"`
+		AddonIDs   []string   `json:"addon_ids"`
+		ID         *string    `json:"id"`        // the new entry's, offline
+		LoggedAt   *time.Time `json:"logged_at"` // offline
 	}
 	if !decode(w, r, &in) {
 		return
@@ -618,8 +633,16 @@ func (h *Handler) LogSavedMeal(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "meal_slot_id is not valid")
 		return
 	}
+	if !clientIDs(w, in.ID) {
+		return
+	}
 	userID := auth.UserID(r)
-	e, err := h.Store.LogSavedMeal(r.Context(), userID, d, id, in.MealSlotID, in.MealName, in.AddonIDs)
+	if h.replayedEntry(w, r, userID, in.ID, nil) {
+		return
+	}
+	now := h.now()
+	e, err := h.Store.LogSavedMeal(r.Context(), userID, d, id, in.MealSlotID, in.MealName, in.AddonIDs,
+		in.ID, clampTime(in.LoggedAt, now.Add(-entryLogWindow), now))
 	if err != nil {
 		h.storeError(w, r, err)
 		return

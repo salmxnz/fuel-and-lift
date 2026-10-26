@@ -101,6 +101,13 @@ export function OverviewTab({ id }: { id: string }) {
             {!user.is_pro && user.plan === "pro" && user.pro_until ? (
               <Row label="Pro ended">{formatDate(user.pro_until)}</Row>
             ) : null}
+            {billing.subscription ? (
+              <Row label="Subscription">
+                {billing.subscription.status.replace(/_/g, " ")}
+                {billing.subscription.cancel_at_period_end ? ", cancelled: ends " : ", renews "}
+                {formatDate(billing.subscription.current_period_end)}
+              </Row>
+            ) : null}
             <Row label="Photo estimates this month">
               <Meter used={billing.photo_estimates.used_this_month} limit={billing.photo_estimates.limit_this_month} />
             </Row>

@@ -69,6 +69,14 @@ type Config struct {
 	SMTPFrom       string
 	SMTPFromName   string
 	EmailAssetsURL string // serves web/public for email images; defaults to AppURL
+
+	// Paid Pro through Stripe. Checkout is off (501) unless the key and the
+	// monthly price are set.
+	StripeSecretKey       string
+	StripeWebhookSecret   string // whsec_..., from the webhook endpoint
+	StripePriceMonthly    string // price_... billed every month
+	StripePriceYearly     string // price_... billed every year; optional
+	StripeManagedPayments bool   // Stripe as merchant of record (handles VAT/GST)
 }
 
 // SecureCookies reports whether cookies carry the Secure flag.
@@ -79,6 +87,11 @@ func (c Config) AIConfigured() bool { return c.OpenRouterAPIKey != "" || c.Anthr
 
 // PushConfigured reports whether Web Push can be sent.
 func (c Config) PushConfigured() bool { return c.VAPIDPublicKey != "" && c.VAPIDPrivateKey != "" }
+
+// PaymentsConfigured reports whether paid Pro can be bought.
+func (c Config) PaymentsConfigured() bool {
+	return c.StripeSecretKey != "" && c.StripePriceMonthly != ""
+}
 
 // IsAdminEmail reports whether email is listed in ADMIN_EMAILS.
 func (c Config) IsAdminEmail(email string) bool {
@@ -149,6 +162,12 @@ func Load() (Config, error) {
 		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
 		SMTPFrom:     os.Getenv("SMTP_FROM"),
 		SMTPFromName: os.Getenv("SMTP_FROM_NAME"),
+
+		StripeSecretKey:       os.Getenv("STRIPE_SECRET_KEY"),
+		StripeWebhookSecret:   os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		StripePriceMonthly:    os.Getenv("STRIPE_PRICE_MONTHLY"),
+		StripePriceYearly:     os.Getenv("STRIPE_PRICE_YEARLY"),
+		StripeManagedPayments: envBool("STRIPE_MANAGED_PAYMENTS", false),
 	}
 	cfg.EmailAssetsURL = strings.TrimRight(env("EMAIL_ASSETS_URL", cfg.AppURL), "/")
 	if cfg.SMTPFromName == "" {

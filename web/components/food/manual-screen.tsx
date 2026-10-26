@@ -5,8 +5,8 @@ import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button, Field, PageHeader, TextInput } from "@/components/ui/primitives"
-import { api, errorMessage, seg } from "@/lib/api/client"
-import type { EntryDayResponse } from "@/lib/api/types"
+import { errorMessage, seg } from "@/lib/api/client"
+import { logMeal } from "@/components/food/offline-log"
 import { parseDecimal } from "@/lib/format"
 import { targetBody, targetFromParams } from "@/lib/meal-target"
 import { guessIcon } from "@/lib/food-icons"
@@ -41,15 +41,21 @@ export function ManualScreen() {
     if (Object.keys(next).length > 0) return
     setSaving(true)
     try {
-      await api.post<EntryDayResponse>(`days/${seg(target.date)}/entries`, {
+      const body = {
         ...targetBody(target),
         name,
-        origin: "manual",
+        origin: "manual" as const,
         kcal: Math.round(k ?? 0),
         protein_g: parseDecimal(form.protein) ?? 0,
         carbs_g: parseDecimal(form.carbs) ?? 0,
         fat_g: parseDecimal(form.fat) ?? 0,
-        icon: icon ?? "none",
+      }
+      await logMeal({
+        path: `days/${seg(target.date)}/entries`,
+        date: target.date,
+        label: target.label,
+        body: { ...body, icon: icon ?? "none" },
+        entry: { ...body, icon: icon ?? null },
       })
       toast.success(`Logged to ${target.label}. Nice one.`)
       router.push(`/today?date=${target.date}`)

@@ -152,6 +152,9 @@ func (s *Store) LibraryExerciseIDs(ctx context.Context, names []string) (map[str
 
 // PlannedSet is one set in a template.
 type PlannedSet struct {
+	// ID is a client-made id (uuid) for a set added to a session, so an
+	// offline replay can't add it twice. Templates don't keep it.
+	ID         *string  `json:"id,omitempty"`
 	Warmup     bool     `json:"warmup"`
 	TargetKg   *float64 `json:"target_kg"`
 	TargetReps *int     `json:"target_reps"`
@@ -172,6 +175,9 @@ type Cardio struct {
 
 // BlockInput is a block as the client sends it.
 type BlockInput struct {
+	// ID is a client-made id (uuid) for a block added to a session, so an
+	// offline replay can't add it twice. Templates don't keep it.
+	ID          *string      `json:"id,omitempty"`
 	ExerciseID  string       `json:"exercise_id"`
 	Sets        []PlannedSet `json:"sets"`
 	Cardio      *Cardio      `json:"cardio"`
@@ -229,10 +235,20 @@ func newBlockID() string {
 func toStored(blocks []BlockInput) []storedBlock {
 	out := make([]storedBlock, len(blocks))
 	for i, b := range blocks {
-		if b.Sets == nil {
-			b.Sets = []PlannedSet{}
-		}
+		b.ID = nil
+		b.Sets = withoutIDs(b.Sets)
 		out[i] = storedBlock{ID: newBlockID(), BlockInput: b}
+	}
+	return out
+}
+
+// withoutIDs copies sets without their client ids (never nil): only
+// sessions keep set ids.
+func withoutIDs(sets []PlannedSet) []PlannedSet {
+	out := make([]PlannedSet, len(sets))
+	for i, x := range sets {
+		x.ID = nil
+		out[i] = x
 	}
 	return out
 }

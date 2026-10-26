@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { motion, useReducedMotion, type PanInfo } from "motion/react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { ErrorCard, LoadingBlock, PageHeader, Spinner } from "@/components/ui/primitives"
 import { BellIcon, CheckIcon, ClockIcon, MinusIcon, PlusIcon } from "@/components/ui/icons"
@@ -10,12 +10,12 @@ import { BackButton } from "@/components/ui/back-button"
 import { Sky } from "@/components/ui/sky"
 import { PartnerStrip } from "@/components/friends/live-training"
 import { api, errorMessage, seg } from "@/lib/api/client"
-import type { PartnersResponse, Session, SessionBlock, SessionResponse, SessionSet, TemplateDetailResponse } from "@/lib/api/types"
+import type { PartnersResponse, PlannedSet, Session, SessionBlock, SessionResponse, SessionSet, TemplateDetailResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
 import { weekdayName } from "@/lib/dates"
 import { num1, parseDecimal } from "@/lib/format"
-import { applyPending, enqueue, isOffline, useOfflineQueue, type NewOp } from "@/lib/offline-queue"
+import { enqueue, isOffline, localSet, newId, sessionOps, useOnline, useOutbox, type NewOp } from "@/lib/offline-queue"
 import { enablePush } from "@/lib/push"
 import { cancelRestPush, clearResting, scheduleRestPush, setRestAlertsOff, showResting, useRestAlerts } from "@/lib/rest-alerts"
 import { doLater } from "@/lib/smart-order"
@@ -26,19 +26,22 @@ import { RestTimerPill, useRestTimer } from "./rest-timer"
 import { blockDone, blockPlanText, blockSummary, cardioText, ordinal } from "./session-helpers"
 import { ExerciseIcon } from "./exercise-icon"
 import { QuickAddSets } from "./quick-add-sets"
+import { addExercise, mustQueue, useSessionId } from "./offline-session"
 
 const DEFAULT_REST = 90
 const SWIPE_SKIP_PX = 90
 
 type Drafts = Record<string, { kg: string; reps: string }>
 
-export function SessionScreen({ id }: { id: string }) {
+export function SessionScreen({ id: rendered }: { id: string }) {
+  const id = useSessionId(rendered)
+  // What the server has, with changes still waiting to be sent laid on top
+  // (useApi does that; a workout started offline exists only in the outbox).
   const session = useApi<SessionResponse>(`sessions/${seg(id)}`)
-  const reloadSession = session.reload
-  const queue = useOfflineQueue(id, useCallback(() => void reloadSession(), [reloadSession]))
-  // What the server has, with changes still waiting to be sent laid on top.
-  const raw = session.data?.session
-  const s = useMemo(() => (raw ? applyPending(raw, queue.ops) : undefined), [raw, queue.ops])
+  const outbox = useOutbox()
+  const online = useOnline()
+  const waitingOps = useMemo(() => sessionOps(outbox, id), [outbox, id])
+  const s = session.data?.session
   const tpl = useApi<TemplateDetailResponse>(s?.template_id ? `templates/${seg(s.template_id)}` : null)
   const partners = useApi<PartnersResponse>(`sessions/${seg(id)}/partners`)
   const live = s?.status === "active"
@@ -131,15 +134,21 @@ export function SessionScreen({ id }: { id: string }) {
     session.setData((prev) => (prev ? { session: mutator(prev.session) } : prev!))
   }
 
+  function noteOffline() {
+    if (online || offlineToast.current) return
+    offlineToast.current = true
+    toast("You're offline. Your workout is saved on this phone and syncs when you're back.")
+  }
+
   /**
    * Run a change. One that can wait (`later`) is saved on the phone when
    * there's no network, or when earlier changes are still waiting, and sent
    * once it's back.
    */
   async function call(key: string, fn: () => Promise<SessionResponse>, rollback: Session, later?: NewOp) {
-    if (later && queue.ops.length > 0) {
+    if (later && mustQueue(id)) {
       enqueue(later)
-      void queue.flush()
+      noteOffline()
       return true
     }
     setPending((p) => ({ ...p, [key]: true }))
@@ -150,14 +159,11 @@ export function SessionScreen({ id }: { id: string }) {
     } catch (err) {
       if (later && isOffline(err)) {
         enqueue(later)
-        if (!offlineToast.current) {
-          offlineToast.current = true
-          toast("You're offline. Your sets are saved on this phone and sync when you're back.")
-        }
+        noteOffline()
         return true
       }
       apply(rollback)
-      toast.error(isOffline(err) ? "That needs a connection. Ticking sets works offline." : errorMessage(err))
+      toast.error(errorMessage(err))
       return false
     } finally {
       setPending((p) => {
@@ -289,17 +295,12 @@ export function SessionScreen({ id }: { id: string }) {
   async function quickSets(block: SessionBlock, count: number, reps: number | null, kg: number | null) {
     if (!s) return
     for (let i = 0; i < count; i++) {
-      const ok = await call(
-        `extra-${block.id}`,
-        () =>
-          api.post<SessionResponse>(`sessions/${seg(s.id)}/blocks/${seg(block.id)}/sets`, {
-            warmup: false,
-            target_kg: kg,
-            target_reps: reps != null ? Math.round(reps) : null,
-            to_failure: reps == null,
-          }),
-        s
-      )
+      const ok = await addSet(block, {
+        warmup: false,
+        target_kg: kg,
+        target_reps: reps != null ? Math.round(reps) : null,
+        to_failure: reps == null,
+      })
       if (!ok) break
     }
   }
@@ -308,16 +309,23 @@ export function SessionScreen({ id }: { id: string }) {
     if (!s) return
     const work = block.sets.filter((x) => !x.warmup)
     const last = work[work.length - 1] ?? block.sets[block.sets.length - 1]
-    await call(
+    await addSet(block, {
+      warmup: false,
+      target_kg: last?.actual_kg ?? last?.target_kg ?? null,
+      target_reps: last?.to_failure ? null : (last?.target_reps ?? null),
+      to_failure: last?.to_failure ?? false,
+    })
+  }
+
+  /** One more set on a block (made here, so it can be ticked before it's synced). */
+  function addSet(block: SessionBlock, planned: PlannedSet) {
+    if (!s) return Promise.resolve(false)
+    const body = { ...planned, id: newId() }
+    return call(
       `extra-${block.id}`,
-      () =>
-        api.post<SessionResponse>(`sessions/${seg(s.id)}/blocks/${seg(block.id)}/sets`, {
-          warmup: false,
-          target_kg: last?.actual_kg ?? last?.target_kg ?? null,
-          target_reps: last?.to_failure ? null : (last?.target_reps ?? null),
-          to_failure: last?.to_failure ?? false,
-        }),
-      s
+      () => api.post<SessionResponse>(`sessions/${seg(s.id)}/blocks/${seg(block.id)}/sets`, body),
+      s,
+      { kind: "session.addSet", sessionId: s.id, blockId: block.id, set: localSet(body), body }
     )
   }
 
@@ -353,13 +361,15 @@ export function SessionScreen({ id }: { id: string }) {
         <SessionStats blocks={blocks} />
       </Sky>
 
-      {queue.ops.length > 0 || !queue.online ? (
+      {waitingOps.length > 0 || !online ? (
         <div role="status" className="flex items-center justify-between gap-2 rounded-[12px] bg-warn-bg px-3 py-2 text-[13px]">
           <span>
-            {queue.online ? "Syncing" : "Offline"}
-            {queue.ops.length > 0 ? ` · ${queue.ops.length} change${queue.ops.length === 1 ? "" : "s"} saved on this phone` : ": ticking sets still works"}
+            {online ? "Syncing" : "Offline"}
+            {waitingOps.length > 0
+              ? ` · ${waitingOps.length} change${waitingOps.length === 1 ? "" : "s"} saved on this phone`
+              : ": your workout still saves on this phone"}
           </span>
-          {queue.online && queue.ops.length > 0 ? <Spinner size={14} /> : null}
+          {online && waitingOps.length > 0 ? <Spinner size={14} /> : null}
         </div>
       ) : null}
 
@@ -515,13 +525,22 @@ export function SessionScreen({ id }: { id: string }) {
         onClose={() => setPicker(false)}
         onPick={(exercise, plan) => {
           setPicker(false)
-          const body =
-            exercise.kind === "cardio"
-              ? { exercise_id: exercise.id, cardio: { minutes: 20, incline: null, speed: null } }
-              : { exercise_id: exercise.id, ...(plan ? { sets: plan.sets } : {}) }
-          void call("add-block", () => api.post<SessionResponse>(`sessions/${seg(s.id)}/blocks`, body), s).then((ok) => {
-            if (ok) toast.success(`${exercise.name} added for today`)
-          })
+          const cardio = exercise.kind === "cardio" ? { minutes: 20, incline: null, speed: null } : null
+          setPending((p) => ({ ...p, "add-block": true }))
+          addExercise(s.id, exercise, cardio ? undefined : plan?.sets, cardio)
+            .then((next) => {
+              if (next) apply(next)
+              else noteOffline()
+              toast.success(`${exercise.name} added for today`)
+            })
+            .catch((err) => toast.error(errorMessage(err)))
+            .finally(() =>
+              setPending((p) => {
+                const n = { ...p }
+                delete n["add-block"]
+                return n
+              })
+            )
         }}
       />
 
@@ -546,12 +565,7 @@ export function SessionScreen({ id }: { id: string }) {
             onDone={timer.finish}
           />
         ) : null}
-        <FinishButton
-          href={`/gym/session/${s.id}/review`}
-          finished={finished}
-          blocks={blocks}
-          waiting={queue.ops.length > 0 || !queue.online}
-        />
+        <FinishButton href={`/gym/session/${s.id}/review`} finished={finished} blocks={blocks} />
       </div>
     </main>
   )
@@ -816,21 +830,11 @@ function nextSetText(blocks: SessionBlock[], blockId: string, setId: string): st
   return ""
 }
 
-/** The finish bar fills as you go; at 100% it says so. Finishing needs the network. */
-function FinishButton({ href, finished, blocks, waiting }: { href: string; finished: boolean; blocks: SessionBlock[]; waiting: boolean }) {
+/** The finish bar fills as you go; at 100% it says so. Offline, finishing waits on the phone too. */
+function FinishButton({ href, finished, blocks }: { href: string; finished: boolean; blocks: SessionBlock[] }) {
   const p = progressOf(blocks)
   const share = p.total > 0 ? p.done / p.total : 0
   const all = !finished && p.total > 0 && p.done === p.total
-  if (waiting && !finished) {
-    return (
-      <div
-        role="status"
-        className="glass-dark relative flex min-h-14 items-center justify-center rounded-btn px-4 text-center text-[14px] font-bold text-white"
-      >
-        Finish once you&apos;re back online · {p.done}/{p.total}
-      </div>
-    )
-  }
   return (
     <Link
       href={href}

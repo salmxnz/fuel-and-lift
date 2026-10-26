@@ -341,68 +341,6 @@ func truncate(s string, n int) string {
 	return s[:n]
 }
 
-// --- billing ---------------------------------------------------------------------
-
-func (h *Handler) billing(ctx context.Context, userID string) (map[string]any, error) {
-	u, err := h.Store.GetUser(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	a, err := h.allowance(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	joined, err := h.Store.ReferralCount(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	stored, err := h.Store.StoredPhotoCount(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	var storedLimit *int
-	if !a.pro {
-		n := h.Cfg.FreePhotosStored
-		storedLimit = &n
-	}
-	plan := "free"
-	var source *string
-	var until *time.Time
-	if a.pro {
-		plan = "pro"
-		source, until = u.ProSource, u.ProUntil
-	}
-	return map[string]any{
-		"plan":       plan,
-		"pro_source": source,
-		"pro_until":  until,
-		"photo_estimates": map[string]any{
-			"used_this_month":  a.usage.PhotosThisMonth,
-			"limit_this_month": a.photoLimit,
-			"resets_on":        a.resetsOn,
-		},
-		"referrals":     map[string]int{"joined": joined, "needed": h.Cfg.ReferralsForPro},
-		"photos_stored": stored,
-		"photos_limit":  storedLimit,
-	}, nil
-}
-
-// Billing handles GET /v1/billing.
-func (h *Handler) Billing(w http.ResponseWriter, r *http.Request) {
-	b, err := h.billing(r.Context(), auth.UserID(r))
-	if err != nil {
-		h.storeError(w, r, err)
-		return
-	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"billing": b})
-}
-
-// Checkout handles POST /v1/billing/checkout. No payment provider yet.
-func (h *Handler) Checkout(w http.ResponseWriter, r *http.Request) {
-	httpx.ErrorCode(w, http.StatusNotImplemented, "checkout_unavailable",
-		"paid Pro isn't open yet — invite 8 friends to get Pro free, forever")
-}
-
 // nilIfEmpty turns "" into JSON null.
 func nilIfEmpty(s string) *string {
 	if s == "" {

@@ -14,8 +14,9 @@ import {
   ListIcon,
   StoreIcon,
 } from "@/components/ui/icons"
-import { api, errorMessage, seg } from "@/lib/api/client"
-import type { Day, EntryDayResponse, MealSlotsResponse, SavedMealsResponse } from "@/lib/api/types"
+import { errorMessage } from "@/lib/api/client"
+import { logSavedMeal } from "@/components/food/offline-log"
+import type { Day, MealSlotsResponse, SavedMealsResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { kcal } from "@/lib/format"
 import { slotForNow, targetBody, targetQuery, type MealTarget } from "@/lib/meal-target"
@@ -96,11 +97,15 @@ function AddFoodBody({
     if (!mealTarget) return
     setLogging(id)
     try {
-      const res = await api.post<EntryDayResponse>(`days/${seg(date)}/saved-meals/${seg(id)}`, {
-        ...targetBody(mealTarget),
-        addon_ids: [],
+      const res = await logSavedMeal({
+        date,
+        label: mealTarget.label,
+        meal: saved.data?.saved_meals.find((m) => m.id === id),
+        mealId: id,
+        target: targetBody(mealTarget),
+        addonIds: [],
       })
-      onLogged(res.day)
+      if (res) onLogged(res.day)
       toast.success(`${name} in ${mealTarget.label}. Sorted.`)
       onClose()
     } catch (err) {

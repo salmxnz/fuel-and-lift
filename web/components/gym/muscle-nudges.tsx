@@ -5,12 +5,14 @@ import { useState, useSyncExternalStore } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/primitives"
 import { CloseIcon, TargetIcon } from "@/components/ui/icons"
+import { useQueryClient } from "@tanstack/react-query"
 import { api, errorMessage, seg } from "@/lib/api/client"
-import type { GymInsightsResponse, Nudge, PlannedSet, SessionResponse, WeekExtrasResponse } from "@/lib/api/types"
+import type { GymInsightsResponse, Nudge, PlannedSet, WeekExtrasResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { startOfWeek, todayISO, weekdayName } from "@/lib/dates"
 import { num1 } from "@/lib/format"
 import { ExerciseIcon } from "./exercise-icon"
+import { addExercise, startWorkout } from "./offline-session"
 
 // "You haven't trained forearms in 2 weeks": the muscles the API says need
 // work, with a couple of exercises for each. They go into the next workout
@@ -60,6 +62,7 @@ function dayLabel(date: string): string {
 
 export function MuscleNudges({ activeSessionId }: { activeSessionId: string | null }) {
   const router = useRouter()
+  const client = useQueryClient()
   const insights = useApi<GymInsightsResponse>("gym/insights")
   const hidden = useDismissed().split(",")
   const [busy, setBusy] = useState<string | null>(null)
@@ -92,10 +95,8 @@ export function MuscleNudges({ activeSessionId }: { activeSessionId: string | nu
   async function startNow(n: Nudge) {
     setBusy(`now-${n.muscle}`)
     try {
-      const id = activeSessionId ?? (await api.post<SessionResponse>("sessions", { date: todayISO() })).session.id
-      for (const x of n.exercises) {
-        await api.post<SessionResponse>(`sessions/${seg(id)}/blocks`, { exercise_id: x.exercise.id, sets: setsFor(x.last_kg) })
-      }
+      const id = activeSessionId ?? (await startWorkout(client, todayISO(), null))
+      for (const x of n.exercises) await addExercise(id, x.exercise, setsFor(x.last_kg))
       router.push(`/gym/session/${id}`)
     } catch (err) {
       toast.error(errorMessage(err))

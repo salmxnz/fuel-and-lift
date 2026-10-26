@@ -4,6 +4,7 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/salmxnz/fuel-and-lift/api/internal/auth"
 	"github.com/salmxnz/fuel-and-lift/api/internal/httpx"
@@ -98,6 +99,7 @@ func (h *Handler) Suggestions(w http.ResponseWriter, r *http.Request) {
 
 // LogAgain handles POST /v1/entries/{id}/again {date, meal_slot_id?, meal_name?}:
 // log one of your past meals again (same meal as before when neither is given).
+// An id that is already the user's entry (an offline replay) returns it with 200.
 func (h *Handler) LogAgain(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -107,6 +109,8 @@ func (h *Handler) LogAgain(w http.ResponseWriter, r *http.Request) {
 		Date       *store.Date `json:"date"`
 		MealSlotID *string     `json:"meal_slot_id"`
 		MealName   *string     `json:"meal_name"`
+		ID         *string     `json:"id"`        // the new entry's, offline
+		LoggedAt   *time.Time  `json:"logged_at"` // offline
 	}
 	if !decode(w, r, &in) {
 		return
@@ -120,11 +124,20 @@ func (h *Handler) LogAgain(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "meal_slot_id is not valid")
 		return
 	}
-	e, err := h.Store.LogAgain(r.Context(), userID, id, d, in.MealSlotID, in.MealName)
+	if !clientIDs(w, in.ID) {
+		return
+	}
+	if h.replayedEntry(w, r, userID, in.ID, nil) {
+		return
+	}
+	now := h.now()
+	e, err := h.Store.LogAgain(r.Context(), userID, id, d, in.MealSlotID, in.MealName,
+		in.ID, clampTime(in.LoggedAt, now.Add(-entryLogWindow), now))
 	if err != nil {
 		h.storeError(w, r, err)
 		return
 	}
+	h.withExtras(r.Context(), userID, &e)
 	day, err := h.day(r.Context(), userID, d)
 	if err != nil {
 		h.storeError(w, r, err)

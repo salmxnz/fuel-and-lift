@@ -10,6 +10,9 @@ The back office: a Next.js app for admins to look people up and manage them.
   friends, public) and can be hidden from the Shop.
 - **Actions**: grant Pro (forever or until a date) or revoke it, make or remove
   admins, suspend or lift a suspension.
+- **Feedback**: bugs and ideas people send from Me → Feedback, with their
+  screenshots. Filter by status (new, seen, done) and kind, and reply: the
+  note shows on their Feedback screen.
 - **Notifications**: every push and email the server tried to send (sent,
   failed, skipped for quiet hours or no devices, or off on the server), with
   24-hour counts. Kept 90 days.

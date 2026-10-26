@@ -71,6 +71,38 @@ func notFound(err error) error {
 	return err
 }
 
+// rowQuerier is a pool or a transaction.
+type rowQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// ownedRow reports whether table already has a row with this id belonging
+// to userID (a client-made id being replayed). Someone else's row is
+// ErrNotFound; no row is false.
+func ownedRow(ctx context.Context, q rowQuerier, table, id, userID string) (bool, error) {
+	var mine bool
+	err := q.QueryRow(ctx, `select user_id = $2::uuid from `+table+` where id = $1::uuid`, id, userID).Scan(&mine)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !mine {
+		return false, ErrNotFound
+	}
+	return true, nil
+}
+
+// uniqueConflict maps a unique constraint failure (a client id already in
+// use) to ErrConflict.
+func uniqueConflict(err error) error {
+	if isUniqueViolation(err) {
+		return ErrConflict
+	}
+	return err
+}
+
 // isUniqueViolation reports a unique constraint failure.
 func isUniqueViolation(err error) bool {
 	var pg *pgconn.PgError

@@ -21,6 +21,18 @@ set the header.
 Every request (but `GET /health` and reads of the logs) is recorded in the audit log (see "Admin:
 audit log"): who, what route, status, time taken and error text, never bodies.
 
+**Offline replays.** The PWA queues some creates made offline and replays them
+later, maybe more than once when a response was lost. Those creates take an
+optional client-made `id` (a UUID, else `400 "id is not valid"`) and the real
+time it happened (`started_at`, `finished_at`, `logged_at`; RFC 3339, clamped to
+a window). Sending the same `id` again returns the existing row (`200`, nothing
+else changes and nothing is announced); an `id` that belongs to someone else is
+`404`. Meant for offline replays: online clients can leave them out. They are:
+`POST /v1/sessions` (also its block and set ids), `POST /v1/sessions/{id}/blocks`,
+`POST /v1/sessions/{id}/blocks/{block_id}/sets`, `POST /v1/sessions/{id}/finish`
+(`finished_at` only), `POST /v1/days/{date}/entries`,
+`POST /v1/days/{date}/saved-meals/{id}` and `POST /v1/entries/{id}/again`.
+
 ## Auth
 
 ### `POST /v1/auth/google`
@@ -247,6 +259,10 @@ With `ai_estimate_id`, the estimate's photos are kept on the entry while the
 user has room (free: `FREE_PHOTOS_STORED`, 20; Pro unlimited); photos that don't
 fit are deleted and counted in `photos_skipped`.
 
+Offline (see "Offline replays"): optional `id` (UUID) and `logged_at` (RFC 3339,
+kept within the last 7 days and now; left out = now). The same `id` again →
+`200` with that entry and its day (`photos_skipped: 0`), nothing else done.
+
 ### `PATCH /v1/entries/{id}` `{name?, meal_slot_id?, meal_name?, items?, icon?, category?}` → `200 {"entry": Entry, "day": Day}`
 `icon`: a `FoodIcon`, or `"none"` to remove it; left out keeps it. `category`
 works the same way with a `MealCategory`.
@@ -284,8 +300,11 @@ type SavedMeal = {
 ### `PUT /v1/saved-meals/{id}` (same body; `visibility` is ignored; `icon` and `category` left out keep theirs, `"none"` removes them) → `200 {"saved_meal": SavedMeal}`
 ### `PUT /v1/saved-meals/{id}/visibility` `{visibility}` → `200 {visibility, published_at, hidden}`
 ### `DELETE /v1/saved-meals/{id}` → `204`
-### `POST /v1/days/{date}/saved-meals/{id}` `{meal_slot_id?, meal_name?, addon_ids: []}`
+### `POST /v1/days/{date}/saved-meals/{id}` `{meal_slot_id?, meal_name?, addon_ids: [], id?, logged_at?}`
 Logs the base items plus the chosen add-ons as one entry. `201 {"entry": Entry, "day": Day}`
+Offline: `id` (UUID) is the new entry's and `logged_at` is as for
+`POST /v1/days/{date}/entries`; the same `id` again → `200` with that entry and
+its day (even if the saved meal was removed since), nothing else done.
 
 ## Suggestions
 `GET /v1/suggestions?date=&meal_slot_id=` → `200`
@@ -300,9 +319,11 @@ Logs the base items plus the chosen add-ons as one entry. `201 {"entry": Entry, 
 `meal_slot_id` is optional; without it `again` and `usual` are empty. `gap` is null when you're
 within 120 kcal of your target or over.
 
-`POST /v1/entries/{id}/again` `{date?, meal_slot_id?, meal_name?}` → `201 {"entry": Entry, "day": Day}`:
+`POST /v1/entries/{id}/again` `{date?, meal_slot_id?, meal_name?, id?, logged_at?}` → `201 {"entry": Entry, "day": Day}`:
 logs one of your entries again (items, macros, picture, category and origin; `shared` becomes `manual`).
-`date` defaults to today; the meal defaults to the original's.
+`date` defaults to today; the meal defaults to the original's. Offline: the body's
+`id` (UUID) is the new entry's and `logged_at` is as for `POST /v1/days/{date}/entries`;
+the same `id` again → `200` with that entry and its day, nothing else done.
 
 ## Foods
 
@@ -499,6 +520,7 @@ type WeekExtra = { id: string, week_start: string, template_id: string, template
 - `DELETE /v1/gym/week-extras/{id}` → `204` (only while unused)
 ### `GET /v1/templates` → `200 {"templates": Template[]}`
 ### `POST /v1/templates` `{name, blocks: [{exercise_id, sets, cardio, rest_seconds, notes}], visibility?}` → `201 {"template": Template}`
+  (A block's or set's `id`, as sessions take, is accepted and ignored: templates make their own block ids and keep none for sets. The same goes for `POST /v1/gym/week-extras`.)
 ### `GET /v1/templates/{id}` → `200 {"template": Template, "versions": [{version, version_id, created_at}]}`
 ### `PUT /v1/templates/{id}` (same body as POST) → `200 {"template": Template}` — saves a **new version**
 ### `DELETE /v1/templates/{id}` → `204` (archived; history keeps it)
@@ -574,10 +596,22 @@ type Session = { id: string, date: string, template_id: string | null, template_
 
 type Proposal = { exercise_id: string, exercise_name: string, from_kg: number, to_kg: number }
 ```
-- `POST /v1/sessions` `{date, template_id?}` → `201 {"session": Session}` (a copy of the template's current version, plus that week's extras for it)
+- `POST /v1/sessions` `{date, template_id?, id?, started_at?, blocks?}` → `201 {"session": Session}` (a copy of the template's current version, plus that week's extras for it)
+  Offline (see "Offline replays"): `id` (UUID) is the session's; `started_at`
+  (RFC 3339) is kept within the last 24 hours and now (left out = now). `blocks`
+  `[{id, exercise_id, cardio?, notes?, sets: [{id, warmup, target_kg, target_reps, to_failure}]}]`
+  (ids are UUIDs, each used once; same limits as template blocks, up to 40)
+  replaces the template's blocks, in that order, keeping their ids; with
+  `template_id` the template's name and version are still recorded, and the
+  week's extras for it count as used (the client includes them itself). A block
+  or set id already used elsewhere is `409`. The same session `id` again → `200`
+  with that session unchanged, and no "training now" announcement.
 - `GET /v1/sessions?from=&to=` → `200 {"sessions": Session[]}`
 - `GET /v1/sessions/{id}` → `200 {"session": Session}`
-- `POST /v1/sessions/{id}/blocks` `{exercise_id, sets?, cardio?}` → `201 {"session": Session}` (an extra exercise today only, with planned sets when given)
+- `POST /v1/sessions/{id}/blocks` `{id?, exercise_id, sets?, cardio?}` → `201 {"session": Session}` (an extra exercise today only, with planned sets when given)
+  Offline: `id` (UUID) is the block's and each set may carry its own `id`. A block
+  `id` already in this session → the session unchanged (`201`); in another
+  session → `404`.
 - `PATCH /v1/sessions/{id}/blocks/{block_id}` `{skipped?, cardio_done?, cardio_actual?}` → `200 {"session": Session}` (`cardio_actual: null` clears it)
 - `PUT /v1/sessions/{id}/order` `{block_ids}` → `200 {"session": Session}`
   New order ("machine's taken, do it later"); must list every block once, else `400`.
@@ -586,10 +620,14 @@ type Proposal = { exercise_id: string, exercise_name: string, from_kg: number, t
   `seconds` (5–1800), even in quiet hours, so it reaches a locked phone. A new
   rest replaces the old one. `409` once the workout is finished.
 - `DELETE /v1/sessions/{id}/rest` → `204` (cancels it)
-- `POST /v1/sessions/{id}/blocks/{block_id}/sets` `{warmup?, target_kg?, target_reps?, to_failure?}` → `201 {"session": Session}` (a third set today)
+- `POST /v1/sessions/{id}/blocks/{block_id}/sets` `{id?, warmup?, target_kg?, target_reps?, to_failure?}` → `201 {"session": Session}` (a third set today)
+  Offline: `id` (UUID) is the set's; already in this block → the session
+  unchanged (`201`); anywhere else → `404`.
 - `PATCH /v1/sessions/{id}/sets/{set_id}` `{actual_kg?, actual_reps?, done?}` → `200 {"session": Session}`
 - `POST /v1/sessions/{id}/accept-all` → marks every unskipped set done at its targets → `200 {"session": Session}`
-- `POST /v1/sessions/{id}/finish` → `200 {"session": Session, "proposals": Proposal[], "records": Record[]}`
+- `POST /v1/sessions/{id}/finish` `{finished_at?}` (or no body) → `200 {"session": Session, "proposals": Proposal[], "records": Record[]}`
+  `finished_at` (RFC 3339, a workout finished offline) is kept within the
+  session's `started_at` and now, and only counts on the first finish (left out = now).
   (`Record = {exercise_id, exercise_name, kg, reps}`; the first finish posts to the feed and pushes friends, finishing again only recomputes)
   A proposal appears when every done working set of an exercise beat the template's target weight.
 - `POST /v1/sessions/{id}/apply` `{"exercise_ids": [...]}` → `200 {"template": Template}` (new version)
@@ -625,7 +663,7 @@ against the monthly allowance but share the fair-use rate limit.
 
 Pro comes from one of three sources: `admin` (set by an admin), `referrals`
 (**8 friends joined through your links: Pro forever for you**) or `subscription`
-(paid; checkout not wired yet). Pro cannot be gifted. A referral counts once the
+(paid through Stripe, see below). Pro cannot be gifted. A referral counts once the
 friend has finished onboarding, and each person can only ever count for one
 inviter.
 
@@ -638,10 +676,50 @@ type Billing = {
   referrals: { joined: number, needed: number }  // needed = 8
   photos_stored: number                    // meal photos kept
   photos_limit: number | null              // 20 on free, null = unlimited
+  subscription: Subscription | null        // the latest paid subscription, even an ended one
+}
+type Subscription = {
+  // Stripe's status. active/trialing pay for Pro; past_due means a renewal
+  // failed and Stripe is retrying (Pro runs to the end of what was paid for).
+  status: "active" | "trialing" | "past_due" | "unpaid" | "paused" | "canceled" | "incomplete" | "incomplete_expired"
+  current_period_end: string               // renews (or ends, see below) then
+  cancel_at_period_end: boolean            // cancelled: Pro stops at current_period_end
+  interval: "month" | "year" | null        // the plan
+  amount: number | null                    // its price in minor units (249 = $2.49)
+  currency: string | null
+  started_at: string | null
+  canceled_at: string | null               // when they asked to cancel
+  ended_at: string | null
 }
 ```
-- `GET /v1/billing` → `200 {"billing": Billing}`
-- `POST /v1/billing/checkout` → `501` until a payment provider is configured (returns `{url}` later)
+```ts
+type ProPlan = {
+  id: "monthly" | "yearly",
+  amount: number,                          // minor units from Stripe: 249 = $2.49
+  currency: string,                        // "usd"
+  interval: "month" | "year"
+}
+```
+- `GET /v1/billing` → `200 {"billing": Billing, "plans": ProPlan[]}`. `plans` is what
+  Pro costs, read from Stripe (cached for an hour); `[]` while payments are off.
+  Only `GET /v1/billing` has `plans`; other responses carry just `Billing`.
+- `POST /v1/billing/checkout` `{plan?: "monthly" | "yearly"}` (default monthly) →
+  `200 {"url"}`: a Stripe Checkout page for the Pro subscription; send the browser
+  there. `400` for a plan that isn't on offer. It comes back to `/pro?checkout=success`
+  (or `/pro` when they back out). Pro starts when Stripe's webhook lands, usually
+  within seconds, so refetch `billing` until `plan` is `"pro"`.
+  `409` `already_pro` when they have Pro, `409` `has_subscription` when a
+  subscription is still live (use the portal), `501` `checkout_unavailable` when
+  Stripe isn't configured, `502` `payments_unavailable` when Stripe failed.
+- `POST /v1/billing/portal` (no body) → `200 {"url"}`: Stripe's Customer Portal
+  to change the card, see invoices or cancel. `404` `no_subscription` when they
+  never paid.
+- `POST /v1/billing/webhook`: for Stripe only (signed with `Stripe-Signature`,
+  no user auth). The web app exposes it as `/api/stripe/webhook`. A dispute, an
+  early fraud warning or a full refund on a charge that paid for Pro cancels
+  that subscription at once, so Pro ends (`subscription.status` `"canceled"`).
+
+A subscription never replaces or ends Pro from an admin or from referrals.
 
 When a free user is over the monthly photo allowance, `POST /v1/ai/meal-estimate`
 with an image returns `402 {"error": {"message": "...", "code": "photo_limit"}}`
@@ -928,7 +1006,8 @@ type AdminUser = {
 - `PUT /v1/admin/users/{id}/pro` `{until: string|null}` → `200 {"user"}`. Pro from an admin
   (`pro_source: "admin"`), forever or until a future time. `400` when `until` has passed, or
   when it would cut short Pro forever from referrals.
-- `DELETE /v1/admin/users/{id}/pro` → `200 {"user"}` (back to free; `400` for `admin_email`)
+- `DELETE /v1/admin/users/{id}/pro` → `200 {"user"}` (back to free; `400` for `admin_email`, and
+  for paid Pro: cancel the subscription in Stripe, the webhook then ends it)
 - `PUT /v1/admin/users/{id}/role` `{role}` → `200 {"user"}`. `400` when demoting yourself or
   an `admin_email`. The new role shows up in their next access token.
 - `POST /v1/admin/users/{id}/suspend` `{reason?}` (≤ 300 chars) → `200 {"user"}`. Revokes every
@@ -946,6 +1025,39 @@ type AdminUser = {
 
 Hiding any of their meals, templates or routines (whatever the visibility) uses
 `POST/DELETE /v1/admin/shop/{kind}/{id}/hide` above.
+
+### Admin: billing (admins only)
+Subscriptions as Stripe's webhooks last reported them, plus live payments from
+Stripe for one user.
+
+```ts
+type AdminSubscription = Subscription & {
+  id: string, customer_id: string,               // sub_…, cus_…
+  price_id: string | null,
+  cancel_at: string | null,                      // when a scheduled cancellation takes effect
+  cancel_reason: string | null,                  // Stripe's: cancellation_requested | payment_failed | payment_disputed
+  cancel_feedback: string | null,                // theirs, from the portal: too_expensive | missing_features | unused | other | …
+  cancel_comment: string | null,
+  livemode: boolean, created_at: string, updated_at: string,
+  user?: { id, name, email, avatar_url }         // on the billing list
+}
+type StripeInfo = { configured: boolean, mode: "test" | "live" | null,
+  dashboard_url: string | null }                 // e.g. https://dashboard.stripe.com/acct_…/test; link `${dashboard_url}/subscriptions/${id}`
+type AdminPayment = { id, amount, amount_refunded, currency, status: "succeeded" | "pending" | "failed",
+  refunded, disputed, created, description, failure_message, receipt_url, payment_intent }
+```
+- `GET /v1/admin/billing?status=&q=&limit=&offset=` → `200 {"summary", "subscriptions": AdminSubscription[], "total", "stripe": StripeInfo}`.
+  `status`: `active` (renewing), `cancelling` (won't renew), `past_due` (also unpaid, paused,
+  incomplete) or `ended`; `q` matches email or name. `summary` is
+  `{active, cancelling, past_due, ended_30d, new_30d, monthly, yearly, mrr: {currency, amount}[]}`,
+  MRR counting a yearly price as a twelfth.
+- `GET /v1/admin/users/{id}/billing` → `200 {"billing": Billing, "customer_id": string | null,
+  "subscriptions": AdminSubscription[], "payments": AdminPayment[] | null, "payments_error": string | null, "stripe"}`.
+  `payments` are their latest 25 charges, read from Stripe; `null` with a `payments_error` when Stripe
+  didn't answer.
+- `POST /v1/admin/users/{id}/billing/sync` → the same as the GET, after reading each of their
+  subscriptions from Stripe again (a missed webhook, or rows stored before a field was kept).
+  `501` when Stripe isn't configured, `502` when it didn't answer.
 
 ### Admin: notifications (admins only)
 Every push and email the server tried to send. A push is recorded once per
@@ -1007,6 +1119,32 @@ type AuditEntry = {
   (`2xx`…`5xx`) or a code (`404`); `q` matches the path; `limit` ≤ 200.
 
 Kept `AUDIT_RETENTION_DAYS` (default 30).
+
+### Admin: feedback (admins only)
+- `GET /v1/admin/feedback?status=&kind=&user_id=&before=&limit=50`
+  → `200 {"feedback": Feedback[], "next_before": number|null, "counts": {new, seen, done}}`
+  (newest first; `Feedback.user` and `user_agent` are filled in for admins).
+- `PATCH /v1/admin/feedback/{id}` `{status?, admin_note?}` → `200 {"feedback": Feedback}`.
+  The note is shown to the sender (`""` clears it).
+
+## Feedback
+
+```ts
+type Feedback = {
+  id: number, kind: "bug" | "idea" | "other", message: string,
+  page: string | null,              // the screen it was sent from
+  status: "new" | "seen" | "done",
+  admin_note: string | null,        // a reply from the team
+  photos: { id: string, url: string, content_type: string }[],  // signed links, valid PHOTO_URL_TTL
+  created_at: string, updated_at: string,
+  user?: Person, user_agent?: string | null   // admin list only
+}
+```
+- `POST /v1/feedback` `{kind?, message, page?, images?: [{media_type, data}]}` → `201 {"feedback": Feedback}`
+  Message 1–2000 characters; up to 3 base64 images (2 MB each), kept in R2.
+  `503 photos_unavailable` when images are sent without photo storage. Admins
+  get a push ("Ravi sent a bug").
+- `GET /v1/feedback` → `200 {"feedback": Feedback[]}` (yours, newest first).
 
 ## Notifications (Web Push)
 

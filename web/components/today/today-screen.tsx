@@ -15,6 +15,7 @@ import { DayDot, WeekPager } from "@/components/ui/week-pager"
 import type { Day, DayResponse, Entry, MealSlotsResponse, ProgressCaloriesResponse, SavedMealsResponse, SuggestionsResponse } from "@/lib/api/types"
 import { api } from "@/lib/api/client"
 import { useApi } from "@/lib/api/use-api"
+import { isPendingEntry, pendingOps } from "@/lib/offline-queue"
 import { addDays, dayTitle, isISODate, startOfWeek, todayISO } from "@/lib/dates"
 import { Sky, SkyTitle, SKY_ICON } from "@/components/ui/sky"
 import { cn } from "@/lib/cn"
@@ -251,7 +252,11 @@ export function TodayScreen() {
                   isPastDay={isPast}
                   savedMeals={saved.data?.saved_meals}
                   onAdd={(target) => openFood(target)}
-                  onEdit={setEditing}
+                  onEdit={(e) => {
+                    // Logged offline: it isn't on the server to change yet.
+                    if (isPendingEntry(pendingOps(), e.id)) toast("Syncing… You can change it once it's sent.")
+                    else setEditing(e)
+                  }}
                   onDayChange={(d) => day.setData({ day: d })}
                 />
               )}

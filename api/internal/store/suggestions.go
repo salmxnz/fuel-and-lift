@@ -86,8 +86,9 @@ func (s *Store) RichIn(ctx context.Context, userID, nutrient string, maxKcal flo
 }
 
 // LogAgain copies one of the user's entries (items, macros, picture and how
-// it was logged) onto a date and meal.
-func (s *Store) LogAgain(ctx context.Context, userID, entryID string, d Date, slotID, mealName *string) (Entry, error) {
+// it was logged) onto a date and meal. newID and loggedAt are as for
+// NewEntry's ID and LoggedAt.
+func (s *Store) LogAgain(ctx context.Context, userID, entryID string, d Date, slotID, mealName *string, newID *string, loggedAt *time.Time) (Entry, error) {
 	rows, err := s.Pool.Query(ctx, `select `+entryCols+` from log_entries where id = $1::uuid and user_id = $2::uuid`, entryID, userID)
 	if err != nil {
 		return Entry{}, err
@@ -106,5 +107,6 @@ func (s *Store) LogAgain(ctx context.Context, userID, entryID string, d Date, sl
 	return s.AddEntry(ctx, userID, d, NewEntry{
 		MealSlotID: slotID, MealName: mealName, Name: src.Name, Origin: origin,
 		SavedMealID: src.SavedMealID, Items: src.Items, Macros: src.Macros, Icon: src.Icon, Category: src.Category,
+		ID: newID, LoggedAt: loggedAt,
 	})
 }

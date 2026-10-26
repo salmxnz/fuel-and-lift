@@ -16,8 +16,8 @@ function makeQueryClient(): QueryClient {
       queries: {
         // Fresh for 30 s: switching tabs inside that window doesn't refetch.
         staleTime: 30_000,
-        // Kept (and persisted) for a day.
-        gcTime: 24 * HOUR,
+        // Kept (and persisted) for a week: the app opens offline with it.
+        gcTime: 7 * 24 * HOUR,
         // Don't retry what the server answered on purpose (404, 403…).
         retry: (count, err) => count < 1 && (!(err instanceof ApiError) || err.status === 0 || err.status >= 500),
         // Coming back to the app refetches stale queries only.
@@ -95,6 +95,8 @@ export function affectedBy(path: string): string[] {
       return ["friends", "feed", "people/", "sharing", "invite-links", "billing"]
     case "photos":
       return ["photos", "days/", "billing"]
+    case "feedback":
+      return ["feedback"]
     case "ai":
     case "billing":
       return ["billing", "ai/"]

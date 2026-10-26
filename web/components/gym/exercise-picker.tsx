@@ -19,6 +19,7 @@ import type {
 } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { cn } from "@/lib/cn"
+import { useOnline } from "@/lib/offline-queue"
 import { prepareImage, type PreparedImage } from "@/lib/image"
 import { DescribePanel, SnapResult, type PickPlan } from "./exercise-ai"
 import { ExerciseIcon } from "./exercise-icon"
@@ -152,13 +153,27 @@ function PickerBody({ onPick }: { onPick: (exercise: Exercise, plan?: PickPlan) 
   )
 }
 
+/** Name and other-name matches, for searching offline. */
+function searchLocally(list: Exercise[], q: string): Exercise[] {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean)
+  const hit = (text: string) => words.every((w) => text.toLowerCase().includes(w))
+  return list.flatMap((e) => {
+    if (hit(e.name)) return [e]
+    const alias = e.aliases.find(hit)
+    return alias ? [{ ...e, matched_alias: alias }] : []
+  })
+}
+
 function LibraryList({ q, onPick }: { q: string; onPick: (exercise: Exercise) => void }) {
   const query = useDebounced(q.trim(), 250)
   // Old results stay while a new search loads, so the sheet doesn't jump.
+  const online = useOnline()
   const results = useApi<ExercisesResponse>(`exercises?q=${encodeURIComponent(query)}`, { keepPrevious: true })
+  // Offline, search the full list kept on the phone instead.
+  const all = useApi<ExercisesResponse>(online || !query ? null : "exercises?q=")
   const [creating, setCreating] = useState(false)
   const [sharing, setSharing] = useState<string | null>(null)
-  const list = results.data?.exercises ?? []
+  const list = !online && query && all.data ? searchLocally(all.data.exercises, query) : (results.data?.exercises ?? [])
   const exact = list.some((e) => e.name.toLowerCase() === q.trim().toLowerCase())
 
   return (
@@ -166,9 +181,9 @@ function LibraryList({ q, onPick }: { q: string; onPick: (exercise: Exercise) =>
       {creating ? <CreateForm name={q.trim()} onCancel={() => setCreating(false)} onCreated={onPick} /> : null}
 
       <div className="flex max-h-[46dvh] flex-col overflow-y-auto rounded-card bg-white px-3.5 py-1">
-        {results.loading ? (
+        {results.loading && list.length === 0 ? (
           <ListSkeleton />
-        ) : results.error ? (
+        ) : results.error && list.length === 0 ? (
           <p className="m-0 py-3 text-[14px] text-danger">{results.error.message}</p>
         ) : list.length === 0 ? (
           <p className="m-0 py-3 text-[14px] text-muted">{query ? `No exercise called “${query}” yet.` : "No exercises yet."}</p>

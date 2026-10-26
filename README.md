@@ -59,6 +59,47 @@ your links and finish onboarding, and you get Pro forever. Pro can't be gifted.
 Every user also has a fair-use rate limit, and there's a global monthly AI budget
 cap (`AI_MONTHLY_BUDGET_USD`).
 
+### Paid Pro (Stripe)
+
+Pro can also be bought as a subscription through Stripe Checkout; people
+manage or cancel it in Stripe's Customer Portal. Until `STRIPE_SECRET_KEY` and
+`STRIPE_PRICE_MONTHLY` are set, checkout answers `501` and the paywall says
+"coming soon".
+
+1. In Stripe, create one **Pro** product with two recurring prices: $2.49
+   monthly and $24.90 yearly (12 × 2.49 less two months). Put their `price_...`
+   ids in `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_YEARLY`; the paywall reads the
+   amounts from Stripe. To change a price, add a new one in Stripe and swap the
+   id (existing subscribers stay on theirs). Turn on the Customer Portal
+   (Settings → Billing → Customer portal) with cancellation at period end, and
+   add the Pro product with both prices there so people can switch plans
+   (quantity not adjustable). Plan switches must use billing cycle anchor
+   **now** with **prorations**: monthly → yearly then charges $24.90 less the
+   unused month straight away. "Unchanged" charges nothing until a year later,
+   and "unchanged" with prorations bills the year twice. Prices are tax inclusive (`tax_behavior:
+   inclusive`, lookup keys `pro_monthly` / `pro_yearly`): customers pay exactly
+   $2.49 / $24.90 and Stripe takes VAT out of it.
+2. Add a webhook endpoint at `${APP_URL}/api/stripe/webhook` on API version
+   `2026-09-30.endive` for `checkout.session.completed`,
+   `customer.subscription.created`, `.updated`, `.deleted`, `.paused`,
+   `.resumed`, `invoice.paid`, `invoice.payment_failed`, `charge.refunded`,
+   `charge.dispute.created` and `radar.early_fraud_warning.created`, then put
+   its signing secret in `STRIPE_WEBHOOK_SECRET`. Use a restricted key
+   (`rk_...`) for `STRIPE_SECRET_KEY`; `api/.env.example` lists the permissions.
+3. Optional: to have Stripe be the merchant of record (it then collects and
+   files VAT/GST), enable Managed Payments in the Dashboard, give the product
+   an eligible tax code (e.g. `txcd_10103000`) and set
+   `STRIPE_MANAGED_PAYMENTS=true`. Only some business countries are eligible.
+
+Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook`, then use
+the `whsec_...` it prints and the test card `4242 4242 4242 4242`.
+
+A subscription gives Pro until the end of each paid period. A charge that's
+disputed, flagged as likely fraud or fully refunded cancels its subscription
+straight away (partial refunds don't). It never replaces
+or ends Pro from an admin or from referrals, and admins can't revoke paid Pro
+(cancel it in Stripe and the webhook ends it).
+
 ## Emails
 
 The API sends a few transactional emails over SMTP (`SMTP_*` in `api/.env`;

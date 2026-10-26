@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
 	"sort"
 	"time"
@@ -65,16 +66,45 @@ type Record struct {
 	Reps         *int    `json:"reps"`
 }
 
+// SessionStart is what a client may decide about a new session. ID and
+// StartedAt come from a session started offline; Blocks, when not nil, are
+// used instead of the template's (the client built them from the template,
+// the week's extras included).
+type SessionStart struct {
+	ID        *string
+	StartedAt *time.Time
+	Blocks    []BlockInput
+}
+
 // StartSession creates a session for a date, copied from the template's
 // current version when templateID is given (an empty session otherwise),
 // plus any exercises added to that workout for that week.
 func (s *Store) StartSession(ctx context.Context, userID string, d Date, templateID *string) (Session, error) {
+	sess, _, err := s.StartSessionWith(ctx, userID, d, templateID, SessionStart{})
+	return sess, err
+}
+
+// StartSessionWith is StartSession with the client's id, start time and
+// blocks. created is false when opt.ID is already one of the user's
+// sessions: that one comes back unchanged. Someone else's id is ErrNotFound.
+func (s *Store) StartSessionWith(ctx context.Context, userID string, d Date, templateID *string, opt SessionStart) (Session, bool, error) {
 	var id string
+	created := true
 	err := s.tx(ctx, func(tx pgx.Tx) error {
+		if opt.ID != nil {
+			found, err := ownedRow(ctx, tx, "sessions", *opt.ID, userID)
+			if err != nil {
+				return err
+			}
+			if found {
+				id, created = *opt.ID, false
+				return nil
+			}
+		}
 		var name *string
 		var versionID *string
 		var version *int
-		var blocks []storedBlock
+		blocks := opt.Blocks
 		if templateID != nil {
 			var n, vid string
 			var v int
@@ -86,78 +116,156 @@ func (s *Store) StartSession(ctx context.Context, userID string, d Date, templat
 			if err != nil {
 				return notFound(err)
 			}
-			if err := json.Unmarshal(raw, &blocks); err != nil {
-				return err
-			}
 			name, versionID, version = &n, &vid, &v
-		}
-		if err := tx.QueryRow(ctx, `
-			insert into sessions (user_id, date, template_id, template_version_id, template_version, template_name)
-			values ($1::uuid, $2, $3::uuid, $4::uuid, $5, $6) returning id::text`,
-			userID, d.Time, templateID, versionID, version, name).Scan(&id); err != nil {
-			return err
-		}
-		for i, b := range blocks {
-			var cardio []byte
-			if b.Cardio != nil {
-				cardio, _ = json.Marshal(b.Cardio)
-			}
-			var bid string
-			if err := tx.QueryRow(ctx, `insert into session_blocks (session_id, position, exercise_id, cardio, notes)
-				values ($1::uuid, $2, $3::uuid, $4, $5) returning id::text`, id, i, b.ExerciseID, cardio, b.Notes).Scan(&bid); err != nil {
-				return err
-			}
-			for j, set := range b.Sets {
-				if _, err := tx.Exec(ctx, `insert into session_sets (block_id, position, warmup, target_kg, target_reps, to_failure)
-					values ($1::uuid, $2, $3, $4, $5, $6)`, bid, j, set.Warmup, set.TargetKg, set.TargetReps, set.ToFailure); err != nil {
+			if opt.Blocks == nil {
+				var stored []storedBlock
+				if err := json.Unmarshal(raw, &stored); err != nil {
 					return err
+				}
+				blocks = make([]BlockInput, len(stored))
+				for i, b := range stored {
+					b.BlockInput.ID = nil
+					b.Sets = withoutIDs(b.Sets)
+					blocks[i] = b.BlockInput
 				}
 			}
 		}
-		if templateID != nil {
-			// Exercises added to this workout for this week only.
-			return appendWeekExtras(ctx, tx, userID, id, *templateID, d, len(blocks))
+		if opt.Blocks != nil {
+			if err := checkExercises(ctx, tx, userID, opt.Blocks); err != nil {
+				return err
+			}
 		}
-		return nil
+		err := tx.QueryRow(ctx, `
+			insert into sessions (id, user_id, date, template_id, template_version_id, template_version, template_name, started_at)
+			values (coalesce($1::uuid, gen_random_uuid()), $2::uuid, $3, $4::uuid, $5::uuid, $6, $7, coalesce($8::timestamptz, now()))
+			on conflict (id) do nothing returning id::text`,
+			opt.ID, userID, d.Time, templateID, versionID, version, name, opt.StartedAt).Scan(&id)
+		if errors.Is(err, pgx.ErrNoRows) && opt.ID != nil {
+			// The same id, saved by a request racing this one.
+			found, err := ownedRow(ctx, tx, "sessions", *opt.ID, userID)
+			if err == nil && !found {
+				err = ErrConflict
+			}
+			id, created = *opt.ID, false
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		if err := insertSessionBlocks(ctx, tx, id, blocks); err != nil {
+			return err
+		}
+		if templateID == nil {
+			return nil
+		}
+		if opt.Blocks != nil {
+			// The client's blocks already have this week's extras.
+			return claimWeekExtras(ctx, tx, userID, id, *templateID, d)
+		}
+		// Exercises added to this workout for this week only.
+		return appendWeekExtras(ctx, tx, userID, id, *templateID, d, len(blocks))
 	})
 	if err != nil {
-		return Session{}, err
+		return Session{}, false, err
 	}
-	return s.GetSession(ctx, userID, id)
+	sess, err := s.GetSession(ctx, userID, id)
+	return sess, created, err
+}
+
+// insertSessionBlocks adds blocks (positions in order) and their sets to a
+// new session, keeping client-made ids. An id already in use is ErrConflict.
+func insertSessionBlocks(ctx context.Context, tx pgx.Tx, sessionID string, blocks []BlockInput) error {
+	for i, b := range blocks {
+		var cardio []byte
+		if b.Cardio != nil {
+			cardio, _ = json.Marshal(b.Cardio)
+		}
+		var bid string
+		if err := tx.QueryRow(ctx, `insert into session_blocks (id, session_id, position, exercise_id, cardio, notes)
+			values (coalesce($1::uuid, gen_random_uuid()), $2::uuid, $3, $4::uuid, $5, $6) returning id::text`,
+			b.ID, sessionID, i, b.ExerciseID, cardio, b.Notes).Scan(&bid); err != nil {
+			return uniqueConflict(err)
+		}
+		if err := insertSessionSets(ctx, tx, bid, b.Sets); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// insertSessionSets adds sets (positions in order) to a new block, keeping
+// client-made ids. An id already in use is ErrConflict.
+func insertSessionSets(ctx context.Context, tx pgx.Tx, blockID string, sets []PlannedSet) error {
+	for j, set := range sets {
+		if _, err := tx.Exec(ctx, `insert into session_sets (id, block_id, position, warmup, target_kg, target_reps, to_failure)
+			values (coalesce($1::uuid, gen_random_uuid()), $2::uuid, $3, $4, $5, $6, $7)`,
+			set.ID, blockID, j, set.Warmup, set.TargetKg, set.TargetReps, set.ToFailure); err != nil {
+			return uniqueConflict(err)
+		}
+	}
+	return nil
 }
 
 // AddSessionBlock adds an exercise to a session, with planned sets or cardio
-// when given (a machine photo fills in the weight and three sets).
-func (s *Store) AddSessionBlock(ctx context.Context, userID, sessionID, exerciseID string, sets []PlannedSet, cardio *Cardio) (Session, error) {
+// when given (a machine photo fills in the weight and three sets). A block id
+// already in this session leaves the session unchanged (an offline replay);
+// one used anywhere else is ErrNotFound.
+func (s *Store) AddSessionBlock(ctx context.Context, userID, sessionID string, b BlockInput) (Session, error) {
 	err := s.tx(ctx, func(tx pgx.Tx) error {
 		if err := ownSession(ctx, tx, userID, sessionID); err != nil {
 			return err
 		}
-		if err := checkExercises(ctx, tx, userID, []BlockInput{{ExerciseID: exerciseID}}); err != nil {
-			return err
-		}
-		var raw []byte
-		if cardio != nil {
-			raw, _ = json.Marshal(cardio)
-		}
-		var bid string
-		if err := tx.QueryRow(ctx, `insert into session_blocks (session_id, position, exercise_id, cardio)
-			values ($1::uuid, (select coalesce(max(position) + 1, 0) from session_blocks where session_id = $1::uuid), $2::uuid, $3)
-			returning id::text`, sessionID, exerciseID, raw).Scan(&bid); err != nil {
-			return err
-		}
-		for j, set := range sets {
-			if _, err := tx.Exec(ctx, `insert into session_sets (block_id, position, warmup, target_kg, target_reps, to_failure)
-				values ($1::uuid, $2, $3, $4, $5, $6)`, bid, j, set.Warmup, set.TargetKg, set.TargetReps, set.ToFailure); err != nil {
+		if b.ID != nil {
+			if found, err := blockInSession(ctx, tx, *b.ID, sessionID); err != nil || found {
 				return err
 			}
 		}
-		return nil
+		if err := checkExercises(ctx, tx, userID, []BlockInput{{ExerciseID: b.ExerciseID}}); err != nil {
+			return err
+		}
+		var raw []byte
+		if b.Cardio != nil {
+			raw, _ = json.Marshal(b.Cardio)
+		}
+		var bid string
+		err := tx.QueryRow(ctx, `insert into session_blocks (id, session_id, position, exercise_id, cardio)
+			values (coalesce($4::uuid, gen_random_uuid()), $1::uuid,
+			        (select coalesce(max(position) + 1, 0) from session_blocks where session_id = $1::uuid), $2::uuid, $3)
+			on conflict (id) do nothing returning id::text`, sessionID, b.ExerciseID, raw, b.ID).Scan(&bid)
+		if errors.Is(err, pgx.ErrNoRows) && b.ID != nil {
+			// The same id, saved by a request racing this one.
+			found, err := blockInSession(ctx, tx, *b.ID, sessionID)
+			if err == nil && !found {
+				err = ErrConflict
+			}
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		return insertSessionSets(ctx, tx, bid, b.Sets)
 	})
 	if err != nil {
 		return Session{}, err
 	}
 	return s.GetSession(ctx, userID, sessionID)
+}
+
+// blockInSession reports whether block id exists in sessionID. A block of
+// another session is ErrNotFound; no block is false.
+func blockInSession(ctx context.Context, tx pgx.Tx, id, sessionID string) (bool, error) {
+	var here bool
+	err := tx.QueryRow(ctx, `select session_id = $2::uuid from session_blocks where id = $1::uuid`, id, sessionID).Scan(&here)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !here {
+		return false, ErrNotFound
+	}
+	return true, nil
 }
 
 func ownSession(ctx context.Context, tx pgx.Tx, userID, sessionID string) error {
@@ -351,21 +459,61 @@ func (s *Store) ReorderSession(ctx context.Context, userID, sessionID string, bl
 	return s.GetSession(ctx, userID, sessionID)
 }
 
-// AddSet appends a set to a block ("a third set today").
+// AddSet appends a set to a block ("a third set today"). A set id already
+// in that block leaves the session unchanged (an offline replay); one used
+// anywhere else is ErrNotFound.
 func (s *Store) AddSet(ctx context.Context, userID, sessionID, blockID string, p PlannedSet) (Session, error) {
-	ct, err := s.Pool.Exec(ctx, `
-		insert into session_sets (block_id, position, warmup, target_kg, target_reps, to_failure)
-		select b.id, (select coalesce(max(position) + 1, 0) from session_sets where block_id = b.id), $4, $5, $6, $7
-		from session_blocks b join sessions s on s.id = b.session_id
-		where b.id = $3::uuid and s.id = $2::uuid and s.user_id = $1::uuid`,
-		userID, sessionID, blockID, p.Warmup, p.TargetKg, p.TargetReps, p.ToFailure)
+	err := s.tx(ctx, func(tx pgx.Tx) error {
+		if p.ID != nil {
+			if found, err := setInBlock(ctx, tx, userID, sessionID, blockID, *p.ID); err != nil || found {
+				return err
+			}
+		}
+		ct, err := tx.Exec(ctx, `
+			insert into session_sets (id, block_id, position, warmup, target_kg, target_reps, to_failure)
+			select coalesce($8::uuid, gen_random_uuid()), b.id, (select coalesce(max(position) + 1, 0) from session_sets where block_id = b.id), $4, $5, $6, $7
+			from session_blocks b join sessions s on s.id = b.session_id
+			where b.id = $3::uuid and s.id = $2::uuid and s.user_id = $1::uuid
+			on conflict (id) do nothing`,
+			userID, sessionID, blockID, p.Warmup, p.TargetKg, p.TargetReps, p.ToFailure, p.ID)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			if p.ID != nil {
+				// Maybe the same id, saved by a request racing this one.
+				if found, err := setInBlock(ctx, tx, userID, sessionID, blockID, *p.ID); err != nil || found {
+					return err
+				}
+			}
+			return ErrNotFound
+		}
+		return nil
+	})
 	if err != nil {
 		return Session{}, err
 	}
-	if ct.RowsAffected() == 0 {
-		return Session{}, ErrNotFound
-	}
 	return s.GetSession(ctx, userID, sessionID)
+}
+
+// setInBlock reports whether set id exists in the user's block of the
+// session. A set anywhere else is ErrNotFound; no set is false.
+func setInBlock(ctx context.Context, tx pgx.Tx, userID, sessionID, blockID, id string) (bool, error) {
+	var here bool
+	err := tx.QueryRow(ctx, `
+		select x.block_id = $2::uuid and b.session_id = $3::uuid and s.user_id = $4::uuid
+		from session_sets x join session_blocks b on b.id = x.block_id join sessions s on s.id = b.session_id
+		where x.id = $1::uuid`, id, blockID, sessionID, userID).Scan(&here)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !here {
+		return false, ErrNotFound
+	}
+	return true, nil
 }
 
 // SetPatch is what changes on a set.
@@ -420,11 +568,12 @@ func (s *Store) AcceptAll(ctx context.Context, userID, sessionID string) (Sessio
 }
 
 // FinishSession closes a session and works out template proposals and new
-// personal records.
-func (s *Store) FinishSession(ctx context.Context, userID, sessionID string) (Session, []Proposal, []Record, error) {
+// personal records. finishedAt (when it was finished offline) is used on the
+// first finish only; nil is now.
+func (s *Store) FinishSession(ctx context.Context, userID, sessionID string, finishedAt *time.Time) (Session, []Proposal, []Record, error) {
 	if _, err := s.Pool.Exec(ctx, `
-		update sessions set status = 'finished', finished_at = coalesce(finished_at, now())
-		where id = $1::uuid and user_id = $2::uuid`, sessionID, userID); err != nil {
+		update sessions set status = 'finished', finished_at = coalesce(finished_at, $3::timestamptz, now())
+		where id = $1::uuid and user_id = $2::uuid`, sessionID, userID, finishedAt); err != nil {
 		return Session{}, nil, nil, err
 	}
 	sess, err := s.GetSession(ctx, userID, sessionID)

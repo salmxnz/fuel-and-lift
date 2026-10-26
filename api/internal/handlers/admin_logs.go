@@ -65,6 +65,11 @@ func (h *Handler) CleanupOnce(ctx context.Context) {
 			h.Log.Info("cleanup: notifications", "deleted", n)
 		}
 	}
+	if n, err := h.Store.PruneStripeEvents(ctx, now.AddDate(0, 0, -30)); err != nil {
+		h.Log.Warn("cleanup: stripe events", "err", err)
+	} else if n > 0 {
+		h.Log.Info("cleanup: stripe events", "deleted", n)
+	}
 }
 
 // pageParams reads ?before= (an id cursor) and ?limit= (1-200).

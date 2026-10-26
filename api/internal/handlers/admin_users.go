@@ -154,6 +154,11 @@ func (h *Handler) RevokePro(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "people in ADMIN_EMAILS always have Pro")
 		return
 	}
+	if u.IsPro && u.ProSource != nil && *u.ProSource == "subscription" {
+		// It would come back at the next renewal.
+		badRequest(w, "they pay for Pro: cancel their subscription in Stripe instead")
+		return
+	}
 	if err := h.Store.RevokePro(r.Context(), u.ID); err != nil {
 		h.storeError(w, r, err)
 		return

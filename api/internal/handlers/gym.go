@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/salmxnz/fuel-and-lift/api/internal/ai"
 	"github.com/salmxnz/fuel-and-lift/api/internal/auth"
@@ -340,11 +341,17 @@ func (h *Handler) PutWeeklyPlan(w http.ResponseWriter, r *http.Request) {
 
 // --- sessions --------------------------------------------------------------------
 
-// StartSession handles POST /v1/sessions.
+// StartSession handles POST /v1/sessions {date?, template_id?, id?,
+// started_at?, blocks?}. id, started_at and blocks come from a session
+// started offline: blocks replace the template's (and its week extras), and
+// an id that is already the user's session returns it unchanged (200).
 func (h *Handler) StartSession(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Date       *store.Date `json:"date"`
-		TemplateID *string     `json:"template_id"`
+		Date       *store.Date        `json:"date"`
+		TemplateID *string            `json:"template_id"`
+		ID         *string            `json:"id"`
+		StartedAt  *time.Time         `json:"started_at"`
+		Blocks     []store.BlockInput `json:"blocks"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -358,15 +365,63 @@ func (h *Handler) StartSession(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "template_id is not valid")
 		return
 	}
-	s, err := h.Store.StartSession(r.Context(), userID, d, in.TemplateID)
+	if !clientIDs(w, in.ID) {
+		return
+	}
+	if len(in.Blocks) > 40 {
+		badRequest(w, "a session can start with at most 40 exercises")
+		return
+	}
+	seen := map[string]bool{}
+	for _, b := range in.Blocks {
+		if msg := checkBlock(b); msg != "" {
+			badRequest(w, msg)
+			return
+		}
+		if !sessionBlockIDs(w, b, seen) {
+			return
+		}
+	}
+	now := h.now()
+	s, created, err := h.Store.StartSessionWith(r.Context(), userID, d, in.TemplateID, store.SessionStart{
+		ID: in.ID, StartedAt: clampTime(in.StartedAt, now.Add(-24*time.Hour), now), Blocks: in.Blocks,
+	})
 	if err != nil {
 		h.storeError(w, r, err)
+		return
+	}
+	if !created {
+		httpx.JSON(w, http.StatusOK, map[string]any{"session": s})
 		return
 	}
 	if d == h.today(r.Context(), userID) {
 		h.announceTraining(context.WithoutCancel(r.Context()), userID, s)
 	}
 	httpx.JSON(w, http.StatusCreated, map[string]any{"session": s})
+}
+
+// sessionBlockIDs checks the client-made ids of a session block and its sets:
+// uuids, each used once (seen collects them across a request).
+func sessionBlockIDs(w http.ResponseWriter, b store.BlockInput, seen map[string]bool) bool {
+	ids := []*string{b.ID}
+	for _, x := range b.Sets {
+		ids = append(ids, x.ID)
+	}
+	if !clientIDs(w, ids...) {
+		return false
+	}
+	for _, id := range ids {
+		if id == nil {
+			continue
+		}
+		k := strings.ToLower(*id)
+		if seen[k] {
+			badRequest(w, "ids must be unique")
+			return false
+		}
+		seen[k] = true
+	}
+	return true
 }
 
 // ListSessions handles GET /v1/sessions?from=&to=.
@@ -403,7 +458,9 @@ func (h *Handler) sessionResponse(w http.ResponseWriter, r *http.Request, status
 	httpx.JSON(w, status, map[string]any{"session": s})
 }
 
-// AddSessionBlock handles POST /v1/sessions/{id}/blocks {exercise_id, sets?, cardio?}.
+// AddSessionBlock handles POST /v1/sessions/{id}/blocks {id?, exercise_id,
+// sets?, cardio?}. A block id already in the session (an offline replay)
+// leaves it unchanged.
 func (h *Handler) AddSessionBlock(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -417,7 +474,10 @@ func (h *Handler) AddSessionBlock(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, msg)
 		return
 	}
-	s, err := h.Store.AddSessionBlock(r.Context(), auth.UserID(r), id, in.ExerciseID, in.Sets, in.Cardio)
+	if !sessionBlockIDs(w, in, map[string]bool{}) {
+		return
+	}
+	s, err := h.Store.AddSessionBlock(r.Context(), auth.UserID(r), id, in)
 	h.sessionResponse(w, r, http.StatusCreated, s, err)
 }
 
@@ -450,7 +510,8 @@ func (h *Handler) PatchBlock(w http.ResponseWriter, r *http.Request) {
 	h.sessionResponse(w, r, http.StatusOK, s, err)
 }
 
-// AddSet handles POST /v1/sessions/{id}/blocks/{block_id}/sets.
+// AddSet handles POST /v1/sessions/{id}/blocks/{block_id}/sets {id?, …}. A
+// set id already in the block (an offline replay) leaves it unchanged.
 func (h *Handler) AddSet(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -466,6 +527,9 @@ func (h *Handler) AddSet(w http.ResponseWriter, r *http.Request) {
 	}
 	if (in.TargetKg != nil && (*in.TargetKg < 0 || *in.TargetKg > 1000)) || (in.TargetReps != nil && (*in.TargetReps < 0 || *in.TargetReps > 200)) {
 		badRequest(w, "target values are out of range")
+		return
+	}
+	if !clientIDs(w, in.ID) {
 		return
 	}
 	s, err := h.Store.AddSet(r.Context(), auth.UserID(r), id, blockID, in)
@@ -513,10 +577,18 @@ func (h *Handler) AcceptAll(w http.ResponseWriter, r *http.Request) {
 
 // FinishSession handles POST /v1/sessions/{id}/finish. The first finish writes
 // the feed activity, record activities and friend pushes; finishing again
-// only recomputes the proposals.
+// only recomputes the proposals. An optional {finished_at} (a session
+// finished offline) is kept within [started_at, now] and only counts on the
+// first finish.
 func (h *Handler) FinishSession(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
+		return
+	}
+	var in struct {
+		FinishedAt *time.Time `json:"finished_at"`
+	}
+	if !decode(w, r, &in) {
 		return
 	}
 	userID := auth.UserID(r)
@@ -525,7 +597,11 @@ func (h *Handler) FinishSession(w http.ResponseWriter, r *http.Request) {
 		h.storeError(w, r, err)
 		return
 	}
-	s, props, recs, err := h.Store.FinishSession(r.Context(), userID, id)
+	now := h.now()
+	if before.StartedAt.After(now) {
+		now = before.StartedAt
+	}
+	s, props, recs, err := h.Store.FinishSession(r.Context(), userID, id, clampTime(in.FinishedAt, before.StartedAt, now))
 	if err != nil {
 		h.storeError(w, r, err)
 		return

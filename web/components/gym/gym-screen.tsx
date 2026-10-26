@@ -3,12 +3,13 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Avatar, Button, ErrorCard, Field, Skeleton, TextInput } from "@/components/ui/primitives"
 import { ChevronRightIcon, DumbbellIcon, PlusIcon, TemplatesIcon } from "@/components/ui/icons"
 import { Sheet } from "@/components/ui/sheet"
 import { api, errorMessage } from "@/lib/api/client"
-import type { RoutinesResponse, SessionResponse, SessionsResponse, Template, TemplateResponse, TemplatesResponse, WeeklyPlan } from "@/lib/api/types"
+import type { RoutinesResponse, SessionsResponse, Template, TemplateResponse, TemplatesResponse, WeeklyPlan } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { addDays, formatDayMonth, relativeDay, todayISO, weekdayKey, type WeekdayKey } from "@/lib/dates"
 import { GymWeek } from "./gym-week"
@@ -21,6 +22,7 @@ import { GymNowCard } from "@/components/friends/gym-now-card"
 import { PlanHero, TicketButton, TodayExercises, templateMinutes } from "./gym-hero"
 import { MuscleNudges } from "./muscle-nudges"
 import { RoutinesSection } from "./routines-section"
+import { startWorkout } from "./offline-session"
 
 const DAY_NAMES: Record<WeekdayKey, string> = {
   mon: "Monday",
@@ -40,6 +42,7 @@ export function summarizeTemplate(t: Template): string {
 
 export function GymScreen() {
   const router = useRouter()
+  const client = useQueryClient()
   const today = todayISO()
   const templates = useApi<TemplatesResponse>("templates")
   const plan = useApi<WeeklyPlan>("weekly-plan")
@@ -61,11 +64,10 @@ export function GymScreen() {
   async function start(templateId: string | null) {
     setStarting(templateId ?? "empty")
     try {
-      const res = await api.post<SessionResponse>("sessions", {
-        date: today,
-        ...(templateId ? { template_id: templateId } : {}),
-      })
-      router.push(`/gym/session/${res.session.id}`)
+      const template = templateId ? byId.get(templateId) : null
+      if (templateId && !template) throw new Error("Open this workout once online to use it offline.")
+      const id = await startWorkout(client, today, template ?? null)
+      router.push(`/gym/session/${id}`)
     } catch (err) {
       toast.error(errorMessage(err))
       setStarting(null)

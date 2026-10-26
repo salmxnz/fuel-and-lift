@@ -192,6 +192,32 @@ type NewEntry struct {
 	Macros       Macros  // used when Items is empty
 	Icon         *string // a foodicon key; nil = none
 	Category     *string // one of MealCategories; nil = none
+	// ID and LoggedAt come from an entry logged offline: an ID that is
+	// already the user's entry returns that entry unchanged. Nil is a new
+	// id / now.
+	ID       *string
+	LoggedAt *time.Time
+}
+
+// ExistingEntry finds the user's entry with a client-made id being
+// replayed. found is false when there is none; someone else's is ErrNotFound.
+func (s *Store) ExistingEntry(ctx context.Context, userID, id string) (e Entry, found bool, err error) {
+	if found, err = ownedRow(ctx, s.Pool, "log_entries", id, userID); err != nil || !found {
+		return Entry{}, false, err
+	}
+	e, err = getEntry(ctx, s.Pool, userID, id)
+	return e, err == nil, err
+}
+
+func getEntry(ctx context.Context, q interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}, userID, id string) (Entry, error) {
+	rows, err := q.Query(ctx, `select `+entryCols+` from log_entries where id = $1::uuid and user_id = $2::uuid`, id, userID)
+	if err != nil {
+		return Entry{}, err
+	}
+	e, err := pgx.CollectExactlyOneRow(rows, scanEntry)
+	return e, notFound(err)
 }
 
 // MealCategories are the categories a logged or saved meal can have.
@@ -262,15 +288,35 @@ func addEntry(ctx context.Context, tx pgx.Tx, userID string, d Date, in NewEntry
 		m = SumItems(in.Items)
 	}
 	items, _ := json.Marshal(in.Items)
+	if in.ID != nil {
+		if found, err := ownedRow(ctx, tx, "log_entries", *in.ID, userID); err != nil {
+			return Entry{}, err
+		} else if found {
+			return getEntry(ctx, tx, userID, *in.ID)
+		}
+	}
 	rows, err := tx.Query(ctx, `
-		insert into log_entries (user_id, date, meal_slot_id, meal_name, name, origin, saved_meal_id, ai_estimate_id, items, kcal, protein_g, carbs_g, fat_g, icon, category)
-		values ($1::uuid, $2, $3::uuid, $4, $5, $6, $7::uuid, $8::uuid, $9, $10, $11, $12, $13, $14, $15)
+		insert into log_entries (id, user_id, date, meal_slot_id, meal_name, name, origin, saved_meal_id, ai_estimate_id, items, kcal, protein_g, carbs_g, fat_g, icon, category, logged_at)
+		values (coalesce($16::uuid, gen_random_uuid()), $1::uuid, $2, $3::uuid, $4, $5, $6, $7::uuid, $8::uuid, $9, $10, $11, $12, $13, $14, $15, coalesce($17::timestamptz, now()))
+		on conflict (id) do nothing
 		returning `+entryCols,
-		userID, d.Time, slotID, meal, in.Name, in.Origin, in.SavedMealID, in.AIEstimateID, items, m.Kcal, m.ProteinG, m.CarbsG, m.FatG, in.Icon, in.Category)
+		userID, d.Time, slotID, meal, in.Name, in.Origin, in.SavedMealID, in.AIEstimateID, items, m.Kcal, m.ProteinG, m.CarbsG, m.FatG, in.Icon, in.Category,
+		in.ID, in.LoggedAt)
 	if err != nil {
 		return Entry{}, err
 	}
-	return pgx.CollectExactlyOneRow(rows, scanEntry)
+	e, err := pgx.CollectExactlyOneRow(rows, scanEntry)
+	if errors.Is(err, pgx.ErrNoRows) && in.ID != nil {
+		// The same id, saved by a request racing this one.
+		if found, err := ownedRow(ctx, tx, "log_entries", *in.ID, userID); err != nil || !found {
+			if err == nil {
+				err = ErrConflict
+			}
+			return Entry{}, err
+		}
+		return getEntry(ctx, tx, userID, *in.ID)
+	}
+	return e, err
 }
 
 // EntryPatch changes parts of an entry.
@@ -591,7 +637,8 @@ func (s *Store) ArchiveSavedMeal(ctx context.Context, userID, id string) error {
 }
 
 // LogSavedMeal logs the base items plus the chosen add-ons as one entry.
-func (s *Store) LogSavedMeal(ctx context.Context, userID string, d Date, id string, slotID, mealName *string, addonIDs []string) (Entry, error) {
+// entryID and loggedAt are as for NewEntry.
+func (s *Store) LogSavedMeal(ctx context.Context, userID string, d Date, id string, slotID, mealName *string, addonIDs []string, entryID *string, loggedAt *time.Time) (Entry, error) {
 	m, err := s.GetSavedMeal(ctx, userID, id)
 	if err != nil {
 		return Entry{}, err
@@ -611,6 +658,7 @@ func (s *Store) LogSavedMeal(ctx context.Context, userID string, d Date, id stri
 	}
 	e, err := s.AddEntry(ctx, userID, d, NewEntry{
 		MealSlotID: slotID, MealName: mealName, Name: m.Name, Origin: "saved", SavedMealID: &m.ID, Items: items, Icon: m.Icon, Category: m.Category,
+		ID: entryID, LoggedAt: loggedAt,
 	})
 	if err != nil {
 		return e, err

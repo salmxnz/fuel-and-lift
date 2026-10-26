@@ -49,6 +49,7 @@ export function UserActions({ user }: { user: AdminUser }) {
 
   const name = user.display_name ?? (user.name || user.email)
   const referralPro = user.is_pro && user.pro_source === "referrals"
+  const paidPro = user.is_pro && user.pro_source === "subscription"
 
   return (
     <>
@@ -66,9 +67,9 @@ export function UserActions({ user }: { user: AdminUser }) {
             {user.is_pro ? "Change Pro…" : "Grant Pro…"}
           </DropdownMenuItem>
           {user.is_pro ? (
-            <DropdownMenuItem disabled={user.admin_email} onSelect={() => setOpen("revoke")}>
+            <DropdownMenuItem disabled={user.admin_email || paidPro} onSelect={() => setOpen("revoke")}>
               <X />
-              Revoke Pro…
+              {paidPro ? "Paid: cancel in Stripe" : "Revoke Pro…"}
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuSeparator />

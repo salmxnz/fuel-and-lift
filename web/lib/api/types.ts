@@ -191,6 +191,9 @@ export type DayResponse = { day: Day }
 export type EntryDayResponse = { entry: Entry; day: Day; photos_skipped?: number }
 
 export type NewEntryRequest = {
+  /** Made on the phone (offline logging); sending it again returns the existing entry. */
+  id?: string
+  logged_at?: string
   meal_slot_id?: string | null
   meal_name?: string | null
   name: string
@@ -242,6 +245,8 @@ export type SaveEntryResponse = { saved_meal: SavedMeal; entry: Entry; day: Day 
 export type SavedMealResponse = { saved_meal: SavedMeal }
 
 export type LogSavedMealRequest = {
+  id?: string
+  logged_at?: string
   meal_slot_id?: string | null
   meal_name?: string | null
   addon_ids: string[]
@@ -591,7 +596,30 @@ export type SessionResponse = { session: Session }
 export type SessionsResponse = { sessions: Session[] }
 export type SessionRecord = { exercise_id: string; exercise_name: string; kg: number; reps: number }
 export type FinishSessionResponse = { session: Session; proposals: Proposal[]; records: SessionRecord[] }
-export type AddSessionBlockRequest = { exercise_id: string; sets?: PlannedSet[]; cardio?: Cardio | null }
+/**
+ * `id` (and block/set ids) are made on the phone for workouts started offline;
+ * sending the same id again returns the existing session. `blocks` replaces
+ * the template's (the phone built them from its cached copy).
+ */
+export type StartSessionRequest = {
+  id?: string
+  date?: string
+  template_id?: string
+  started_at?: string
+  blocks?: {
+    id: string
+    exercise_id: string
+    cardio: Cardio | null
+    notes: string | null
+    sets: (PlannedSet & { id: string })[]
+  }[]
+}
+export type AddSessionBlockRequest = {
+  id?: string
+  exercise_id: string
+  sets?: (PlannedSet & { id?: string })[]
+  cardio?: Cardio | null
+}
 
 // ---------------------------------------------------------------- Progress
 
@@ -655,10 +683,45 @@ export type Billing = {
   photos_stored: number
   /** null = unlimited (Pro). */
   photos_limit: number | null
+  /** The latest paid subscription, even an ended one; null when they never paid. */
+  subscription: Subscription | null
+}
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "unpaid"
+  | "paused"
+  | "canceled"
+  | "incomplete"
+  | "incomplete_expired"
+export type Subscription = {
+  status: SubscriptionStatus
+  /** Renews then, or ends then when cancel_at_period_end. */
+  current_period_end: string
+  cancel_at_period_end: boolean
+  interval: "month" | "year" | null
+  /** Minor units: 249 = $2.49. */
+  amount: number | null
+  currency: string | null
+  started_at: string | null
+  /** When they asked to cancel. */
+  canceled_at: string | null
+  ended_at: string | null
 }
 export type Referrals = { joined: number; needed: number }
-export type BillingResponse = { billing: Billing }
+/** A way to pay for Pro, priced from Stripe. */
+export type ProPlan = {
+  id: "monthly" | "yearly"
+  /** Minor units: 249 = $2.49. */
+  amount: number
+  currency: string
+  interval: "month" | "year"
+}
+/** plans is empty while payments are off. */
+export type BillingResponse = { billing: Billing; plans: ProPlan[] }
 export type CheckoutResponse = { url: string }
+export type PortalResponse = { url: string }
 
 // ---------------------------------------------------------------- Friends
 
@@ -918,3 +981,24 @@ export type SuggestionsResponse = {
   gap: { nutrient: "protein" | "kcal"; left: number; picks: Entry[] } | null
   friends: FriendMeal[]
 }
+
+// ---------------------------------------------------------------- Feedback
+
+export type FeedbackKind = "bug" | "idea" | "other"
+export type FeedbackStatus = "new" | "seen" | "done"
+export type Feedback = {
+  id: number
+  kind: FeedbackKind
+  message: string
+  /** The screen it was sent from. */
+  page: string | null
+  status: FeedbackStatus
+  /** A reply from the team. */
+  admin_note: string | null
+  /** Signed links, valid for about an hour. */
+  photos: { id: string; url: string; content_type: string }[]
+  created_at: string
+  updated_at: string
+}
+export type FeedbackListResponse = { feedback: Feedback[] }
+export type FeedbackResponse = { feedback: Feedback }

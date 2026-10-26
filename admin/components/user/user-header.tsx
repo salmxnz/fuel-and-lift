@@ -76,6 +76,7 @@ export function UserHeader({ id }: { id: string }) {
       <TabNav
         tabs={[
           { href: base, label: "Overview", exact: true },
+          { href: `${base}/billing`, label: "Billing" },
           { href: `${base}/meals`, label: "Meals", count: data?.user.counts.saved_meals },
           { href: `${base}/workouts`, label: "Workouts", count: data?.user.counts.templates },
           { href: `${base}/routines`, label: "Routines", count: data?.user.counts.routines },

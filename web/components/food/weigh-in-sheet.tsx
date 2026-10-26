@@ -6,6 +6,7 @@ import { Sheet } from "@/components/ui/sheet"
 import { Button, Chip, Skeleton } from "@/components/ui/primitives"
 import { useMe } from "@/components/me-context"
 import { api, errorMessage } from "@/lib/api/client"
+import { enqueue, isOffline, offlineNow } from "@/lib/offline-queue"
 import type { WeighInResponse, WeighInsResponse } from "@/lib/api/types"
 import { useApi } from "@/lib/api/use-api"
 import { addDays, formatDayMonth, todayISO } from "@/lib/dates"
@@ -45,11 +46,25 @@ export function WeighInForm({ onDone }: { onDone: () => void }) {
     }
     setSaving(true)
     setError(null)
+    const body = { date, weight_kg: weightKg, note: note.trim() || null }
+    const when = date === todayISO() ? "today" : formatDayMonth(date)
     try {
-      await api.post<WeighInResponse>("weigh-ins", { date, weight_kg: weightKg, note: note.trim() || null })
-      toast.success(`${num1(weightKg)} kg locked in for ${date === todayISO() ? "today" : formatDayMonth(date)}`)
+      // Same date replaces, so it's safe to send again later.
+      if (offlineNow()) {
+        enqueue({ kind: "weighin.put", body })
+        toast.success(`${num1(weightKg)} kg saved on this phone for ${when}. It syncs when you're back online.`)
+      } else {
+        await api.post<WeighInResponse>("weigh-ins", body)
+        toast.success(`${num1(weightKg)} kg locked in for ${when}`)
+      }
       onDone()
     } catch (err) {
+      if (isOffline(err)) {
+        enqueue({ kind: "weighin.put", body })
+        toast.success(`${num1(weightKg)} kg saved on this phone for ${when}. It syncs when you're back online.`)
+        onDone()
+        return
+      }
       setError(errorMessage(err))
     } finally {
       setSaving(false)
